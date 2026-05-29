@@ -50,7 +50,7 @@
 //! let top_lists = routing.route(&query, 16);
 //! ```
 
-use std::sync::Arc;
+
 
 use crate::list_bounds::{DistanceMetric, SphericalCapMetadata};
 

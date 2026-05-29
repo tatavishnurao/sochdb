@@ -1251,7 +1251,7 @@ impl LscsStorage {
                                 // only replaces if timestamp is strictly greater.
                                 results
                                     .entry(key_vec)
-                                    .and_modify(|e: &mut (Vec<u8>, u64, bool)| {
+                                    .and_modify(|_e: &mut (Vec<u8>, u64, bool)| {
                                         // Keep the existing (newer) entry
                                     })
                                     .or_insert_with(|| (val_vec, 0, deleted));

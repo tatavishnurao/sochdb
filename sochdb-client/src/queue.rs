@@ -82,12 +82,11 @@
 //! ```
 
 use std::collections::{BinaryHeap, HashMap};
-use std::cmp::{Ordering, Reverse};
+use std::cmp::Ordering;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
-use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 
 // ============================================================================
 // Key Encoding - Big-Endian for Lexicographic Ordering

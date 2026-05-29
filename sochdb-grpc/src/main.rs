@@ -118,7 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let kv_server = KvServer::new();
     
     // Create gRPC health service for Kubernetes probes
-    let (mut health_reporter, health_service) = health_reporter();
+    let (health_reporter, health_service) = health_reporter();
     
     // Mark the overall service as serving (empty service name = overall health)
     // The empty string "" represents overall server health

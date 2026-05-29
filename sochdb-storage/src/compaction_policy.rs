@@ -30,10 +30,9 @@
 //! 3. **FIFO Compaction**: Age-based TTL with minimal overhead
 //! 4. **Tiered Compaction**: Hybrid approach balancing WA and SA
 
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::HashSet;
 use std::cmp::Ordering;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
-use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use parking_lot::RwLock;

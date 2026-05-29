@@ -39,7 +39,7 @@
 //! 4. **Recovery Phases**: Analysis → Redo → Undo (with CLRs for nested undo)
 
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// Durability level for write operations

@@ -38,7 +38,7 @@
 //! - Exit degraded: metric < (threshold - hysteresis) for M consecutive checks
 
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

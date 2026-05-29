@@ -100,7 +100,7 @@ impl CheckpointService for CheckpointServer {
         let req = request.into_inner();
 
         match self.checkpoints.get(&req.checkpoint_id) {
-            Some(data) => {
+            Some(_data) => {
                 // In real implementation, this would restore actual data
                 let restored_keys = 10u64; // Mock value
 

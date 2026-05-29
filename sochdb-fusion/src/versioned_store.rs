@@ -78,7 +78,7 @@ use parking_lot::RwLock;
 
 use sochdb_core::knowledge_object::{
     BitemporalCoord, CompressionMode, KnowledgeObject, KnowledgeObjectBuilder,
-    KnowledgeObjectError, ObjectId, ObjectKind,
+    ObjectId,
 };
 use sochdb_storage::epoch_mvcc::{EpochManager, EpochMvccStore};
 use sochdb_storage::hlc::HybridLogicalClock;

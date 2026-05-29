@@ -4,7 +4,6 @@
 
 use std::time::Instant;
 use std::collections::{HashSet, BinaryHeap};
-use std::cmp::Reverse;
 
 const ITERATIONS: usize = 100_000;
 const VEC_SIZE: usize = 384;

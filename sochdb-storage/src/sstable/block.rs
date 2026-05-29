@@ -61,7 +61,7 @@
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::cmp::Ordering;
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read};
 
 /// Default restart interval (entries between restart points)
 pub const DEFAULT_RESTART_INTERVAL: usize = 16;
@@ -493,7 +493,7 @@ impl Block {
         // TODO: Use hash index if available
         
         // Fall back to binary search
-        let mut iter = self.seek(key);
+        let iter = self.seek(key);
         if iter.valid() && iter.key() == key {
             Some(iter.value().to_vec())
         } else {

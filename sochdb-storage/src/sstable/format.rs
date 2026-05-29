@@ -61,7 +61,6 @@
 //! ```
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
 /// SSTable magic number: "TDBSSTab" in ASCII

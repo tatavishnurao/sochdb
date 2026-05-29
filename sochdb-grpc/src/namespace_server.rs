@@ -11,7 +11,7 @@ use crate::proto::{
     namespace_service_server::{NamespaceService, NamespaceServiceServer},
     CreateNamespaceRequest, CreateNamespaceResponse, DeleteNamespaceRequest,
     DeleteNamespaceResponse, GetNamespaceRequest, GetNamespaceResponse, ListNamespacesRequest,
-    ListNamespacesResponse, Namespace, NamespaceQuota, NamespaceStats, SetQuotaRequest,
+    ListNamespacesResponse, Namespace, NamespaceStats, SetQuotaRequest,
     SetQuotaResponse,
 };
 use dashmap::DashMap;

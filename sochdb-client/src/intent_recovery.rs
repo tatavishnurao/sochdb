@@ -41,15 +41,15 @@
 
 use std::collections::{HashMap, HashSet};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 
-use crate::wal_atomic::{Lsn, WalConfig, WalPayload, WalReader, WalRecord, WalRecordType, WalWriter};
+use crate::wal_atomic::{Lsn, WalPayload, WalReader, WalRecord, WalRecordType, WalWriter};
 
 // ============================================================================
 // Intent Status

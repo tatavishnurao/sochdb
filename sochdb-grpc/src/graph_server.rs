@@ -18,7 +18,7 @@ use crate::proto::{
     QueryTemporalGraphRequest, QueryTemporalGraphResponse, TemporalEdge,
 };
 use dashmap::DashMap;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 

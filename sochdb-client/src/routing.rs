@@ -62,7 +62,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use crate::ConnectionTrait;
-use crate::error::{ClientError, Result};
+
 
 /// Standard tool categories for routing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

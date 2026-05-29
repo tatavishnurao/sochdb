@@ -45,8 +45,6 @@
 //! Pool sizing: `blocking_threads ≈ 2×cores` for mixed I/O+CPU, capped to
 //! prevent memory blowups (each thread has stack + allocator footprint).
 
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;

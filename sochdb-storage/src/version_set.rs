@@ -77,7 +77,6 @@
 //! For 8 threads, expected speedup: ~6-8x on read-heavy workloads.
 
 use arc_swap::{ArcSwap, Guard};
-use crossbeam_epoch::{self as epoch, Atomic, Owned, Shared};
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

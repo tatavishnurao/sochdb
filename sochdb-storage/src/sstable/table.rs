@@ -27,16 +27,15 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use memmap2::{Mmap, MmapOptions};
 use parking_lot::RwLock;
 
-use super::block::{Block, BlockHandle, BlockIterator, BlockType};
+use super::block::{Block, BlockHandle, BlockType};
 use super::filter::FilterReader;
-use super::format::{Footer, Header, Section, SectionType, SSTableFormat, HEADER_SIZE};
+use super::format::{Footer, Header, SectionType, HEADER_SIZE};
 
 /// Block cache entry
 pub struct CachedBlock {
@@ -407,7 +406,7 @@ impl SSTable {
     }
 
     /// Create an iterator over all entries
-    pub fn iter(&self) -> SSTableIterator {
+    pub fn iter(&self) -> SSTableIterator<'_> {
         SSTableIterator::new(self)
     }
 
@@ -416,7 +415,7 @@ impl SSTable {
         &self,
         start: Option<&[u8]>,
         end: Option<&[u8]>,
-    ) -> RangeIterator {
+    ) -> RangeIterator<'_> {
         RangeIterator::new(self, start, end)
     }
 

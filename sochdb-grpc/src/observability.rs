@@ -536,7 +536,7 @@ impl SloTracker {
 
     /// Reset window (typically called periodically)
     pub fn reset_window(&self) {
-        if let Some(ref hist) = self.histogram {
+        if let Some(ref _hist) = self.histogram {
             // Histograms don't support atomic reset, so this is best-effort
             // In production, use a proper histogram library with windowing
         }

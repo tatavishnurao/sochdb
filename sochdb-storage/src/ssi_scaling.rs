@@ -45,10 +45,8 @@
 //!
 //! where n = keys read, m = intervals, k = hash functions
 
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashSet};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as AtomicOrdering};
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::time::Duration;
 
 use parking_lot::RwLock;

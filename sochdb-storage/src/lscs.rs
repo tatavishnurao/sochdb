@@ -1616,8 +1616,8 @@ impl Lscs {
         // Cold columns keep their existing L0 stripe addresses.
         let mut col_refs = hot_col_refs;
         let mut total_row_count = 0u64;
-        let mut min_row_id = u64::MAX;
-        let mut max_row_id = 0u64;
+        let min_row_id = u64::MAX;
+        let max_row_id = 0u64;
 
         for segment in &l0_segments {
             bytes_read += segment.row_count * 100; // Estimate per-row overhead

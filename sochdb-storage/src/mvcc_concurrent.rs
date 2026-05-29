@@ -54,7 +54,7 @@
 //! - Single writer ensures WAL consistency
 //! - Epoch-based GC prevents use-after-free
 
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

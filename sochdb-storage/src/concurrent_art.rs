@@ -70,7 +70,6 @@
 
 use crossbeam_epoch::{self as epoch, Atomic, Guard, Owned, Shared};
 use std::mem::MaybeUninit;
-use std::ptr;
 
 // =============================================================================
 // Helper functions for initializing large Atomic arrays
@@ -96,7 +95,6 @@ fn init_atomic_array_256() -> [Atomic<ArtNode>; 256] {
     unsafe { std::mem::transmute(arr) }
 }
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
 
 // =============================================================================
 // Node Types
@@ -418,7 +416,7 @@ impl Node48 {
     }
 
     /// Add a child
-    pub fn add_child(&self, key: u8, child: Owned<ArtNode>, guard: &Guard) -> bool {
+    pub fn add_child(&self, key: u8, child: Owned<ArtNode>, _guard: &Guard) -> bool {
         let n = self.header.num_children.load(Ordering::Acquire);
         if n >= 48 {
             return false;

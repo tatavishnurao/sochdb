@@ -46,9 +46,8 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 
 /// Resource dimension for admission control
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

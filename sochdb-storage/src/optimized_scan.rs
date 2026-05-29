@@ -37,10 +37,7 @@
 //! Compare to naive scan: O(n) where n = total entries
 
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-use std::sync::Arc;
 
-use parking_lot::RwLock;
 
 /// Snapshot timestamp for MVCC visibility
 pub type Timestamp = u64;

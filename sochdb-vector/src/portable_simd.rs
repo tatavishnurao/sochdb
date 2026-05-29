@@ -40,7 +40,7 @@
 //!
 //! Kernel design minimizes cache misses and maximizes ILP.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+
 
 // ============================================================================
 // CPU Feature Detection

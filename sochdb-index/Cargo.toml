@@ -59,6 +59,7 @@ crc32fast = "1.5.0"
 default = ["local-embeddings"]
 local-embeddings = []
 fastembed-embeddings = ["dep:fastembed"]
+metrics = []
 # Tokio opt-in via "async" (workspace Rule #2)
 async = ["llm-embeddings"]
 llm-embeddings = ["dep:llm", "dep:tokio", "dep:async-trait"]

@@ -76,7 +76,6 @@
 //! )?;
 //! ```
 
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
@@ -84,9 +83,8 @@ use sochdb_core::soch::SochValue;
 
 use crate::ast_query::AstQueryExecutor;
 use crate::connection::SochConnection;
-use crate::crud::{DeleteResult, InsertResult, UpdateResult};
 use crate::error::{ClientError, Result};
-use crate::schema::{CreateIndexResult, CreateTableResult, DropTableResult};
+
 
 // Re-export QueryResult from ast_query for convenience
 pub use crate::ast_query::QueryResult;

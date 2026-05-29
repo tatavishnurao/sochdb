@@ -68,12 +68,10 @@
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
 
 use parking_lot::RwLock;
 
 use crate::index_policy::{IndexPolicy, TableIndexConfig, TableIndexRegistry};
-use crate::key_buffer::ArenaKeyHandle;
 
 // ============================================================================
 // QueueIndexConfig - Queue-Specific Configuration

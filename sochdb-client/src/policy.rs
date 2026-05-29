@@ -60,10 +60,9 @@
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::ConnectionTrait;
-use crate::error::{ClientError, Result};
 
 /// Action to take when a policy is triggered.
 #[derive(Debug, Clone, PartialEq)]

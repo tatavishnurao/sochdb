@@ -135,7 +135,6 @@
 use memmap2::MmapMut;
 use parking_lot::RwLock;
 use std::fs::{self, OpenOptions};
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 

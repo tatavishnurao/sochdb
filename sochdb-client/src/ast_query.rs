@@ -45,8 +45,8 @@ use std::collections::HashMap;
 use sochdb_core::soch::{SochType, SochValue};
 use sochdb_query::sql::{
     BinaryOperator, ConflictAction, CreateIndexStmt, CreateTableStmt, DataType, DeleteStmt,
-    DropIndexStmt, DropTableStmt, Expr, InsertSource, InsertStmt, Literal, ObjectName,
-    OnConflict, Parser, SelectItem, SelectStmt, SqlDialect, Statement, UpdateStmt,
+    DropIndexStmt, DropTableStmt, Expr, InsertSource, InsertStmt, Literal,
+    Parser, SelectItem, SelectStmt, SqlDialect, Statement, UpdateStmt,
 };
 
 /// Query execution result

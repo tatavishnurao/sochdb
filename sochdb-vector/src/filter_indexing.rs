@@ -46,8 +46,7 @@
 //! let index = FilterIndex::new(policy);
 //! ```
 
-use std::collections::{HashMap, HashSet, BTreeMap};
-use std::sync::Arc;
+use std::collections::HashMap;
 
 // ============================================================================
 // Filter Representation

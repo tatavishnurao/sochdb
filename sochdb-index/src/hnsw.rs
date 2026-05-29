@@ -4615,8 +4615,6 @@ impl HnswIndex {
         internal_nodes: &[Option<Arc<HnswNode>>],
         flat_neighbors: &[u32],
     ) -> smallvec::SmallVec<[FastCandidate; 64]> {
-        use std::collections::BinaryHeap;
-        
         let slots_per_node = self.max_neighbors_per_node;
         
         with_scratch_buffers(|scratch| {
@@ -4775,8 +4773,6 @@ impl HnswIndex {
         vector_store: &[QuantizedVector],
         internal_nodes: &[Option<Arc<HnswNode>>],
     ) -> smallvec::SmallVec<[FastCandidate; 64]> {
-        use std::collections::BinaryHeap;
-        
         // Use scratch buffers for zero allocation
         with_scratch_buffers(|scratch| {
             // Reuse thread-local FastCandidate heaps — zero per-call allocation
@@ -4813,9 +4809,9 @@ impl HnswIndex {
                         
                         // Process each neighbor with prefetch pipeline
                         let neighbors = &layer_data.neighbors;
-                        let n_neighbors = neighbors.len();
+                        let _n_neighbors = neighbors.len();
                         
-                        for (i, &neighbor_dense) in neighbors.iter().enumerate() {
+                        for (_i, &neighbor_dense) in neighbors.iter().enumerate() {
                             // Prefetch next neighbor's data (hide memory latency)
                             #[cfg(target_arch = "aarch64")]
                             if i + 4 < n_neighbors {
@@ -5544,8 +5540,6 @@ impl HnswIndex {
         // Use Rayon parallel iteration: each core processes a chunk of nodes
         // Each thread maintains a local BinaryHeap of size k (max-heap by distance)
         // to avoid collecting all 1.18M distances and sorting them.
-        use std::collections::BinaryHeap;
-        use std::cmp::Reverse;
 
         // Collect node refs into a Vec so Rayon can partition them
         let node_entries: Vec<_> = self.nodes.iter().collect();
@@ -6251,7 +6245,7 @@ impl HnswIndex {
         debug_assert_eq!(b.len(), 1024);
         
         #[cfg(target_arch = "x86_64")]
-        unsafe {
+        {
             simd_distance::cosine_distance_fast(a, b)
         }
         #[cfg(target_arch = "aarch64")]
@@ -6271,7 +6265,7 @@ impl HnswIndex {
         debug_assert_eq!(b.len(), 3072);
         
         #[cfg(target_arch = "x86_64")]
-        unsafe {
+        {
             simd_distance::cosine_distance_fast(a, b)
         }
         #[cfg(target_arch = "aarch64")]
@@ -6411,7 +6405,7 @@ impl HnswIndex {
         debug_assert_eq!(b.len(), 1024);
         
         #[cfg(target_arch = "x86_64")]
-        unsafe {
+        {
             simd_distance::l2_distance_fast(a, b)
         }
         #[cfg(target_arch = "aarch64")]
@@ -6431,7 +6425,7 @@ impl HnswIndex {
         debug_assert_eq!(b.len(), 3072);
         
         #[cfg(target_arch = "x86_64")]
-        unsafe {
+        {
             simd_distance::l2_distance_fast(a, b)
         }
         #[cfg(target_arch = "aarch64")]

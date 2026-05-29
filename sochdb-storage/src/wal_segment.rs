@@ -42,7 +42,6 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use parking_lot::{Mutex, RwLock};
@@ -571,7 +570,7 @@ impl WalSegmentManager {
     }
 
     /// Iterator for recovery
-    pub fn recovery_iterator(&self, from_lsn: u64) -> RecoveryIterator {
+    pub fn recovery_iterator(&self, from_lsn: u64) -> RecoveryIterator<'_> {
         RecoveryIterator::new(self, from_lsn)
     }
 

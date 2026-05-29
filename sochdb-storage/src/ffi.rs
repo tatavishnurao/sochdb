@@ -64,7 +64,7 @@ fn hash_id_to_u128(id: &str) -> u128 {
 }
 
 fn ensure_collection_index(
-    db: &Database,
+    _db: &Database,
     namespace: &str,
     collection: &str,
     dimension: usize,
@@ -4095,7 +4095,7 @@ pub unsafe extern "C" fn sochdb_set_compression(
 ) -> c_int {
     if ptr.is_null() { return -1; }
     let db = unsafe { &(*ptr).0 };
-    let comp_type = crate::compression::CompressionType::from_u8(compression);
+    let _comp_type = crate::compression::CompressionType::from_u8(compression);
     
     // Store compression preference via KV
     let txn = match db.begin_transaction() {
@@ -4159,7 +4159,7 @@ pub unsafe extern "C" fn sochdb_execute_sql(
         return ptr::null_mut();
     }
     let db = unsafe { &(*ptr).0 };
-    let sql = match unsafe { CStr::from_ptr(sql_ptr) }.to_str() {
+    let _sql = match unsafe { CStr::from_ptr(sql_ptr) }.to_str() {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };

@@ -5,7 +5,7 @@
 //! This profiles the actual time spent in each phase of insert and search.
 
 use std::time::{Duration, Instant};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use sochdb_index::hnsw::{HnswConfig, HnswIndex, DistanceMetric};
 use rand::Rng;
 

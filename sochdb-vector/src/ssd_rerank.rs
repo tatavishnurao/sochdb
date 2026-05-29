@@ -48,8 +48,7 @@
 //! ```
 
 use std::collections::BinaryHeap;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use crate::cost_model::CostTracker;
@@ -553,7 +552,7 @@ impl RerankExecutor {
         let mut io_bytes = 0u64;
         
         // Process IO ranges
-        'outer: for range in &ranges {
+        for range in &ranges {
             // Check budgets
             if io_ops >= self.config.max_io_ops {
                 stats.budget_exhausted = true;
@@ -688,7 +687,7 @@ impl MockStorage {
         
         for i in 0..n_vectors {
             for j in 0..dim {
-                let val = ((i + j) as f32 / (n_vectors + dim) as f32);
+                let val = (i + j) as f32 / (n_vectors + dim) as f32;
                 data.extend_from_slice(&val.to_le_bytes());
             }
         }

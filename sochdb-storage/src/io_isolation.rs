@@ -35,9 +35,7 @@
 //! recency+frequency without LRU's pathological scan sensitivity.
 
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
 
-use parking_lot::RwLock;
 
 /// I/O workload type for classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

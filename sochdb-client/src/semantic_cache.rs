@@ -46,7 +46,7 @@
 //! Note: Semantic similarity ≠ query equivalence. Similar queries may have
 //! different correct answers, so semantic cache hits are marked as "approximate".
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -583,7 +583,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         norm_b += b[i] * b[i];
     }
     
-    let norm = (norm_a.sqrt() * norm_b.sqrt());
+    let norm = norm_a.sqrt() * norm_b.sqrt();
     if norm == 0.0 {
         0.0
     } else {

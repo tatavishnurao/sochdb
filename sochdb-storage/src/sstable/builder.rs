@@ -29,7 +29,7 @@ use std::path::Path;
 
 use super::block::{BlockBuilder, BlockHandle, BlockType, DEFAULT_RESTART_INTERVAL};
 use super::filter::{BloomFilterPolicy, FilterBuilder, FilterPolicy};
-use super::format::{Footer, Header, Section, SectionType, SSTableFormat, HEADER_SIZE};
+use super::format::{Footer, Header, Section, SectionType, HEADER_SIZE};
 
 /// Default block size (4KB - matches typical filesystem block)
 pub const DEFAULT_BLOCK_SIZE: usize = 4 * 1024;
@@ -275,7 +275,7 @@ impl SSTableBuilder {
     }
 
     /// Add index entry
-    fn add_index_entry(&mut self, largest_key: &[u8]) -> std::io::Result<()> {
+    fn add_index_entry(&mut self, _largest_key: &[u8]) -> std::io::Result<()> {
         // Index entries are already added in flush_data_block
         // This is for any additional processing
         Ok(())
