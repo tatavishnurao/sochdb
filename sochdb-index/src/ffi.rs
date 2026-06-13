@@ -107,18 +107,23 @@ pub unsafe extern "C" fn hnsw_new(
     ef_construction: usize,
 ) -> *mut HnswIndexPtr {
     ffi_guard!({
+        // Inherit HnswConfig::default() for any field the caller leaves as 0,
+        // so the embedded FFI path gets the same 95+-recall defaults (m=32,
+        // m0=64, ef_construction=256, F32) as every other entry point instead
+        // of the old cheap m=16/efc=100 graph.
+        let def = HnswConfig::default();
         let config = HnswConfig {
             max_connections: if max_connections == 0 {
-                16
+                def.max_connections
             } else {
                 max_connections
             },
             ef_construction: if ef_construction == 0 {
-                100
+                def.ef_construction
             } else {
                 ef_construction
-            }, // Reduced default from 200
-            ..Default::default()
+            },
+            ..def
         };
 
         let index = HnswIndex::new(dimension, config);

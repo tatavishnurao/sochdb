@@ -168,29 +168,37 @@ impl VectorIndexService for VectorIndexServer {
 
         // Build config
         let proto_config = req.config.unwrap_or_default();
+        // Fall back to HnswConfig::default() for any field the client leaves
+        // unset, so the gRPC path inherits the same 95+-recall defaults
+        // (m=32, m0=64, ef_construction=256, F32 precision) as every other
+        // entry point. Previously these fallbacks were hardcoded to the old
+        // cheap values (m=16/m0=32/efc=200), so a client that didn't specify
+        // an HNSW config silently got a low-recall graph (~0.90 vs ~0.97 on
+        // hard 768-d data) — the exact default-drift #27 removed elsewhere.
+        let def = HnswConfig::default();
         let config = HnswConfig {
             max_connections: if proto_config.max_connections > 0 {
                 proto_config.max_connections as usize
             } else {
-                16
+                def.max_connections
             },
             max_connections_layer0: if proto_config.max_connections_layer0 > 0 {
                 proto_config.max_connections_layer0 as usize
             } else {
-                32
+                def.max_connections_layer0
             },
             ef_construction: if proto_config.ef_construction > 0 {
                 proto_config.ef_construction as usize
             } else {
-                200
+                def.ef_construction
             },
             ef_search: if proto_config.ef_search > 0 {
                 proto_config.ef_search as usize
             } else {
-                300
+                def.ef_search
             },
             metric: Self::convert_metric(req.metric()),
-            ..Default::default()
+            ..def
         };
 
         let dimension = req.dimension as usize;
