@@ -1,0 +1,10 @@
+type,vector_rag_exact_match,sochdb_exact_match,interpretation
+knowledge_update,0.0,1.0,Vector baseline misses the later priority-update record
+multi_fact,0.8,1.0,Vector baseline misses one exact benchmark-spec list
+positioning,1.0,1.0,Both retrieve conceptual framing correctly
+paper_structure,1.0,1.0,Both retrieve Section 11 structure correctly
+paper_integrity,1.0,1.0,Both retrieve claim-integrity warning correctly
+single_hop,1.0,1.0,Both answer simple direct questions
+temporal_update,1.0,1.0,Both answer the temporal update question in this dataset
+comparison,1.0,1.0,Both handle dataset comparison question
+why,1.0,1.0,Both handle why-style question

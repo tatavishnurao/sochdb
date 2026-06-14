@@ -1,0 +1,3185 @@
+warning: output filename collision at /home/vishnu-rao/Desktop/Arjun/projects/sochdb/target/release/deps/libsochdb_index.rlib
+  |
+  = note: the lib target `sochdb_index` in package `sochdb-index v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-index)` has the same output filename as the lib target `sochdb_index` in package `sochdb-index v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-index)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /home/vishnu-rao/Desktop/Arjun/projects/sochdb/target/release/deps/libsochdb_index.so
+  |
+  = note: the lib target `sochdb_index` in package `sochdb-index v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-index)` has the same output filename as the lib target `sochdb_index` in package `sochdb-index v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-index)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /home/vishnu-rao/Desktop/Arjun/projects/sochdb/target/release/deps/libsochdb_index.so.dwp
+  |
+  = note: the lib target `sochdb_index` in package `sochdb-index v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-index)` has the same output filename as the lib target `sochdb_index` in package `sochdb-index v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-index)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /home/vishnu-rao/Desktop/Arjun/projects/sochdb/target/release/deps/libsochdb_storage.rlib
+  |
+  = note: the lib target `sochdb_storage` in package `sochdb-storage v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-storage)` has the same output filename as the lib target `sochdb_storage` in package `sochdb-storage v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-storage)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /home/vishnu-rao/Desktop/Arjun/projects/sochdb/target/release/deps/libsochdb_storage.so
+  |
+  = note: the lib target `sochdb_storage` in package `sochdb-storage v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-storage)` has the same output filename as the lib target `sochdb_storage` in package `sochdb-storage v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-storage)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /home/vishnu-rao/Desktop/Arjun/projects/sochdb/target/release/deps/libsochdb_storage.so.dwp
+  |
+  = note: the lib target `sochdb_storage` in package `sochdb-storage v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-storage)` has the same output filename as the lib target `sochdb_storage` in package `sochdb-storage v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-storage)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: unused import: `Write`
+  --> sochdb-core/src/knowledge_object.rs:81:21
+   |
+81 | use std::io::{Read, Write};
+   |                     ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sochdb-core` (lib) generated 1 warning
+   Compiling sochdb-index v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-index)
+warning: `sochdb-core` (lib) generated 1 warning (1 duplicate)
+warning: unused variable: `token`
+   --> sochdb-kernel/src/atomic_claim.rs:817:13
+    |
+817 |         let token = match manager.claim("queue1", "task1", "worker1", 30_000) {
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_token`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `ContiguousNodeStorage` and `LayerData`
+   --> sochdb-index/src/edge_delta_buffer.rs:451:40
+    |
+451 |     use crate::storage::node_storage::{ContiguousNodeStorage, LayerData};
+    |                                        ^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::vector_quantized::QuantizedVector`
+   --> sochdb-index/src/edge_delta_buffer.rs:452:9
+    |
+452 |     use crate::vector_quantized::QuantizedVector;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `WaveStats`
+  --> sochdb-index/src/hnsw.rs:76:91
+   |
+76 | ...aves, process_wave_parallel, WaveResult, WaveStats};
+   |                                             ^^^^^^^^^
+
+warning: unused import: `std::collections::BinaryHeap`
+    --> sochdb-index/src/hnsw.rs:4618:13
+     |
+4618 |         use std::collections::BinaryHeap;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::BinaryHeap`
+    --> sochdb-index/src/hnsw.rs:4778:13
+     |
+4778 |         use std::collections::BinaryHeap;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unexpected `cfg` condition value: `metrics`
+    --> sochdb-index/src/hnsw.rs:4997:15
+     |
+4997 |         #[cfg(feature = "metrics")]
+     |               ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `async`, `default`, `fastembed-embeddings`, `llm-embeddings`, and `local-embeddings`
+     = help: consider adding `metrics` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+     = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `metrics`
+    --> sochdb-index/src/hnsw.rs:4999:15
+     |
+4999 |         #[cfg(feature = "metrics")]
+     |               ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `async`, `default`, `fastembed-embeddings`, `llm-embeddings`, and `local-embeddings`
+     = help: consider adding `metrics` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `metrics`
+    --> sochdb-index/src/hnsw.rs:5002:15
+     |
+5002 |         #[cfg(feature = "metrics")]
+     |               ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `async`, `default`, `fastembed-embeddings`, `llm-embeddings`, and `local-embeddings`
+     = help: consider adding `metrics` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `metrics`
+    --> sochdb-index/src/hnsw.rs:5105:15
+     |
+5105 |         #[cfg(feature = "metrics")]
+     |               ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `async`, `default`, `fastembed-embeddings`, `llm-embeddings`, and `local-embeddings`
+     = help: consider adding `metrics` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `metrics`
+    --> sochdb-index/src/hnsw.rs:5109:15
+     |
+5109 |         #[cfg(feature = "metrics")]
+     |               ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `async`, `default`, `fastembed-embeddings`, `llm-embeddings`, and `local-embeddings`
+     = help: consider adding `metrics` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `metrics`
+    --> sochdb-index/src/hnsw.rs:5006:19
+     |
+5006 |             #[cfg(feature = "metrics")]
+     |                   ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `async`, `default`, `fastembed-embeddings`, `llm-embeddings`, and `local-embeddings`
+     = help: consider adding `metrics` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unused import: `std::cmp::Reverse`
+    --> sochdb-index/src/hnsw.rs:5548:13
+     |
+5548 |         use std::cmp::Reverse;
+     |             ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `dot_product_quantized`
+  --> sochdb-index/src/rng_optimization_tests.rs:12:134
+   |
+12 | ...ine_distance_normalized_quantized, dot_product_quantized};
+   |                                       ^^^^^^^^^^^^^^^^^^^^^
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/aosoa_tiles.rs:402:25
+    |
+402 |             let v_vec = _mm_loadu_ps(tile_ptr.add(d * T));
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/aosoa_tiles.rs:384:5
+    |
+384 |     pub unsafe fn tile_l2_squared_avx2(&self, query: &[f32], tile_idx: usize) -> [f32; T] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: `#[warn(unsafe_op_in_unsafe_fn)]` (part of `#[warn(rust_2024_compatibility)]`) on by default
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/aosoa_tiles.rs:402:38
+    |
+402 |             let v_vec = _mm_loadu_ps(tile_ptr.add(d * T));
+    |                                      ^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to function `std::arch::x86_64::_mm_fmadd_ps` with `#[target_feature]` is unsafe and requires unsafe block
+   --> sochdb-index/src/aosoa_tiles.rs:404:19
+    |
+404 |             acc = _mm_fmadd_ps(diff, diff, acc);
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to function with `#[target_feature]`
+    |
+    = help: in order for the call to be safe, the context requires the following additional target feature: fma
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_storeu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/aosoa_tiles.rs:408:9
+    |
+408 |         _mm_storeu_ps(dists.as_mut_ptr(), acc);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning: unused variable: `wave_results`
+    --> sochdb-index/src/hnsw.rs:3080:17
+     |
+3080 |             let wave_results: Vec<WaveResult> = process_wave_parallel(&wave, |node_id| {
+     |                 ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_wave_results`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `n_neighbors`
+    --> sochdb-index/src/hnsw.rs:4816:29
+     |
+4816 |                         let n_neighbors = neighbors.len();
+     |                             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_n_neighbors`
+
+warning: unused variable: `i`
+    --> sochdb-index/src/hnsw.rs:4818:30
+     |
+4818 |                         for (i, &neighbor_dense) in neighbors.iter().enumerate() {
+     |                              ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unnecessary `unsafe` block
+    --> sochdb-index/src/hnsw.rs:6254:9
+     |
+6254 |         unsafe {
+     |         ^^^^^^ unnecessary `unsafe` block
+     |
+     = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: unnecessary `unsafe` block
+    --> sochdb-index/src/hnsw.rs:6274:9
+     |
+6274 |         unsafe {
+     |         ^^^^^^ unnecessary `unsafe` block
+
+warning: unnecessary `unsafe` block
+    --> sochdb-index/src/hnsw.rs:6414:9
+     |
+6414 |         unsafe {
+     |         ^^^^^^ unnecessary `unsafe` block
+
+warning: unnecessary `unsafe` block
+    --> sochdb-index/src/hnsw.rs:6434:9
+     |
+6434 |         unsafe {
+     |         ^^^^^^ unnecessary `unsafe` block
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6845:22
+     |
+6845 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+    --> sochdb-index/src/hnsw.rs:6831:5
+     |
+6831 |     unsafe fn cosine_distance_avx2_unrolled_128(&self, a: &[f32], b: &[f32]) -> f32 {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6845:38
+     |
+6845 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6846:22
+     |
+6846 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6846:38
+     |
+6846 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6855:19
+     |
+6855 |         let dot = Self::horizontal_sum_avx2(dot_sum);
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6856:22
+     |
+6856 |         let norm_a = Self::horizontal_sum_avx2(norm_a_sum).sqrt();
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6857:22
+     |
+6857 |         let norm_b = Self::horizontal_sum_avx2(norm_b_sum).sqrt();
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6889:23
+     |
+6889 |             let va0 = _mm256_loadu_ps(a_ptr.add(i));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+    --> sochdb-index/src/hnsw.rs:6870:5
+     |
+6870 |     unsafe fn cosine_distance_avx2_unrolled_768(&self, a: &[f32], b: &[f32]) -> f32 {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6889:39
+     |
+6889 |             let va0 = _mm256_loadu_ps(a_ptr.add(i));
+     |                                       ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6890:23
+     |
+6890 |             let vb0 = _mm256_loadu_ps(b_ptr.add(i));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6890:39
+     |
+6890 |             let vb0 = _mm256_loadu_ps(b_ptr.add(i));
+     |                                       ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6891:23
+     |
+6891 |             let va1 = _mm256_loadu_ps(a_ptr.add(i + 8));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6891:39
+     |
+6891 |             let va1 = _mm256_loadu_ps(a_ptr.add(i + 8));
+     |                                       ^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6892:23
+     |
+6892 |             let vb1 = _mm256_loadu_ps(b_ptr.add(i + 8));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6892:39
+     |
+6892 |             let vb1 = _mm256_loadu_ps(b_ptr.add(i + 8));
+     |                                       ^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6910:19
+     |
+6910 |         let dot = Self::horizontal_sum_avx2(dot_sum);
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6911:22
+     |
+6911 |         let norm_a = Self::horizontal_sum_avx2(norm_a_sum).sqrt();
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6912:22
+     |
+6912 |         let norm_b = Self::horizontal_sum_avx2(norm_b_sum).sqrt();
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6944:23
+     |
+6944 |             let va0 = _mm256_loadu_ps(a_ptr.add(i));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+    --> sochdb-index/src/hnsw.rs:6925:5
+     |
+6925 |     unsafe fn cosine_distance_avx2_unrolled_1536(&self, a: &[f32], b: &[f32]) -> f32 {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6944:39
+     |
+6944 |             let va0 = _mm256_loadu_ps(a_ptr.add(i));
+     |                                       ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6945:23
+     |
+6945 |             let vb0 = _mm256_loadu_ps(b_ptr.add(i));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6945:39
+     |
+6945 |             let vb0 = _mm256_loadu_ps(b_ptr.add(i));
+     |                                       ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6946:23
+     |
+6946 |             let va1 = _mm256_loadu_ps(a_ptr.add(i + 8));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6946:39
+     |
+6946 |             let va1 = _mm256_loadu_ps(a_ptr.add(i + 8));
+     |                                       ^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6947:23
+     |
+6947 |             let vb1 = _mm256_loadu_ps(b_ptr.add(i + 8));
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6947:39
+     |
+6947 |             let vb1 = _mm256_loadu_ps(b_ptr.add(i + 8));
+     |                                       ^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6963:19
+     |
+6963 |         let dot = Self::horizontal_sum_avx2(dot_sum);
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6964:22
+     |
+6964 |         let norm_a = Self::horizontal_sum_avx2(norm_a_sum).sqrt();
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6965:22
+     |
+6965 |         let norm_b = Self::horizontal_sum_avx2(norm_b_sum).sqrt();
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6988:22
+     |
+6988 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+    --> sochdb-index/src/hnsw.rs:6977:5
+     |
+6977 |     unsafe fn l2_distance_avx2_unrolled_128(&self, a: &[f32], b: &[f32]) -> f32 {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6988:38
+     |
+6988 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6989:22
+     |
+6989 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6989:38
+     |
+6989 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:6994:9
+     |
+6994 |         Self::horizontal_sum_avx2(sum).sqrt()
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7010:22
+     |
+7010 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+    --> sochdb-index/src/hnsw.rs:7000:5
+     |
+7000 |     unsafe fn l2_distance_avx2_unrolled_768(&self, a: &[f32], b: &[f32]) -> f32 {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7010:38
+     |
+7010 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7011:22
+     |
+7011 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7011:38
+     |
+7011 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7016:9
+     |
+7016 |         Self::horizontal_sum_avx2(sum).sqrt()
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7032:22
+     |
+7032 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+    --> sochdb-index/src/hnsw.rs:7022:5
+     |
+7022 |     unsafe fn dot_product_avx2_unrolled_128(&self, a: &[f32], b: &[f32]) -> f32 {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7032:38
+     |
+7032 |             let va = _mm256_loadu_ps(a_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7033:22
+     |
+7033 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7033:38
+     |
+7033 |             let vb = _mm256_loadu_ps(b_ptr.add(i));
+     |                                      ^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `hnsw::HnswIndex::horizontal_sum_avx2` is unsafe and requires unsafe block
+    --> sochdb-index/src/hnsw.rs:7037:9
+     |
+7037 |         Self::horizontal_sum_avx2(sum)
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+     |
+     = note: consult the function's documentation for information on how to avoid undefined behavior
+     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/optimized_search.rs:431:22
+    |
+431 |             let va = _mm256_loadu_ps(a.as_ptr().add(idx));
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/optimized_search.rs:420:5
+    |
+420 |     unsafe fn euclidean_distance_avx2(&self, a: &[f32], b: &[f32]) -> f32 {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/optimized_search.rs:431:38
+    |
+431 |             let va = _mm256_loadu_ps(a.as_ptr().add(idx));
+    |                                      ^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/optimized_search.rs:432:22
+    |
+432 |             let vb = _mm256_loadu_ps(b.as_ptr().add(idx));
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/optimized_search.rs:432:38
+    |
+432 |             let vb = _mm256_loadu_ps(b.as_ptr().add(idx));
+    |                                      ^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning: variable does not need to be mutable
+   --> sochdb-index/src/unified_search.rs:650:13
+    |
+650 |         let mut id_mapper = IdMapper::new();
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_si256` is unsafe and requires unsafe block
+   --> sochdb-index/src/unified_quant.rs:389:22
+    |
+389 |             let va = _mm256_loadu_si256(a.as_ptr().add(idx) as *const __m256i);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/unified_quant.rs:379:5
+    |
+379 |     unsafe fn dot_i8_avx2(a: &[i8], b: &[i8]) -> i32 {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/unified_quant.rs:389:41
+    |
+389 |             let va = _mm256_loadu_si256(a.as_ptr().add(idx) as *const __m256i);
+    |                                         ^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_si256` is unsafe and requires unsafe block
+   --> sochdb-index/src/unified_quant.rs:390:22
+    |
+390 |             let vb = _mm256_loadu_si256(b.as_ptr().add(idx) as *const __m256i);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/unified_quant.rs:390:41
+    |
+390 |             let vb = _mm256_loadu_si256(b.as_ptr().add(idx) as *const __m256i);
+    |                                         ^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:188:18
+    |
+188 |         let va = _mm_loadu_ps(a.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/predicated_simd.rs:177:5
+    |
+177 |     unsafe fn blend_avx2(a: [f32; 4], b: [f32; 4], mask: SimdMask) -> [f32; 4] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:189:18
+    |
+189 |         let vb = _mm_loadu_ps(b.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_si128` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:190:18
+    |
+190 |         let vm = _mm_loadu_si128(mask_expanded.as_ptr() as *const __m128i);
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_storeu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:195:9
+    |
+195 |         _mm_storeu_ps(out.as_mut_ptr(), result);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:266:18
+    |
+266 |         let va = _mm_loadu_ps(a.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/predicated_simd.rs:264:5
+    |
+264 |     unsafe fn min_avx2(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:267:18
+    |
+267 |         let vb = _mm_loadu_ps(b.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_storeu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:270:9
+    |
+270 |         _mm_storeu_ps(out.as_mut_ptr(), result);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:313:18
+    |
+313 |         let va = _mm_loadu_ps(a.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/predicated_simd.rs:311:5
+    |
+311 |     unsafe fn max_avx2(a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:314:18
+    |
+314 |         let vb = _mm_loadu_ps(b.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_storeu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:317:9
+    |
+317 |         _mm_storeu_ps(out.as_mut_ptr(), result);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:474:18
+    |
+474 |         let va = _mm256_loadu_ps(a.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/predicated_simd.rs:459:5
+    |
+459 |     unsafe fn blend_avx2(a: [f32; 8], b: [f32; 8], mask: u8) -> [f32; 8] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:475:18
+    |
+475 |         let vb = _mm256_loadu_ps(b.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_si256` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:476:18
+    |
+476 |         let vm = _mm256_loadu_si256(mask_expanded.as_ptr() as *const __m256i);
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_storeu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:481:9
+    |
+481 |         _mm256_storeu_ps(out.as_mut_ptr(), result);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:507:18
+    |
+507 |         let va = _mm256_loadu_ps(a.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/predicated_simd.rs:505:5
+    |
+505 |     unsafe fn min_avx2(a: [f32; 8], b: [f32; 8]) -> [f32; 8] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:508:18
+    |
+508 |         let vb = _mm256_loadu_ps(b.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_storeu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:511:9
+    |
+511 |         _mm256_storeu_ps(out.as_mut_ptr(), result);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:539:18
+    |
+539 |         let va = _mm256_loadu_ps(a.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/predicated_simd.rs:537:5
+    |
+537 |     unsafe fn cmp_lt_avx2(a: [f32; 8], b: [f32; 8]) -> u8 {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/predicated_simd.rs:540:18
+    |
+540 |         let vb = _mm256_loadu_ps(b.as_ptr());
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:132:21
+    |
+132 |                     query_ptr.add(prefetch_d) as *const i8,
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_batch_distance.rs:104:5
+    |
+104 | /     pub unsafe fn batch_l2_squared_8x(
+105 | |         query: &[f32],
+106 | |         candidates: &[&[f32]; 8],
+107 | |         dimension: usize,
+108 | |     ) -> [f32; 8] {
+    | |_________________^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:136:34
+    |
+136 |                     _mm_prefetch(c.as_ptr().add(prefetch_d) as *const i8, _MM_HINT_T0);
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:141:21
+    |
+141 |             let q = _mm256_loadu_ps(query_ptr.add(d));
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:141:37
+    |
+141 |             let q = _mm256_loadu_ps(query_ptr.add(d));
+    |                                     ^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+152 |             process_candidate!(0, acc0);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+152 |             process_candidate!(0, acc0);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+153 |             process_candidate!(1, acc1);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+153 |             process_candidate!(1, acc1);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+154 |             process_candidate!(2, acc2);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+154 |             process_candidate!(2, acc2);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+155 |             process_candidate!(3, acc3);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+155 |             process_candidate!(3, acc3);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+156 |             process_candidate!(4, acc4);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+156 |             process_candidate!(4, acc4);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+157 |             process_candidate!(5, acc5);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+157 |             process_candidate!(5, acc5);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+158 |             process_candidate!(6, acc6);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+158 |             process_candidate!(6, acc6);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:29
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+159 |             process_candidate!(7, acc7);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:146:45
+    |
+146 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+159 |             process_candidate!(7, acc7);
+    |             --------------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_candidate` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:166:30
+    |
+166 |                 let q_val = *query.get_unchecked(d);
+    |                              ^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:168:34
+    |
+168 |                     let c_val = *candidate.get_unchecked(d);
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:187:13
+    |
+187 |             hsum_256(acc0),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:188:13
+    |
+188 |             hsum_256(acc1),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:189:13
+    |
+189 |             hsum_256(acc2),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:190:13
+    |
+190 |             hsum_256(acc3),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:191:13
+    |
+191 |             hsum_256(acc4),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:192:13
+    |
+192 |             hsum_256(acc5),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:193:13
+    |
+193 |             hsum_256(acc6),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:194:13
+    |
+194 |             hsum_256(acc7),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:241:30
+    |
+241 |                 _mm_prefetch(query_ptr.add(prefetch_d) as *const i8, _MM_HINT_T0);
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_batch_distance.rs:217:5
+    |
+217 | /     pub unsafe fn batch_dot_product_8x(
+218 | |         query: &[f32],
+219 | |         candidates: &[&[f32]; 8],
+220 | |         dimension: usize,
+221 | |     ) -> [f32; 8] {
+    | |_________________^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:244:21
+    |
+244 |             let q = _mm256_loadu_ps(query_ptr.add(d));
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:244:37
+    |
+244 |             let q = _mm256_loadu_ps(query_ptr.add(d));
+    |                                     ^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+253 |             process_dot!(0, acc0);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+253 |             process_dot!(0, acc0);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+254 |             process_dot!(1, acc1);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+254 |             process_dot!(1, acc1);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+255 |             process_dot!(2, acc2);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+255 |             process_dot!(2, acc2);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+256 |             process_dot!(3, acc3);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+256 |             process_dot!(3, acc3);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+257 |             process_dot!(4, acc4);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+257 |             process_dot!(4, acc4);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+258 |             process_dot!(5, acc5);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+258 |             process_dot!(5, acc5);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+259 |             process_dot!(6, acc6);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+259 |             process_dot!(6, acc6);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:29
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+260 |             process_dot!(7, acc7);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:248:45
+    |
+248 |                     let c = _mm256_loadu_ps(candidates[$idx].as_ptr().add(d));
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+...
+260 |             process_dot!(7, acc7);
+    |             --------------------- in this macro invocation
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: this warning originates in the macro `process_dot` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:266:26
+    |
+266 |             let q_val = *query.get_unchecked(d);
+    |                          ^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:268:30
+    |
+268 |                 let c_val = *candidate.get_unchecked(d);
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:284:13
+    |
+284 |             hsum_256(acc0),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:285:13
+    |
+285 |             hsum_256(acc1),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:286:13
+    |
+286 |             hsum_256(acc2),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:287:13
+    |
+287 |             hsum_256(acc3),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:288:13
+    |
+288 |             hsum_256(acc4),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:289:13
+    |
+289 |             hsum_256(acc5),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:290:13
+    |
+290 |             hsum_256(acc6),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `simd_batch_distance::avx2::hsum_256` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_batch_distance.rs:291:13
+    |
+291 |             hsum_256(acc7),
+    |             ^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:253:19
+    |
+253 |         let va0 = _mm256_loadu_ps(a_ptr.add(base));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_distance.rs:236:1
+    |
+236 | pub unsafe fn l2_squared_avx2(a: &[f32], b: &[f32]) -> f32 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:253:35
+    |
+253 |         let va0 = _mm256_loadu_ps(a_ptr.add(base));
+    |                                   ^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:254:19
+    |
+254 |         let vb0 = _mm256_loadu_ps(b_ptr.add(base));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:254:35
+    |
+254 |         let vb0 = _mm256_loadu_ps(b_ptr.add(base));
+    |                                   ^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:258:19
+    |
+258 |         let va1 = _mm256_loadu_ps(a_ptr.add(base + 8));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:258:35
+    |
+258 |         let va1 = _mm256_loadu_ps(a_ptr.add(base + 8));
+    |                                   ^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:259:19
+    |
+259 |         let vb1 = _mm256_loadu_ps(b_ptr.add(base + 8));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:259:35
+    |
+259 |         let vb1 = _mm256_loadu_ps(b_ptr.add(base + 8));
+    |                                   ^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:263:19
+    |
+263 |         let va2 = _mm256_loadu_ps(a_ptr.add(base + 16));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:263:35
+    |
+263 |         let va2 = _mm256_loadu_ps(a_ptr.add(base + 16));
+    |                                   ^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:264:19
+    |
+264 |         let vb2 = _mm256_loadu_ps(b_ptr.add(base + 16));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:264:35
+    |
+264 |         let vb2 = _mm256_loadu_ps(b_ptr.add(base + 16));
+    |                                   ^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:268:19
+    |
+268 |         let va3 = _mm256_loadu_ps(a_ptr.add(base + 24));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:268:35
+    |
+268 |         let va3 = _mm256_loadu_ps(a_ptr.add(base + 24));
+    |                                   ^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:269:19
+    |
+269 |         let vb3 = _mm256_loadu_ps(b_ptr.add(base + 24));
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:269:35
+    |
+269 |         let vb3 = _mm256_loadu_ps(b_ptr.add(base + 24));
+    |                                   ^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:276:18
+    |
+276 |         let va = _mm256_loadu_ps(a_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:276:34
+    |
+276 |         let va = _mm256_loadu_ps(a_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:277:18
+    |
+277 |         let vb = _mm256_loadu_ps(b_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:277:34
+    |
+277 |         let vb = _mm256_loadu_ps(b_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:297:21
+    |
+297 |         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
+    |                     ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:297:43
+    |
+297 |         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
+    |                                           ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:319:18
+    |
+319 |         let va = _mm256_loadu_ps(a_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_distance.rs:307:1
+    |
+307 | pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:319:34
+    |
+319 |         let va = _mm256_loadu_ps(a_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm256_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:320:18
+    |
+320 |         let vb = _mm256_loadu_ps(b_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:320:34
+    |
+320 |         let vb = _mm256_loadu_ps(b_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:335:20
+    |
+335 |         result += *a.get_unchecked(i) * *b.get_unchecked(i);
+    |                    ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:335:42
+    |
+335 |         result += *a.get_unchecked(i) * *b.get_unchecked(i);
+    |                                          ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:360:18
+    |
+360 |         let va = _mm_loadu_ps(a_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_distance.rs:348:1
+    |
+348 | pub unsafe fn l2_squared_sse41(a: &[f32], b: &[f32]) -> f32 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:360:31
+    |
+360 |         let va = _mm_loadu_ps(a_ptr.add(offset));
+    |                               ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:361:18
+    |
+361 |         let vb = _mm_loadu_ps(b_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:361:31
+    |
+361 |         let vb = _mm_loadu_ps(b_ptr.add(offset));
+    |                               ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:375:21
+    |
+375 |         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
+    |                     ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:375:43
+    |
+375 |         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
+    |                                           ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:397:18
+    |
+397 |         let va = _mm_loadu_ps(a_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_distance.rs:385:1
+    |
+385 | pub unsafe fn dot_product_sse41(a: &[f32], b: &[f32]) -> f32 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:397:31
+    |
+397 |         let va = _mm_loadu_ps(a_ptr.add(offset));
+    |                               ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:398:18
+    |
+398 |         let vb = _mm_loadu_ps(b_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:398:31
+    |
+398 |         let vb = _mm_loadu_ps(b_ptr.add(offset));
+    |                               ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:411:20
+    |
+411 |         result += *a.get_unchecked(i) * *b.get_unchecked(i);
+    |                    ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:411:42
+    |
+411 |         result += *a.get_unchecked(i) * *b.get_unchecked(i);
+    |                                          ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm512_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:436:18
+    |
+436 |         let va = _mm512_loadu_ps(a_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_distance.rs:424:1
+    |
+424 | pub unsafe fn l2_squared_avx512(a: &[f32], b: &[f32]) -> f32 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:436:34
+    |
+436 |         let va = _mm512_loadu_ps(a_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm512_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:437:18
+    |
+437 |         let vb = _mm512_loadu_ps(b_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:437:34
+    |
+437 |         let vb = _mm512_loadu_ps(b_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:447:21
+    |
+447 |         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
+    |                     ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:447:43
+    |
+447 |         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
+    |                                           ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm512_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:469:18
+    |
+469 |         let va = _mm512_loadu_ps(a_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> sochdb-index/src/simd_distance.rs:457:1
+    |
+457 | pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:469:34
+    |
+469 |         let va = _mm512_loadu_ps(a_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::arch::x86_64::_mm512_loadu_ps` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:470:18
+    |
+470 |         let vb = _mm512_loadu_ps(b_ptr.add(offset));
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `std::ptr::const_ptr::<impl *const T>::add` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:470:34
+    |
+470 |         let vb = _mm512_loadu_ps(b_ptr.add(offset));
+    |                                  ^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:479:20
+    |
+479 |         result += *a.get_unchecked(i) * *b.get_unchecked(i);
+    |                    ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: call to unsafe function `core::slice::<impl [T]>::get_unchecked` is unsafe and requires unsafe block
+   --> sochdb-index/src/simd_distance.rs:479:42
+    |
+479 |         result += *a.get_unchecked(i) * *b.get_unchecked(i);
+    |                                          ^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning: unnecessary `unsafe` block
+   --> sochdb-index/src/simd_distance.rs:771:26
+    |
+771 |         let sum_scalar = unsafe {
+    |                          ^^^^^^ unnecessary `unsafe` block
+
+warning: unnecessary `unsafe` block
+   --> sochdb-index/src/simd_distance.rs:791:22
+    |
+791 |     let mut result = unsafe {
+    |                      ^^^^^^ unnecessary `unsafe` block
+
+warning: type `hnsw::FastCandidate` is more private than the item `ScratchBuffers::fast_candidates`
+   --> sochdb-index/src/scratch_buffers.rs:217:5
+    |
+217 |     pub fast_candidates: BinaryHeap<FastCandidate>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `ScratchBuffers::fast_candidates` is reachable at visibility `pub`
+    |
+note: but type `hnsw::FastCandidate` is only usable at visibility `pub(crate)`
+   --> sochdb-index/src/hnsw.rs:894:1
+    |
+894 | pub(crate) struct FastCandidate {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `hnsw::FastCandidate` is more private than the item `ScratchBuffers::fast_results_heap`
+   --> sochdb-index/src/scratch_buffers.rs:221:5
+    |
+221 |     pub fast_results_heap: BinaryHeap<Reverse<FastCandidate>>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `ScratchBuffers::fast_results_heap` is reachable at visibility `pub`
+    |
+note: but type `hnsw::FastCandidate` is only usable at visibility `pub(crate)`
+   --> sochdb-index/src/hnsw.rs:894:1
+    |
+894 | pub(crate) struct FastCandidate {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `get_node_by_dense`, `invalidate_flat_cache`, `search_layer_fast`, and `process_neighbors_with_prefetch` are never used
+    --> sochdb-index/src/hnsw.rs:2160:19
+     |
+2070 | impl HnswIndex {
+     | -------------- methods in this implementation
+...
+2160 |     pub(crate) fn get_node_by_dense(&self, dense_index: u32) -> Option<Arc<HnswNode>> {
+     |                   ^^^^^^^^^^^^^^^^^
+...
+2253 |     pub(crate) fn invalidate_flat_cache(&self) {
+     |                   ^^^^^^^^^^^^^^^^^^^^^
+...
+4891 |     fn search_layer_fast(
+     |        ^^^^^^^^^^^^^^^^^
+...
+6008 |     fn process_neighbors_with_prefetch(
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused arithmetic operation that must be used
+   --> sochdb-index/src/simd_distance.rs:784:17
+    |
+784 |                 sum_scalar + diff * diff;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^ the arithmetic operation produces a value
+    |
+    = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+784 |                 let _ = sum_scalar + diff * diff;
+    |                 +++++++
+
+For more information about this error, try `rustc --explain E0133`.
+warning: use of deprecated constant `buddy_allocator::tests::test_arena_large_allocation`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1080:5
+     |
+1080 | /     fn test_arena_large_allocation() {
+1081 | |         let arena = BuddyArena::new(256);
+...    |
+1090 | |         println!("Arena allocated address: {:#x}", addr);
+1091 | |     }
+     | |_____^
+     |
+     = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated constant `buddy_allocator::tests::test_buddy_addr`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:874:5
+    |
+874 | /     fn test_buddy_addr() {
+875 | |         // For order 4 (size 16):
+876 | |         // addr 0 -> buddy 16, addr 16 -> buddy 0
+877 | |         assert_eq!(buddy_addr(0, 4), 16);
+...   |
+884 | |         assert_eq!(buddy_addr(96, 5), 64);
+885 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_buddy_allocator_auto_pool`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:970:5
+    |
+970 | /     fn test_buddy_allocator_auto_pool() {
+971 | |         let alloc = BuddyAllocator::with_pool_size(1024);
+972 | |
+973 | |         assert_eq!(alloc.pool_count(), 0);
+...   |
+977 | |         assert_eq!(alloc.pool_count(), 1);
+978 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_buddy_allocator_basic`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:957:5
+    |
+957 | /     fn test_buddy_allocator_basic() {
+958 | |         let alloc = BuddyAllocator::new();
+959 | |
+960 | |         let addr1 = alloc.allocate(100).unwrap();
+...   |
+966 | |         alloc.deallocate(addr2).unwrap();
+967 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_buddy_allocator_multiple_pools`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:981:5
+    |
+981 | /     fn test_buddy_allocator_multiple_pools() {
+982 | |         let alloc = BuddyAllocator::with_pool_size(256);
+...   |
+997 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_buddy_arena`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1056:5
+     |
+1056 | /     fn test_buddy_arena() {
+1057 | |         let arena = BuddyArena::new(4096);
+...    |
+1076 | |         let _ = arena.allocate(100, 8).unwrap();
+1077 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_concurrent_allocations`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1151:5
+     |
+1151 | /     fn test_concurrent_allocations() {
+1152 | |         use std::sync::Arc;
+1153 | |         use std::thread;
+...    |
+1179 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_double_free`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1126:5
+     |
+1126 | /     fn test_double_free() {
+1127 | |         let pool = MemoryPool::new(0, 1024).unwrap();
+1128 | |
+1129 | |         let addr = pool.allocate(64).unwrap();
+...    |
+1136 | |         ));
+1137 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_free_bytes_tracking`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1108:5
+     |
+1108 | /     fn test_free_bytes_tracking() {
+1109 | |         let pool = MemoryPool::new(0, 1024).unwrap();
+1110 | |
+1111 | |         let initial_free = pool.free_bytes();
+...    |
+1122 | |         assert_eq!(after_free, initial_free);
+1123 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_invalid_address`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1140:5
+     |
+1140 | /     fn test_invalid_address() {
+1141 | |         let pool = MemoryPool::new(0, 1024).unwrap();
+...    |
+1147 | |         ));
+1148 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_memory_pool_basic`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:888:5
+    |
+888 | /     fn test_memory_pool_basic() {
+889 | |         let pool = MemoryPool::new(0, 1024).unwrap();
+...   |
+901 | |         pool.deallocate(addr2).unwrap();
+902 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_memory_pool_merging`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:919:5
+    |
+919 | /     fn test_memory_pool_merging() {
+920 | |         let pool = MemoryPool::new(0, 256).unwrap();
+...   |
+935 | |         assert_eq!(addr3, 0);
+936 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_memory_pool_out_of_memory`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:939:5
+    |
+939 | /     fn test_memory_pool_out_of_memory() {
+940 | |         let pool = MemoryPool::new(0, 256).unwrap();
+...   |
+953 | |         assert!(pool.allocate(16).is_ok());
+954 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_memory_pool_splitting`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:905:5
+    |
+905 | /     fn test_memory_pool_splitting() {
+906 | |         let pool = MemoryPool::new(0, 256).unwrap();
+...   |
+915 | |         pool.deallocate(addr).unwrap();
+916 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_order_to_size`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:866:5
+    |
+866 | /     fn test_order_to_size() {
+867 | |         assert_eq!(order_to_size(4), 16);
+868 | |         assert_eq!(order_to_size(5), 32);
+869 | |         assert_eq!(order_to_size(10), 1024);
+870 | |         assert_eq!(order_to_size(20), 1 << 20);
+871 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_size_to_order`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+   --> sochdb-core/src/buddy_allocator.rs:855:5
+    |
+855 | /     fn test_size_to_order() {
+856 | |         assert_eq!(size_to_order(1), 4); // min = 16
+857 | |         assert_eq!(size_to_order(16), 4); // 2^4 = 16
+858 | |         assert_eq!(size_to_order(17), 5); // needs 2^5 = 32
+...   |
+862 | |         assert_eq!(size_to_order(1025), 11); // needs 2048
+863 | |     }
+    | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_slab_allocator`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1020:5
+     |
+1020 | /     fn test_slab_allocator() {
+1021 | |         let slab = SlabAllocator::new(32);
+...    |
+1040 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_slab_reuse`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1043:5
+     |
+1043 | /     fn test_slab_reuse() {
+1044 | |         let slab = SlabAllocator::new(64);
+1045 | |
+1046 | |         let addr1 = slab.allocate().unwrap();
+...    |
+1052 | |         assert_eq!(addr1, addr2);
+1053 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_stats_tracking`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1094:5
+     |
+1094 | /     fn test_stats_tracking() {
+1095 | |         let pool = MemoryPool::new(0, 1024).unwrap();
+1096 | |
+1097 | |         let addr = pool.allocate(64).unwrap();
+...    |
+1104 | |         assert!(pool.stats().deallocations.load(Ordering::Relaxed) > 0);
+1105 | |     }
+     | |_____^
+
+warning: use of deprecated constant `buddy_allocator::tests::test_typed_allocator`: Use jemalloc feature instead. See buddy_allocator module docs for migration.
+    --> sochdb-core/src/buddy_allocator.rs:1000:5
+     |
+1000 | /     fn test_typed_allocator() {
+1001 | |         #[repr(C)]
+1002 | |         struct MyStruct {
+1003 | |             a: u64,
+...    |
+1016 | |         alloc.deallocate(addr2).unwrap();
+1017 | |     }
+     | |_____^
+
+warning: `sochdb-kernel` (lib test) generated 1 warning (run `cargo fix --lib -p sochdb-kernel --tests` to apply 1 suggestion)
+warning: `sochdb-index` (lib test) generated 213 warnings (run `cargo fix --lib -p sochdb-index --tests` to apply 34 suggestions)
+warning: `sochdb-core` (lib test) generated 21 warnings (1 duplicate)
+warning: unused import: `WaveStats`
+  --> sochdb-index/src/hnsw.rs:76:91
+   |
+76 | ...aves, process_wave_parallel, WaveResult, WaveStats};
+   |                                             ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: type `FastCandidate` is more private than the item `ScratchBuffers::fast_candidates`
+   --> sochdb-index/src/scratch_buffers.rs:217:5
+    |
+217 |     pub fast_candidates: BinaryHeap<FastCandidate>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `ScratchBuffers::fast_candidates` is reachable at visibility `pub`
+    |
+note: but type `FastCandidate` is only usable at visibility `pub(crate)`
+   --> sochdb-index/src/hnsw.rs:894:1
+    |
+894 | pub(crate) struct FastCandidate {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `FastCandidate` is more private than the item `ScratchBuffers::fast_results_heap`
+   --> sochdb-index/src/scratch_buffers.rs:221:5
+    |
+221 |     pub fast_results_heap: BinaryHeap<Reverse<FastCandidate>>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ field `ScratchBuffers::fast_results_heap` is reachable at visibility `pub`
+    |
+note: but type `FastCandidate` is only usable at visibility `pub(crate)`
+   --> sochdb-index/src/hnsw.rs:894:1
+    |
+894 | pub(crate) struct FastCandidate {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `sochdb-index` (lib) generated 209 warnings (206 duplicates) (run `cargo fix --lib -p sochdb-index` to apply 1 suggestion)
+   Compiling sochdb-storage v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-storage)
+warning: unused import: `std::cmp::Reverse`
+ --> sochdb-index/src/bin/micro_bench.rs:7:5
+  |
+7 | use std::cmp::Reverse;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Ordering`
+ --> sochdb-index/src/bin/profile_hotpath.rs:8:36
+  |
+8 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                                    ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> sochdb-index/src/bin/profile_hotpath.rs:129:9
+    |
+129 |     let mut times_distance: Vec<Duration> = Vec::new();
+    |         ----^^^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `times_distance`
+   --> sochdb-index/src/bin/profile_hotpath.rs:129:9
+    |
+129 |     let mut times_distance: Vec<Duration> = Vec::new();
+    |         ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_times_distance`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: static `DISTANCE_CALLS` is never used
+  --> sochdb-index/src/bin/profile_hotpath.rs:18:8
+   |
+18 | static DISTANCE_CALLS: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: static `HEAP_PUSHES` is never used
+  --> sochdb-index/src/bin/profile_hotpath.rs:19:8
+   |
+19 | static HEAP_PUSHES: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^
+
+warning: static `VISITED_CHECKS` is never used
+  --> sochdb-index/src/bin/profile_hotpath.rs:20:8
+   |
+20 | static VISITED_CHECKS: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^
+
+warning: `sochdb-index` (bin "micro_bench") generated 1 warning (run `cargo fix --bin "micro_bench" -p sochdb-index` to apply 1 suggestion)
+warning: `sochdb-index` (bin "profile_hotpath") generated 6 warnings (run `cargo fix --bin "profile_hotpath" -p sochdb-index` to apply 3 suggestions)
+warning: unused imports: `Duration` and `Instant`
+  --> sochdb-storage/src/admission_control.rs:49:17
+   |
+49 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^  ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Mutex`
+  --> sochdb-storage/src/admission_control.rs:51:19
+   |
+51 | use parking_lot::{Mutex, RwLock};
+   |                   ^^^^^
+
+warning: unused import: `Path`
+  --> sochdb-storage/src/durability_contract.rs:42:17
+   |
+42 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/io_isolation.rs:38:5
+   |
+38 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `parking_lot::RwLock`
+  --> sochdb-storage/src/io_isolation.rs:40:5
+   |
+40 | use parking_lot::RwLock;
+   |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `File`
+  --> sochdb-storage/src/mvcc_concurrent.rs:57:15
+   |
+57 | use std::fs::{File, OpenOptions};
+   |               ^^^^
+
+warning: unused import: `Path`
+  --> sochdb-storage/src/pitr.rs:46:17
+   |
+46 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/pitr.rs:48:5
+   |
+48 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `SystemTime` and `UNIX_EPOCH`
+  --> sochdb-storage/src/pitr.rs:49:27
+   |
+49 | use std::time::{Duration, SystemTime, UNIX_EPOCH};
+   |                           ^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `std::cmp::Ordering`
+  --> sochdb-storage/src/ssi_scaling.rs:48:5
+   |
+48 | use std::cmp::Ordering;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `BTreeMap`
+  --> sochdb-storage/src/ssi_scaling.rs:49:24
+   |
+49 | use std::collections::{BTreeMap, HashSet};
+   |                        ^^^^^^^^
+
+warning: unused import: `AtomicUsize`
+  --> sochdb-storage/src/ssi_scaling.rs:50:36
+   |
+50 | use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering as AtomicOrdering};
+   |                                    ^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/ssi_scaling.rs:51:5
+   |
+51 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/queue_index.rs:71:5
+   |
+71 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `crate::key_buffer::ArenaKeyHandle`
+  --> sochdb-storage/src/queue_index.rs:76:5
+   |
+76 | use crate::key_buffer::ArenaKeyHandle;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Atomic`, `Owned`, `Shared`, and `self as epoch`
+  --> sochdb-storage/src/version_set.rs:80:23
+   |
+80 | use crossbeam_epoch::{self as epoch, Atomic, Owned, Shared};
+   |                       ^^^^^^^^^^^^^  ^^^^^^  ^^^^^  ^^^^^^
+
+warning: unused import: `std::ptr`
+  --> sochdb-storage/src/concurrent_art.rs:73:5
+   |
+73 | use std::ptr;
+   |     ^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/concurrent_art.rs:99:5
+   |
+99 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `Write`
+  --> sochdb-storage/src/sstable/block.rs:64:29
+   |
+64 | use std::io::{Cursor, Read, Write};
+   |                             ^^^^^
+
+warning: unused import: `SSTableFormat`
+  --> sochdb-storage/src/sstable/builder.rs:32:59
+   |
+32 | use super::format::{Footer, Header, Section, SectionType, SSTableFormat, HEADER_SIZE};
+   |                                                           ^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> sochdb-storage/src/sstable/format.rs:64:5
+   |
+64 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `SeekFrom`
+  --> sochdb-storage/src/sstable/table.rs:30:27
+   |
+30 | use std::io::{Read, Seek, SeekFrom};
+   |                           ^^^^^^^^
+
+warning: unused import: `BlockIterator`
+  --> sochdb-storage/src/sstable/table.rs:37:40
+   |
+37 | use super::block::{Block, BlockHandle, BlockIterator, BlockType};
+   |                                        ^^^^^^^^^^^^^
+
+warning: unused imports: `SSTableFormat` and `Section`
+  --> sochdb-storage/src/sstable/table.rs:39:37
+   |
+39 | use super::format::{Footer, Header, Section, SectionType, SSTableFormat, HEADER_SIZE};
+   |                                     ^^^^^^^               ^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/wal_segment.rs:45:5
+   |
+45 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `BinaryHeap` and `HashMap`
+  --> sochdb-storage/src/compaction_policy.rs:33:24
+   |
+33 | use std::collections::{BinaryHeap, HashMap, HashSet};
+   |                        ^^^^^^^^^^  ^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/compaction_policy.rs:36:5
+   |
+36 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::BinaryHeap`
+  --> sochdb-storage/src/optimized_scan.rs:40:5
+   |
+40 | use std::collections::BinaryHeap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-storage/src/optimized_scan.rs:41:5
+   |
+41 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `parking_lot::RwLock`
+  --> sochdb-storage/src/optimized_scan.rs:43:5
+   |
+43 | use parking_lot::RwLock;
+   |     ^^^^^^^^^^^^^^^^^^^
+
+warning: `sochdb-index` (lib) generated 209 warnings (209 duplicates)
+warning: unexpected `cfg` condition value: `async`
+   --> sochdb-grpc/src/blocking_pool.rs:430:7
+    |
+430 | #[cfg(feature = "async")]
+    |       ^^^^^^^^^^^^^^^^^ help: remove the condition
+    |
+    = note: no expected values for `feature`
+    = help: consider adding `r#async` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `std::future::Future`
+  --> sochdb-grpc/src/blocking_pool.rs:48:5
+   |
+48 | use std::future::Future;
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::pin::Pin`
+  --> sochdb-grpc/src/blocking_pool.rs:49:5
+   |
+49 | use std::pin::Pin;
+   |     ^^^^^^^^^^^^^
+
+warning: unused import: `File`
+  --> sochdb-grpc/src/health_service.rs:41:15
+   |
+41 | use std::fs::{File, OpenOptions};
+   |               ^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> sochdb-grpc/src/security.rs:36:5
+   |
+36 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `HashMap`
+  --> sochdb-grpc/src/graph_server.rs:21:24
+   |
+21 | use std::collections::{HashMap, HashSet, VecDeque};
+   |                        ^^^^^^^
+
+warning: unused import: `NamespaceQuota`
+  --> sochdb-grpc/src/namespace_server.rs:14:40
+   |
+14 |     ListNamespacesResponse, Namespace, NamespaceQuota, NamespaceStats, SetQuotaRequest,
+   |                                        ^^^^^^^^^^^^^^
+
+warning: unused variable: `hist`
+   --> sochdb-grpc/src/observability.rs:539:21
+    |
+539 |         if let Some(ref hist) = self.histogram {
+    |                     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_hist`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `data`
+   --> sochdb-grpc/src/checkpoint_server.rs:103:18
+    |
+103 |             Some(data) => {
+    |                  ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+
+warning: field `config` is never read
+   --> sochdb-grpc/src/health_service.rs:367:5
+    |
+366 | pub struct HealthService {
+    |            ------------- field in this struct
+367 |     config: HealthServiceConfig,
+    |     ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `config` is never read
+   --> sochdb-grpc/src/observability.rs:689:5
+    |
+688 | pub struct ObservabilityService {
+    |            -------------------- field in this struct
+689 |     config: ObservabilityConfig,
+    |     ^^^^^^
+
+warning: unused variable: `name`
+  --> sochdb-index/benches/vector_bench.rs:59:21
+   |
+59 | fn run_benchmark<F>(name: &str, mut f: F, iterations_per_sample: usize) -> BenchmarkStats
+   |                     ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated struct `mvcc_snapshot::TransactionManager`: Use MvccTransactionManager from wal_integration for production workloads with durability
+   --> sochdb-storage/src/mvcc_snapshot.rs:564:23
+    |
+564 |         let manager = TransactionManager::new();
+    |                       ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `mvcc_snapshot::TransactionManager`: Use MvccTransactionManager from wal_integration for production workloads with durability
+   --> sochdb-storage/src/mvcc_snapshot.rs:583:32
+    |
+583 |         let manager = Arc::new(TransactionManager::new());
+    |                                ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `mvcc_snapshot::TransactionManager`: Use MvccTransactionManager from wal_integration for production workloads with durability
+   --> sochdb-storage/src/mvcc_snapshot.rs:609:32
+    |
+609 |         let manager = Arc::new(TransactionManager::new());
+    |                                ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `mvcc_snapshot::TransactionManager`: Use MvccTransactionManager from wal_integration for production workloads with durability
+   --> sochdb-storage/src/mvcc_snapshot.rs:639:32
+    |
+639 |         let manager = Arc::new(TransactionManager::new());
+    |                                ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Seek`
+  --> sochdb-storage/src/sstable/table.rs:30:21
+   |
+30 | use std::io::{Read, Seek, SeekFrom};
+   |                     ^^^^
+
+warning: unused import: `Read`
+  --> sochdb-storage/src/sstable/table.rs:30:15
+   |
+30 | use std::io::{Read, Seek, SeekFrom};
+   |               ^^^^
+
+warning: unused import: `std::io::Write`
+   --> sochdb-storage/src/payload/disk_hash_index.rs:138:5
+    |
+138 | use std::io::Write;
+    |     ^^^^^^^^^^^^^^
+
+warning: unused variable: `db`
+  --> sochdb-storage/src/ffi.rs:67:5
+   |
+67 |     db: &Database,
+   |     ^^ help: if this is intentional, prefix it with an underscore: `_db`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `comp_type`
+    --> sochdb-storage/src/ffi.rs:4098:9
+     |
+4098 |     let comp_type = crate::compression::CompressionType::from_u8(compression);
+     |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_comp_type`
+
+warning: unused variable: `sql`
+    --> sochdb-storage/src/ffi.rs:4162:9
+     |
+4162 |     let sql = match unsafe { CStr::from_ptr(sql_ptr) }.to_str() {
+     |         ^^^ help: if this is intentional, prefix it with an underscore: `_sql`
+
+warning: variable does not need to be mutable
+    --> sochdb-storage/src/lscs.rs:1619:13
+     |
+1619 |         let mut min_row_id = u64::MAX;
+     |             ----^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> sochdb-storage/src/lscs.rs:1620:13
+     |
+1620 |         let mut max_row_id = 0u64;
+     |             ----^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `keys`
+   --> sochdb-storage/src/dirty_tracking.rs:542:22
+    |
+542 |         let (_epoch, keys) = tracker.advance_epoch();
+    |                      ^^^^ help: if this is intentional, prefix it with an underscore: `_keys`
+
+warning: unused variable: `i`
+   --> sochdb-storage/src/rl_workload.rs:668:13
+    |
+668 |         for i in 0..NUM_ARMS {
+    |             ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `config1`
+   --> sochdb-storage/src/rl_workload.rs:686:13
+    |
+686 |         let config1 = classifier.current_config();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_config1`
+
+warning: variable does not need to be mutable
+    --> sochdb-storage/src/vectorized_scan.rs:1287:13
+     |
+1287 |         let mut v = ColumnVector::Int64(vec![1, 2, 3, 4, 5]);
+     |             ----^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `guard`
+   --> sochdb-storage/src/concurrent_art.rs:421:61
+    |
+421 |     pub fn add_child(&self, key: u8, child: Owned<ArtNode>, guard: &Guard) -> bool {
+    |                                                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_guard`
+
+warning: variable does not need to be mutable
+   --> sochdb-storage/src/sstable/block.rs:496:13
+    |
+496 |         let mut iter = self.seek(key);
+    |             ----^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `largest_key`
+   --> sochdb-storage/src/sstable/builder.rs:278:35
+    |
+278 |     fn add_index_entry(&mut self, largest_key: &[u8]) -> std::io::Result<()> {
+    |                                   ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_largest_key`
+
+warning: fields `deficit` and `pending_count` are never read
+   --> sochdb-storage/src/admission_control.rs:259:5
+    |
+251 | pub struct TenantQuota {
+    |            ----------- fields in this struct
+...
+259 |     deficit: AtomicI64,
+    |     ^^^^^^^
+260 |     /// Queue of pending requests
+261 |     pending_count: AtomicU64,
+    |     ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `dimension` and `metric` are never read
+  --> sochdb-storage/src/ffi.rs:39:5
+   |
+37 | struct CollectionIndex {
+   |        --------------- fields in this struct
+38 |     index: Arc<HnswIndex>,
+39 |     dimension: usize,
+   |     ^^^^^^^^^
+40 |     metric: DistanceMetric,
+   |     ^^^^^^
+
+warning: fields `path` and `our_pid` are never read
+   --> sochdb-storage/src/lock.rs:606:5
+    |
+602 | pub struct RwDatabaseLock {
+    |            -------------- fields in this struct
+...
+606 |     path: PathBuf,
+    |     ^^^^
+...
+610 |     our_pid: u32,
+    |     ^^^^^^^
+
+warning: field `path` is never read
+   --> sochdb-storage/src/mvcc_concurrent.rs:793:5
+    |
+791 | pub struct ConcurrentMvcc {
+    |            -------------- field in this struct
+792 |     /// Path to database
+793 |     path: PathBuf,
+    |     ^^^^
+
+warning: field `path` is never read
+   --> sochdb-storage/src/wal_fencing.rs:376:5
+    |
+374 | pub struct FencedWal {
+    |            --------- field in this struct
+375 |     /// Path to WAL file
+376 |     path: PathBuf,
+    |     ^^^^
+
+warning: associated function `filter_batch_scalar` is never used
+   --> sochdb-storage/src/vectorized_scan.rs:649:8
+    |
+613 | impl SimdVisibilityFilter {
+    | ------------------------- associated function in this implementation
+...
+649 |     fn filter_batch_scalar(commit_ts: &[u64], snapshot_ts: u64, out: &mut [bool]) {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: field `config` is never read
+   --> sochdb-storage/src/io_uring.rs:441:5
+    |
+439 | pub struct LinuxIoUringBackend {
+    |            ------------------- field in this struct
+440 |     uring: Option<IoUring>,
+441 |     config: IoUringConfig,
+    |     ^^^^^^
+
+warning: associated function `check_uring_available` is never used
+   --> sochdb-storage/src/io_uring.rs:476:8
+    |
+450 | impl LinuxIoUringBackend {
+    | ------------------------ associated function in this implementation
+...
+476 |     fn check_uring_available() -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `RestartPoint` is never constructed
+   --> sochdb-storage/src/sstable/block.rs:150:8
+    |
+150 | struct RestartPoint {
+    |        ^^^^^^^^^^^^
+
+warning: struct `HashBucket` is never constructed
+   --> sochdb-storage/src/sstable/block.rs:157:8
+    |
+157 | struct HashBucket {
+    |        ^^^^^^^^^^
+
+warning: field `num_hash_buckets` is never read
+   --> sochdb-storage/src/sstable/block.rs:357:5
+    |
+349 | pub struct Block {
+    |            ----- field in this struct
+...
+357 |     num_hash_buckets: usize,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: field `num_slots` is never read
+   --> sochdb-storage/src/sstable/filter.rs:418:5
+    |
+412 | struct RibbonFilterBuilder {
+    |        ------------------- field in this struct
+...
+418 |     num_slots: usize,
+    |     ^^^^^^^^^
+
+warning: fields `header`, `footer`, and `index` are never read
+   --> sochdb-storage/src/sstable/table.rs:118:5
+    |
+110 | pub struct SSTable {
+    |            ------- fields in this struct
+...
+118 |     header: Header,
+    |     ^^^^^^
+119 |     /// Parsed footer with sections
+120 |     footer: Footer,
+    |     ^^^^^^
+121 |     /// Index block (cached)
+122 |     index: Vec<u8>,
+    |     ^^^^^
+
+warning: field `path` is never read
+   --> sochdb-storage/src/wal_segment.rs:188:5
+    |
+184 | struct ActiveSegment {
+    |        ------------- field in this struct
+...
+188 |     path: PathBuf,
+    |     ^^^^
+
+warning: field `config` is never read
+   --> sochdb-storage/src/compaction_policy.rs:470:5
+    |
+469 | pub struct UniversalCompactionPicker {
+    |            ------------------------- field in this struct
+470 |     config: CompactionConfig,
+    |     ^^^^^^
+
+warning: comparison is useless due to type limits
+   --> sochdb-storage/src/epoch_mvcc.rs:851:17
+    |
+851 |         assert!(gc_stats.versions_removed >= 0);
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_comparisons)]` on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> sochdb-storage/src/sstable/table.rs:410:17
+    |
+410 |     pub fn iter(&self) -> SSTableIterator {
+    |                 ^^^^^     ^^^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                 |
+    |                 the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+410 |     pub fn iter(&self) -> SSTableIterator<'_> {
+    |                                          ++++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> sochdb-storage/src/sstable/table.rs:416:9
+    |
+416 |         &self,
+    |         ^^^^^ the lifetime is elided here
+...
+419 |     ) -> RangeIterator {
+    |          ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+    |
+419 |     ) -> RangeIterator<'_> {
+    |                       ++++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> sochdb-storage/src/wal_segment.rs:574:30
+    |
+574 |     pub fn recovery_iterator(&self, from_lsn: u64) -> RecoveryIterator {
+    |                              ^^^^^                    ^^^^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                              |
+    |                              the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+    |
+574 |     pub fn recovery_iterator(&self, from_lsn: u64) -> RecoveryIterator<'_> {
+    |                                                                       ++++
+
+warning: comparison is useless due to type limits
+   --> sochdb-storage/src/wal_segment.rs:797:17
+    |
+797 |         assert!(cleaned >= 0);
+    |                 ^^^^^^^^^^^^
+
+warning: unused variable: `pool_type`
+   --> sochdb-grpc/src/blocking_pool.rs:530:14
+    |
+530 |         for (pool_type, metrics) in manager.all_metrics() {
+    |              ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pool_type`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `hist`
+   --> sochdb-grpc/src/observability.rs:539:21
+    |
+539 |         if let Some(ref hist) = self.histogram {
+    |                     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_hist`
+
+warning: `sochdb-grpc` (lib) generated 11 warnings (run `cargo fix --lib -p sochdb-grpc` to apply 8 suggestions)
+warning: `sochdb-index` (bin "profile_hotpath" test) generated 6 warnings (6 duplicates)
+warning: `sochdb-index` (bench "vector_bench") generated 1 warning (run `cargo fix --bench "vector_bench" -p sochdb-index` to apply 1 suggestion)
+warning: `sochdb-index` (bin "micro_bench" test) generated 1 warning (1 duplicate)
+warning: `sochdb-storage` (lib test) generated 69 warnings (30 duplicates) (run `cargo fix --lib -p sochdb-storage --tests` to apply 15 suggestions)
+warning: `sochdb-grpc` (lib test) generated 12 warnings (10 duplicates) (run `cargo fix --lib -p sochdb-grpc --tests` to apply 2 suggestions)
+   Compiling sochdb-grpc v0.5.0 (/home/vishnu-rao/Desktop/Arjun/projects/sochdb/sochdb-grpc)
+error: expected identifier, found reserved keyword `gen`
+  --> sochdb-index/benches/perf_regression.rs:41:30
+   |
+41 |     (0..n * dim).map(|_| rng.gen::<f32>() * 2.0 - 1.0).collect()
+   |                              ^^^ expected identifier, found reserved keyword
+   |
+help: escape `gen` to use it as an identifier
+   |
+41 |     (0..n * dim).map(|_| rng.r#gen::<f32>() * 2.0 - 1.0).collect()
+   |                              ++
+
+warning: unused variable: `dim`
+   --> sochdb-index/benches/perf_regression.rs:110:18
+    |
+110 |             |b, (dim, vector)| {
+    |                  ^^^ help: if this is intentional, prefix it with an underscore: `_dim`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sochdb-index` (bench "perf_regression") generated 1 warning
+error: could not compile `sochdb-index` (bench "perf_regression") due to 1 previous error; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+error[E0599]: no method named `memory_stats` found for struct `HnswIndex` in the current scope
+   --> sochdb-index/benches/quantization_bench.rs:127:39
+    |
+127 |                     let stats = index.memory_stats();
+    |                                       ^^^^^^^^^^^^ method not found in `HnswIndex`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `sochdb-index` (bench "quantization_bench") due to 1 previous error
+warning: variable does not need to be mutable
+   --> sochdb-grpc/src/main.rs:121:10
+    |
+121 |     let (mut health_reporter, health_service) = health_reporter();
+    |          ----^^^^^^^^^^^^^^^
+    |          |
+    |          help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sochdb-grpc` (bin "sochdb-grpc-server" test) generated 1 warning (run `cargo fix --bin "sochdb-grpc-server" -p sochdb-grpc --tests` to apply 1 suggestion)
+warning: `sochdb-storage` (lib) generated 59 warnings (29 duplicates) (run `cargo fix --lib -p sochdb-storage` to apply 30 suggestions)
+warning: `sochdb-storage` (lib) generated 59 warnings (59 duplicates)

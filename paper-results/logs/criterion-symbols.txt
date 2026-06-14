@@ -1,0 +1,150 @@
+./sochdb-bench/benches/micro.rs:5:use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+./sochdb-bench/benches/micro.rs:17:            BenchmarkId::new(db_name, value_size),
+./sochdb-bench/benches/micro.rs:48:        group.bench_function(BenchmarkId::new(db_name, n), |b| {
+./sochdb-bench/benches/micro.rs:84:        group.bench_function(BenchmarkId::new(db_name, 1000), |b| {
+./sochdb-bench/benches/micro.rs:111:criterion_group!(benches, bench_point_write, bench_point_read, bench_batch_write);
+./sochdb-bench/benches/micro.rs:112:criterion_main!(benches);
+./sochdb-index/benches/perf_regression.rs:33:use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+./sochdb-index/benches/perf_regression.rs:64:            BenchmarkId::new(format!("{}d", dim), n),
+./sochdb-index/benches/perf_regression.rs:108:            BenchmarkId::new("dim", dim),
+./sochdb-index/benches/perf_regression.rs:141:            BenchmarkId::new(format!("{}d", dim), n),
+./sochdb-index/benches/perf_regression.rs:178:            BenchmarkId::new(format!("{}d", dim), n),
+./sochdb-index/benches/perf_regression.rs:199:criterion_group!(
+./sochdb-index/benches/perf_regression.rs:207:criterion_main!(benches);
+./sochdb-index/benches/hnsw_bench.rs:22:use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+./sochdb-index/benches/hnsw_bench.rs:40:        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+./sochdb-index/benches/hnsw_bench.rs:74:        group.bench_with_input(BenchmarkId::from_parameter(k), &k, |b, &k| {
+./sochdb-index/benches/hnsw_bench.rs:100:        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
+./sochdb-index/benches/hnsw_bench.rs:126:    group.bench_function("mixed_80_20", |b| {
+./sochdb-index/benches/hnsw_bench.rs:154:        group.bench_with_input(BenchmarkId::from_parameter(dim), &dim, |b, &dim| {
+./sochdb-index/benches/hnsw_bench.rs:173:criterion_group!(
+./sochdb-index/benches/hnsw_bench.rs:181:criterion_main!(benches);
+./sochdb-index/benches/concurrent_bench.rs:22:use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+./sochdb-index/benches/concurrent_bench.rs:39:            BenchmarkId::from_parameter(num_threads),
+./sochdb-index/benches/concurrent_bench.rs:91:            BenchmarkId::from_parameter(num_threads),
+./sochdb-index/benches/concurrent_bench.rs:129:            BenchmarkId::from_parameter(num_threads),
+./sochdb-index/benches/concurrent_bench.rs:208:            BenchmarkId::from_parameter(num_threads),
+./sochdb-index/benches/concurrent_bench.rs:240:criterion_group!(
+./sochdb-index/benches/concurrent_bench.rs:247:criterion_main!(benches);
+./sochdb-index/benches/quantization_bench.rs:25:use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+./sochdb-index/benches/quantization_bench.rs:47:            BenchmarkId::new("precision", format!("{:?}", precision)),
+./sochdb-index/benches/quantization_bench.rs:82:            BenchmarkId::new("precision", format!("{:?}", precision)),
+./sochdb-index/benches/quantization_bench.rs:113:            BenchmarkId::new("precision", format!("{:?}", precision)),
+./sochdb-index/benches/quantization_bench.rs:137:criterion_group!(
+./sochdb-index/benches/quantization_bench.rs:143:criterion_main!(benches);
+./sochdb-storage/benches/sochdb_benchmarks.rs:28:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/sochdb_benchmarks.rs:361:        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+./sochdb-storage/benches/sochdb_benchmarks.rs:384:        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+./sochdb-storage/benches/sochdb_benchmarks.rs:410:            BenchmarkId::from_parameter(scan_size),
+./sochdb-storage/benches/sochdb_benchmarks.rs:433:        group.bench_with_input(BenchmarkId::new("json", size), &records, |b, records| {
+./sochdb-storage/benches/sochdb_benchmarks.rs:440:        group.bench_with_input(BenchmarkId::new("toon", size), &records, |b, records| {
+./sochdb-storage/benches/sochdb_benchmarks.rs:473:    group.bench_function("ycsb_a", |b| {
+./sochdb-storage/benches/sochdb_benchmarks.rs:488:    group.bench_function("ycsb_b", |b| {
+./sochdb-storage/benches/sochdb_benchmarks.rs:505:criterion_group!(
+./sochdb-storage/benches/sochdb_benchmarks.rs:514:criterion_main!(benches);
+./sochdb-storage/benches/bench_comparison.rs:32:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_comparison.rs:59:        group.bench_function("sochdb", |b| {
+./sochdb-storage/benches/bench_comparison.rs:90:        group.bench_function("sochdb", |b| {
+./sochdb-storage/benches/bench_comparison.rs:134:        group.bench_function("sochdb", |b| {
+./sochdb-storage/benches/bench_comparison.rs:177:        group.bench_function("sochdb", |b| {
+./sochdb-storage/benches/bench_comparison.rs:230:                BenchmarkId::new("sochdb", scan_size),
+./sochdb-storage/benches/bench_comparison.rs:253:criterion_group!(
+./sochdb-storage/benches/bench_comparison.rs:262:criterion_main!(benches);
+./sochdb-storage/benches/bench_point_read.rs:33:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_point_read.rs:59:        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &_size| {
+./sochdb-storage/benches/bench_point_read.rs:108:    group.bench_function("uniform", |b| {
+./sochdb-storage/benches/bench_point_read.rs:127:    group.bench_function("zipfian", |b| {
+./sochdb-storage/benches/bench_point_read.rs:147:    group.bench_function("sequential", |b| {
+./sochdb-storage/benches/bench_point_read.rs:188:    group.bench_function("miss", |b| {
+./sochdb-storage/benches/bench_point_read.rs:232:            BenchmarkId::from_parameter(format!("{}B", value_size)),
+./sochdb-storage/benches/bench_point_read.rs:259:criterion_group!(
+./sochdb-storage/benches/bench_point_read.rs:267:criterion_main!(benches);
+./sochdb-storage/benches/bench_concurrency.rs:36:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_concurrency.rs:202:            BenchmarkId::from_parameter(format!("{}t", num_threads)),
+./sochdb-storage/benches/bench_concurrency.rs:244:            BenchmarkId::from_parameter(format!("{}t", num_threads)),
+./sochdb-storage/benches/bench_concurrency.rs:298:            BenchmarkId::from_parameter(format!("{}t", num_threads)),
+./sochdb-storage/benches/bench_concurrency.rs:356:        group.bench_function(format!("{}t_reads", num_threads), |b| {
+./sochdb-storage/benches/bench_concurrency.rs:387:criterion_group!(
+./sochdb-storage/benches/bench_concurrency.rs:395:criterion_main!(benches);
+./sochdb-storage/benches/bench_write_amp.rs:35:use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_write_amp.rs:70:            BenchmarkId::from_parameter(format!("{}keys", dataset_size)),
+./sochdb-storage/benches/bench_write_amp.rs:129:            BenchmarkId::from_parameter(format!("{}B", value_size)),
+./sochdb-storage/benches/bench_write_amp.rs:180:            BenchmarkId::from_parameter(format!("{}rounds", update_rounds)),
+./sochdb-storage/benches/bench_write_amp.rs:242:    group.bench_function("full_report", |b| {
+./sochdb-storage/benches/bench_write_amp.rs:279:criterion_group!(
+./sochdb-storage/benches/bench_write_amp.rs:287:criterion_main!(benches);
+./sochdb-storage/benches/bench_space_amp.rs:35:use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_space_amp.rs:70:            BenchmarkId::from_parameter(format!("{}keys", dataset_size)),
+./sochdb-storage/benches/bench_space_amp.rs:122:            BenchmarkId::from_parameter(format!("{}pct", delete_pct)),
+./sochdb-storage/benches/bench_space_amp.rs:184:            BenchmarkId::from_parameter(format!("{}rounds", update_rounds)),
+./sochdb-storage/benches/bench_space_amp.rs:245:    group.bench_function("full_report", |b| {
+./sochdb-storage/benches/bench_space_amp.rs:276:criterion_group!(
+./sochdb-storage/benches/bench_space_amp.rs:284:criterion_main!(benches);
+./sochdb-storage/benches/bench_recovery.rs:30:use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_recovery.rs:46:            BenchmarkId::from_parameter(format!("{}keys", dataset_size)),
+./sochdb-storage/benches/bench_recovery.rs:89:            BenchmarkId::from_parameter(format!("{}writes", writes_before_recover)),
+./sochdb-storage/benches/bench_recovery.rs:139:            BenchmarkId::from_parameter(format!("{}txns", num_txns)),
+./sochdb-storage/benches/bench_recovery.rs:190:            BenchmarkId::from_parameter(format!("{}uncommitted", uncommitted_size)),
+./sochdb-storage/benches/bench_recovery.rs:246:    group.bench_function("full_recovery", |b| {
+./sochdb-storage/benches/bench_recovery.rs:281:criterion_group!(
+./sochdb-storage/benches/bench_recovery.rs:290:criterion_main!(benches);
+./sochdb-storage/benches/bench_ycsb.rs:35:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_ycsb.rs:152:    group.bench_function("workload_a", |b| {
+./sochdb-storage/benches/bench_ycsb.rs:178:    group.bench_function("workload_b", |b| {
+./sochdb-storage/benches/bench_ycsb.rs:204:    group.bench_function("workload_c", |b| {
+./sochdb-storage/benches/bench_ycsb.rs:231:    group.bench_function("workload_e", |b| {
+./sochdb-storage/benches/bench_ycsb.rs:269:            BenchmarkId::from_parameter(&workload_name),
+./sochdb-storage/benches/bench_ycsb.rs:282:criterion_group!(
+./sochdb-storage/benches/bench_ycsb.rs:291:criterion_main!(benches);
+./sochdb-storage/benches/bench_scan.rs:37:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_scan.rs:62:            BenchmarkId::from_parameter(scan_size),
+./sochdb-storage/benches/bench_scan.rs:114:    group.bench_function("collect", |b| {
+./sochdb-storage/benches/bench_scan.rs:137:    group.bench_function("iterator", |b| {
+./sochdb-storage/benches/bench_scan.rs:183:    group.bench_function("short_prefix", |b| {
+./sochdb-storage/benches/bench_scan.rs:196:    group.bench_function("long_prefix", |b| {
+./sochdb-storage/benches/bench_scan.rs:237:            BenchmarkId::from_parameter(format!("{}B", value_size)),
+./sochdb-storage/benches/bench_scan.rs:265:criterion_group!(
+./sochdb-storage/benches/bench_scan.rs:273:criterion_main!(benches);
+./sochdb-storage/benches/bench_compaction.rs:30:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_compaction.rs:46:    group.bench_function("baseline", |b| {
+./sochdb-storage/benches/bench_compaction.rs:96:    group.bench_function("baseline", |b| {
+./sochdb-storage/benches/bench_compaction.rs:148:            BenchmarkId::from_parameter(format!("{}keys", data_size)),
+./sochdb-storage/benches/bench_compaction.rs:214:    group.bench_function("read_100", |b| {
+./sochdb-storage/benches/bench_compaction.rs:242:            BenchmarkId::from_parameter(format!("{}rounds", update_rounds)),
+./sochdb-storage/benches/bench_compaction.rs:290:criterion_group!(
+./sochdb-storage/benches/bench_compaction.rs:299:criterion_main!(benches);
+./sochdb-storage/benches/bench_write.rs:32:use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_write.rs:58:        group.bench_function(mode_name, |b| {
+./sochdb-storage/benches/bench_write.rs:91:            BenchmarkId::from_parameter(format!("{}B", value_size)),
+./sochdb-storage/benches/bench_write.rs:131:            BenchmarkId::from_parameter(batch_size),
+./sochdb-storage/benches/bench_write.rs:174:            BenchmarkId::from_parameter(batch_size),
+./sochdb-storage/benches/bench_write.rs:231:        group.bench_function("disabled", |b| {
+./sochdb-storage/benches/bench_write.rs:260:        group.bench_function("enabled", |b| {
+./sochdb-storage/benches/bench_write.rs:282:criterion_group!(
+./sochdb-storage/benches/bench_write.rs:291:criterion_main!(benches);
+./sochdb-storage/benches/bench_memory.rs:35:use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+./sochdb-storage/benches/bench_memory.rs:89:            BenchmarkId::from_parameter(format!("{}keys", dataset_size)),
+./sochdb-storage/benches/bench_memory.rs:128:            BenchmarkId::from_parameter(format!("{}B", value_size)),
+./sochdb-storage/benches/bench_memory.rs:166:    group.bench_function("after_reads", |b| {
+./sochdb-storage/benches/bench_memory.rs:207:            BenchmarkId::from_parameter(format!("{}rounds", update_rounds)),
+./sochdb-storage/benches/bench_memory.rs:253:    group.bench_function("summary", |b| {
+./sochdb-storage/benches/bench_memory.rs:285:criterion_group!(
+./sochdb-storage/benches/bench_memory.rs:294:criterion_main!(benches);
+./sochdb-vector/benches/simd_kernels.rs:5:use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+./sochdb-vector/benches/simd_kernels.rs:28:                BenchmarkId::new("simd", format!("{}x{}", n_vec, n_blocks)),
+./sochdb-vector/benches/simd_kernels.rs:60:    group.bench_function("simd", |b| {
+./sochdb-vector/benches/simd_kernels.rs:89:            BenchmarkId::new("single", dim),
+./sochdb-vector/benches/simd_kernels.rs:114:            BenchmarkId::new("batch", n_vec),
+./sochdb-vector/benches/simd_kernels.rs:150:            BenchmarkId::new("basic", n_rows),
+./sochdb-vector/benches/simd_kernels.rs:181:    group.bench_function("with_txn", |bench| {
+./sochdb-vector/benches/simd_kernels.rs:207:    group.bench_function("detect", |b| {
+./sochdb-vector/benches/simd_kernels.rs:214:criterion_group!(
+./sochdb-vector/benches/simd_kernels.rs:225:criterion_main!(benches);
+./sochdb-tools/benches/bulk_ingest.rs:27:use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+./sochdb-tools/benches/bulk_ingest.rs:54:            BenchmarkId::new("dimension", dimension),
+./sochdb-tools/benches/bulk_ingest.rs:90:            BenchmarkId::new("size", batch_size),
+./sochdb-tools/benches/bulk_ingest.rs:128:    group.bench_function("sequential_sum", |b| {
+./sochdb-tools/benches/bulk_ingest.rs:135:    group.bench_function("chunked_iter", |b| {
+./sochdb-tools/benches/bulk_ingest.rs:161:        group.bench_function(&label, |b| {
+./sochdb-tools/benches/bulk_ingest.rs:188:criterion_group!(
+./sochdb-tools/benches/bulk_ingest.rs:196:criterion_main!(benches);

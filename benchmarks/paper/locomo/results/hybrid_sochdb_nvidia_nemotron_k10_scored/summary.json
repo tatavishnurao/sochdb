@@ -1,0 +1,48 @@
+{
+  "n_questions": 1986,
+  "system": "hybrid_bm25_sochdb_nvidia_nvidia/llama_nemotron_embed_1b_v2",
+  "mode": "retrieval",
+  "evidence_hit_rate": 0.6358118361153262,
+  "evidence_recall": 0.588382063135771,
+  "avg_context_tokens": 333.8333333333333,
+  "avg_latency_ms": 179.30068349698382,
+  "p50_latency_ms": 179.81112600000415,
+  "p95_latency_ms": 180.6744539999272,
+  "by_category": {
+    "adversarial": {
+      "n_questions": 446,
+      "evidence_hit_rate": 0.6838565022421524,
+      "evidence_recall": 0.6771300448430493,
+      "avg_context_tokens": 340.0986547085202,
+      "avg_latency_ms": 179.44822726682233
+    },
+    "multi_hop": {
+      "n_questions": 96,
+      "evidence_hit_rate": 0.3258426966292135,
+      "evidence_recall": 0.24168319012998457,
+      "avg_context_tokens": 321.8229166666667,
+      "avg_latency_ms": 179.31845831253193
+    },
+    "open_domain": {
+      "n_questions": 841,
+      "evidence_hit_rate": 0.6730083234244947,
+      "evidence_recall": 0.6609195402298851,
+      "avg_context_tokens": 332.17479191438764,
+      "avg_latency_ms": 179.44320827467507
+    },
+    "single_hop": {
+      "n_questions": 282,
+      "evidence_hit_rate": 0.47330960854092524,
+      "evidence_recall": 0.24960214079899415,
+      "avg_context_tokens": 330.48581560283685,
+      "avg_latency_ms": 178.91608698581592
+    },
+    "temporal": {
+      "n_questions": 321,
+      "evidence_hit_rate": 0.7,
+      "evidence_recall": 0.66796875,
+      "avg_context_tokens": 336.00623052959503,
+      "avg_latency_ms": 179.0548329501627
+    }
+  }
+}

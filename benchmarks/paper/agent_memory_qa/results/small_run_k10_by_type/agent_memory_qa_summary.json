@@ -1,0 +1,378 @@
+[
+  {
+    "n_questions": 16,
+    "exact_match": 0.0,
+    "f1": 0.0,
+    "cited_memory_recall": 0.0,
+    "evidence_hit_rate": 0.0,
+    "contains_answer_in_context": 0.0,
+    "avg_context_tokens": 0.0,
+    "avg_latency_ms": 0.007660250275876024,
+    "system": "no_memory",
+    "by_type": {
+      "comparison": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.0034810000215657055
+      },
+      "knowledge_update": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.004798999725608155
+      },
+      "multi_fact": {
+        "n_questions": 5,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.0041446004615863785
+      },
+      "paper_integrity": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.0048080000851769
+      },
+      "paper_structure": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.004458001058083028
+      },
+      "positioning": {
+        "n_questions": 2,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.003656999979284592
+      },
+      "single_hop": {
+        "n_questions": 3,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.022417333336003747
+      },
+      "temporal_update": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.004986000931239687
+      },
+      "why": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 0.0,
+        "avg_latency_ms": 0.004743000317830592
+      }
+    }
+  },
+  {
+    "n_questions": 16,
+    "exact_match": 0.5625,
+    "f1": 0.5625,
+    "cited_memory_recall": 0.5729166666666666,
+    "evidence_hit_rate": 0.625,
+    "contains_answer_in_context": 0.25,
+    "avg_context_tokens": 326.0,
+    "avg_latency_ms": 0.07570781224330858,
+    "system": "recent_history",
+    "by_type": {
+      "comparison": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.07630300024175085
+      },
+      "knowledge_update": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.0751309999031946
+      },
+      "multi_fact": {
+        "n_questions": 5,
+        "exact_match": 0.4,
+        "f1": 0.4,
+        "cited_memory_recall": 0.4,
+        "evidence_hit_rate": 0.4,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.07366099998762365
+      },
+      "paper_integrity": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.07693099905736744
+      },
+      "paper_structure": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.07591399844386615
+      },
+      "positioning": {
+        "n_questions": 2,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.0736759993742453
+      },
+      "single_hop": {
+        "n_questions": 3,
+        "exact_match": 0.3333333333333333,
+        "f1": 0.3333333333333333,
+        "cited_memory_recall": 0.38888888888888884,
+        "evidence_hit_rate": 0.6666666666666666,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.07959366727542753
+      },
+      "temporal_update": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.0766059984016465
+      },
+      "why": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 326.0,
+        "avg_latency_ms": 0.0760019993322203
+      }
+    }
+  },
+  {
+    "n_questions": 16,
+    "exact_match": 0.9375,
+    "f1": 0.9375,
+    "cited_memory_recall": 0.9375,
+    "evidence_hit_rate": 0.9375,
+    "contains_answer_in_context": 0.5,
+    "avg_context_tokens": 325.1875,
+    "avg_latency_ms": 0.3245471249329057,
+    "system": "vector_rag",
+    "by_type": {
+      "comparison": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 294.0,
+        "avg_latency_ms": 0.30595699900004547
+      },
+      "knowledge_update": {
+        "n_questions": 1,
+        "exact_match": 0.0,
+        "f1": 0.0,
+        "cited_memory_recall": 0.0,
+        "evidence_hit_rate": 0.0,
+        "avg_context_tokens": 323.0,
+        "avg_latency_ms": 0.3149530002701795
+      },
+      "multi_fact": {
+        "n_questions": 5,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 321.4,
+        "avg_latency_ms": 0.316550599745824
+      },
+      "paper_integrity": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 345.0,
+        "avg_latency_ms": 0.3675400002975948
+      },
+      "paper_structure": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 324.0,
+        "avg_latency_ms": 0.3351010000187671
+      },
+      "positioning": {
+        "n_questions": 2,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 337.5,
+        "avg_latency_ms": 0.33056850043067243
+      },
+      "single_hop": {
+        "n_questions": 3,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 324.3333333333333,
+        "avg_latency_ms": 0.31562033291265834
+      },
+      "temporal_update": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 329.0,
+        "avg_latency_ms": 0.3169940009684069
+      },
+      "why": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 333.0,
+        "avg_latency_ms": 0.36145800004305784
+      }
+    }
+  },
+  {
+    "n_questions": 16,
+    "exact_match": 1.0,
+    "f1": 1.0,
+    "cited_memory_recall": 1.0,
+    "evidence_hit_rate": 1.0,
+    "contains_answer_in_context": 0.5625,
+    "avg_context_tokens": 324.875,
+    "avg_latency_ms": 0.5882258747078595,
+    "system": "sochdb",
+    "by_type": {
+      "comparison": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 304.0,
+        "avg_latency_ms": 0.5281419998937054
+      },
+      "knowledge_update": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 324.0,
+        "avg_latency_ms": 0.5340469997463515
+      },
+      "multi_fact": {
+        "n_questions": 5,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 323.8,
+        "avg_latency_ms": 0.530215399703593
+      },
+      "paper_integrity": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 343.0,
+        "avg_latency_ms": 0.8469750009680865
+      },
+      "paper_structure": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 324.0,
+        "avg_latency_ms": 0.7887619995017303
+      },
+      "positioning": {
+        "n_questions": 2,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 320.5,
+        "avg_latency_ms": 0.6614139992962009
+      },
+      "single_hop": {
+        "n_questions": 3,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 324.0,
+        "avg_latency_ms": 0.5546093331455874
+      },
+      "temporal_update": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 324.0,
+        "avg_latency_ms": 0.527832999068778
+      },
+      "why": {
+        "n_questions": 1,
+        "exact_match": 1.0,
+        "f1": 1.0,
+        "cited_memory_recall": 1.0,
+        "evidence_hit_rate": 1.0,
+        "avg_context_tokens": 347.0,
+        "avg_latency_ms": 0.5481219995999709
+      }
+    }
+  }
+]

@@ -1,0 +1,48 @@
+{
+  "n_questions": 199,
+  "system": "sochdb_sdk",
+  "mode": "retrieval",
+  "evidence_hit_rate": 0.18877551020408162,
+  "evidence_recall": 0.1836734693877551,
+  "avg_context_tokens": 262.68341708542715,
+  "avg_latency_ms": 207.73640744225838,
+  "p50_latency_ms": 207.78798800165532,
+  "p95_latency_ms": 208.49631799865165,
+  "by_category": {
+    "adversarial": {
+      "n_questions": 47,
+      "evidence_hit_rate": 0.23404255319148937,
+      "evidence_recall": 0.22340425531914893,
+      "avg_context_tokens": 258.40425531914894,
+      "avg_latency_ms": 207.6839621703913
+    },
+    "multi_hop": {
+      "n_questions": 13,
+      "evidence_hit_rate": 0.0,
+      "evidence_recall": 0.0,
+      "avg_context_tokens": 291.53846153846155,
+      "avg_latency_ms": 207.92032315372265
+    },
+    "open_domain": {
+      "n_questions": 70,
+      "evidence_hit_rate": 0.21428571428571427,
+      "evidence_recall": 0.20714285714285716,
+      "avg_context_tokens": 261.3142857142857,
+      "avg_latency_ms": 207.75373652858045
+    },
+    "single_hop": {
+      "n_questions": 32,
+      "evidence_hit_rate": 0.03225806451612903,
+      "evidence_recall": 0.03225806451612903,
+      "avg_context_tokens": 228.53125,
+      "avg_latency_ms": 207.87193187527464
+    },
+    "temporal": {
+      "n_questions": 37,
+      "evidence_hit_rate": 0.2702702702702703,
+      "evidence_recall": 0.2702702702702703,
+      "avg_context_tokens": 290.1081081081081,
+      "avg_latency_ms": 207.58841299981657
+    }
+  }
+}

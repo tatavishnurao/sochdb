@@ -1,0 +1,46 @@
+[
+  {
+    "n_questions": 16,
+    "exact_match": 0.0,
+    "f1": 0.0,
+    "cited_memory_recall": 0.0,
+    "evidence_hit_rate": 0.0,
+    "contains_answer_in_context": 0.0,
+    "avg_context_tokens": 0.0,
+    "avg_latency_ms": 0.019836499973280297,
+    "system": "no_memory"
+  },
+  {
+    "n_questions": 16,
+    "exact_match": 0.1875,
+    "f1": 0.1875,
+    "cited_memory_recall": 0.19791666666666666,
+    "evidence_hit_rate": 0.25,
+    "contains_answer_in_context": 0.125,
+    "avg_context_tokens": 91.0,
+    "avg_latency_ms": 0.05901118754536583,
+    "system": "recent_history"
+  },
+  {
+    "n_questions": 16,
+    "exact_match": 0.8125,
+    "f1": 0.8125,
+    "cited_memory_recall": 0.7916666666666666,
+    "evidence_hit_rate": 0.875,
+    "contains_answer_in_context": 0.4375,
+    "avg_context_tokens": 102.1875,
+    "avg_latency_ms": 0.6386951873764701,
+    "system": "vector_rag"
+  },
+  {
+    "n_questions": 16,
+    "exact_match": 0.9375,
+    "f1": 0.9375,
+    "cited_memory_recall": 0.8854166666666666,
+    "evidence_hit_rate": 1.0,
+    "contains_answer_in_context": 0.5625,
+    "avg_context_tokens": 99.875,
+    "avg_latency_ms": 0.5949598127017452,
+    "system": "sochdb"
+  }
+]

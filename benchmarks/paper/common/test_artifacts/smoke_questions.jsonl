@@ -1,0 +1,1 @@
+{"sample_id": "s1", "question_id": "q1", "question": "What did Alice buy at the market?", "answer": "green tea", "category": "single_hop", "evidence_memory_ids": ["m1"], "metadata": {}}

@@ -1,0 +1,48 @@
+{
+  "n_questions": 199,
+  "system": "hybrid_bm25_local_hash_text_embedding_3_small",
+  "mode": "retrieval",
+  "evidence_hit_rate": 0.35714285714285715,
+  "evidence_recall": 0.336734693877551,
+  "avg_context_tokens": 273.0753768844221,
+  "avg_latency_ms": 20.44310136694896,
+  "p50_latency_ms": 20.283175002987264,
+  "p95_latency_ms": 23.495956000260776,
+  "by_category": {
+    "adversarial": {
+      "n_questions": 47,
+      "evidence_hit_rate": 0.46808510638297873,
+      "evidence_recall": 0.4574468085106383,
+      "avg_context_tokens": 268.3191489361702,
+      "avg_latency_ms": 20.790953915182282
+    },
+    "multi_hop": {
+      "n_questions": 13,
+      "evidence_hit_rate": 0.18181818181818182,
+      "evidence_recall": 0.13636363636363635,
+      "avg_context_tokens": 316.15384615384613,
+      "avg_latency_ms": 20.436334230628116
+    },
+    "open_domain": {
+      "n_questions": 70,
+      "evidence_hit_rate": 0.34285714285714286,
+      "evidence_recall": 0.3357142857142857,
+      "avg_context_tokens": 266.12857142857143,
+      "avg_latency_ms": 20.1522241287291
+    },
+    "single_hop": {
+      "n_questions": 32,
+      "evidence_hit_rate": 0.1935483870967742,
+      "evidence_recall": 0.11290322580645161,
+      "avg_context_tokens": 255.0625,
+      "avg_latency_ms": 19.9130261873961
+    },
+    "temporal": {
+      "n_questions": 37,
+      "evidence_hit_rate": 0.43243243243243246,
+      "evidence_recall": 0.43243243243243246,
+      "avg_context_tokens": 292.7027027027027,
+      "avg_latency_ms": 21.012363946037777
+    }
+  }
+}

@@ -110,3 +110,9 @@ benchmarks/longmemeval/data/
 sochdb-bench/bench-results-*/
 **/embedding_cache/
 *.npy
+
+# Large benchmark data files (>50MB)
+benchmarks/paper/locomo/data/*.jsonl
+benchmarks/paper/locomo/data/*.json
+benchmarks/paper/locomo/results/**/retrieval.jsonl
+benchmarks/paper/longmemeval/data/raw/**/*.json

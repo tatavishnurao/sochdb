@@ -1,0 +1,3 @@
+{"sample_id": "s1", "memory_id": "m1", "speaker": "Alice", "session": "s1", "turn_id": 1, "text": "Alice bought green tea at the market.", "metadata": {}}
+{"sample_id": "s1", "memory_id": "m2", "speaker": "Bob", "session": "s1", "turn_id": 2, "text": "Bob repaired a bicycle.", "metadata": {}}
+{"sample_id": "s1", "memory_id": "m3", "speaker": "Alice", "session": "s2", "turn_id": 1, "text": "Alice planned a train trip.", "metadata": {}}

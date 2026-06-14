@@ -1,0 +1,25 @@
+Tue May 12 09:38:26 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 595.71.05              Driver Version: 595.71.05      CUDA Version: 13.2     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 4060 ...    Off |   00000000:01:00.0  On |                  N/A |
+| N/A   69C    P3             18W /   80W |    1110MiB /   8188MiB |     53%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A            1561      G   /usr/bin/kwin_wayland                   110MiB |
+|    0   N/A  N/A            1676      G   /usr/bin/Xwayland                         4MiB |
+|    0   N/A  N/A            1718      G   /usr/bin/plasmashell                    127MiB |
+|    0   N/A  N/A            5094      G   /opt/zen-browser-bin/zen-bin            197MiB |
+|    0   N/A  N/A            6704    C+G   /usr/lib/zed/zed-editor                 320MiB |
+|    0   N/A  N/A           25801    C+G   /usr/bin/cosmic-term                     50MiB |
++-----------------------------------------------------------------------------------------+

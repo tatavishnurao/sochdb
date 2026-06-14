@@ -1,0 +1,1970 @@
+{
+  "system": "sochdb_hybrid",
+  "legs": {
+    "grep_lexical": true,
+    "hnsw_dense": true
+  },
+  "rrf_k": 60,
+  "corpus_size": 500,
+  "query_count": 50,
+  "embedding_model": "unknown",
+  "top_k_per_leg": 10,
+  "top_n_fused": 5,
+  "query_latency": {
+    "p50_ms": 2.796,
+    "p95_ms": 9.213,
+    "mean_ms": 3.502
+  },
+  "queries": [
+    {
+      "query_id": "query-0000",
+      "query": "momentum neural",
+      "relevant_ids": [
+        "doc-0380",
+        "doc-0250",
+        "doc-0190",
+        "doc-0290",
+        "doc-0240"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0190",
+          "rrf_score": 0.028992,
+          "title": "embedding recurrent learning rate convolution in machine learning"
+        },
+        {
+          "doc_id": "doc-0140",
+          "rrf_score": 0.027433,
+          "title": "attention momentum softmax neural in machine learning"
+        },
+        {
+          "doc_id": "doc-0350",
+          "rrf_score": 0.027271,
+          "title": "hyperparameter dropout in machine learning"
+        },
+        {
+          "doc_id": "doc-0410",
+          "rrf_score": 0.027109,
+          "title": "embedding batch exploding gradient in machine learning"
+        },
+        {
+          "doc_id": "doc-0050",
+          "rrf_score": 0.027072,
+          "title": "accuracy epoch in machine learning"
+        }
+      ],
+      "latency_ms": 2.796
+    },
+    {
+      "query_id": "query-0001",
+      "query": "storage foreign  WAL latch",
+      "relevant_ids": [
+        "doc-0141",
+        "doc-0351",
+        "doc-0321",
+        "doc-0331",
+        "doc-0311"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0021",
+          "rrf_score": 0.032266,
+          "title": "lock isolation buffer pool constraint in databases"
+        },
+        {
+          "doc_id": "doc-0181",
+          "rrf_score": 0.032266,
+          "title": "replica commit optimizer in databases"
+        },
+        {
+          "doc_id": "doc-0071",
+          "rrf_score": 0.031514,
+          "title": "durability compaction deadlock lock in databases"
+        },
+        {
+          "doc_id": "doc-0271",
+          "rrf_score": 0.029643,
+          "title": "compaction  WAL in databases"
+        },
+        {
+          "doc_id": "doc-0301",
+          "rrf_score": 0.029199,
+          "title": "nested primary compaction in databases"
+        }
+      ],
+      "latency_ms": 1.52
+    },
+    {
+      "query_id": "query-0002",
+      "query": "compiler optimization matching reference lexer",
+      "relevant_ids": [
+        "doc-0092",
+        "doc-0012",
+        "doc-0032",
+        "doc-0142",
+        "doc-0122"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0092",
+          "rrf_score": 0.031054,
+          "title": "ownership runtime dispatch pattern in programming languages"
+        },
+        {
+          "doc_id": "doc-0082",
+          "rrf_score": 0.028665,
+          "title": "system sweep in programming languages"
+        },
+        {
+          "doc_id": "doc-0472",
+          "rrf_score": 0.028531,
+          "title": "matching parser interface reference in programming languages"
+        },
+        {
+          "doc_id": "doc-0402",
+          "rrf_score": 0.028324,
+          "title": "optimization monad heap allocation pattern in programming languages"
+        },
+        {
+          "doc_id": "doc-0052",
+          "rrf_score": 0.027584,
+          "title": "ownership matching in programming languages"
+        }
+      ],
+      "latency_ms": 10.017
+    },
+    {
+      "query_id": "query-0003",
+      "query": "Term byzantine",
+      "relevant_ids": [
+        "doc-0153",
+        "doc-0383",
+        "doc-0343",
+        "doc-0373",
+        "doc-0223"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0393",
+          "rrf_score": 0.030835,
+          "title": "consensus vector in distributed systems"
+        },
+        {
+          "doc_id": "doc-0353",
+          "rrf_score": 0.030415,
+          "title": "byzantine tolerance Paxos gossip in distributed systems"
+        },
+        {
+          "doc_id": "doc-0313",
+          "rrf_score": 0.029911,
+          "title": "quorum append entries heartbeat election in distributed systems"
+        },
+        {
+          "doc_id": "doc-0163",
+          "rrf_score": 0.02938,
+          "title": "linearizability log entry in distributed systems"
+        },
+        {
+          "doc_id": "doc-0033",
+          "rrf_score": 0.028612,
+          "title": "tolerant gossip election in distributed systems"
+        }
+      ],
+      "latency_ms": 2.351
+    },
+    {
+      "query_id": "query-0004",
+      "query": "OAuth request response SSE",
+      "relevant_ids": [
+        "doc-0294",
+        "doc-0454",
+        "doc-0464",
+        "doc-0224",
+        "doc-0034"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0434",
+          "rrf_score": 0.029469,
+          "title": "SSE header sent in web development"
+        },
+        {
+          "doc_id": "doc-0104",
+          "rrf_score": 0.028958,
+          "title": "API request ETag in web development"
+        },
+        {
+          "doc_id": "doc-0394",
+          "rrf_score": 0.028739,
+          "title": "middleware POST in web development"
+        },
+        {
+          "doc_id": "doc-0414",
+          "rrf_score": 0.028373,
+          "title": "DELETE SSE server in web development"
+        },
+        {
+          "doc_id": "doc-0474",
+          "rrf_score": 0.027864,
+          "title": "events HTTP in web development"
+        }
+      ],
+      "latency_ms": 1.834
+    },
+    {
+      "query_id": "query-0005",
+      "query": "preemption CFS thread",
+      "relevant_ids": [
+        "doc-0345",
+        "doc-0415",
+        "doc-0385",
+        "doc-0035",
+        "doc-0395"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0395",
+          "rrf_score": 0.032018,
+          "title": "thread page in operating systems"
+        },
+        {
+          "doc_id": "doc-0435",
+          "rrf_score": 0.029727,
+          "title": "page device in operating systems"
+        },
+        {
+          "doc_id": "doc-0425",
+          "rrf_score": 0.027501,
+          "title": "killer table kernel in operating systems"
+        },
+        {
+          "doc_id": "doc-0255",
+          "rrf_score": 0.027497,
+          "title": "preemption fair in operating systems"
+        },
+        {
+          "doc_id": "doc-0085",
+          "rrf_score": 0.027365,
+          "title": "thread mmap killer in operating systems"
+        }
+      ],
+      "latency_ms": 4.956
+    },
+    {
+      "query_id": "query-0006",
+      "query": "NAT MSS",
+      "relevant_ids": [
+        "doc-0176",
+        "doc-0216",
+        "doc-0326",
+        "doc-0156",
+        "doc-0016"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0026",
+          "rrf_score": 0.031514,
+          "title": "tunneling fragmentation socket in networking"
+        },
+        {
+          "doc_id": "doc-0056",
+          "rrf_score": 0.029857,
+          "title": "slow retransmission in networking"
+        },
+        {
+          "doc_id": "doc-0306",
+          "rrf_score": 0.029551,
+          "title": "control TLS in networking"
+        },
+        {
+          "doc_id": "doc-0146",
+          "rrf_score": 0.02901,
+          "title": "UDP window in networking"
+        },
+        {
+          "doc_id": "doc-0006",
+          "rrf_score": 0.028694,
+          "title": "load certificate in networking"
+        }
+      ],
+      "latency_ms": 1.143
+    },
+    {
+      "query_id": "query-0007",
+      "query": "exploit supply chain",
+      "relevant_ids": [
+        "doc-0437",
+        "doc-0327",
+        "doc-0307",
+        "doc-0037",
+        "doc-0127"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0117",
+          "rrf_score": 0.032258,
+          "title": "engineering supply chain social in security"
+        },
+        {
+          "doc_id": "doc-0097",
+          "rrf_score": 0.02967,
+          "title": "audit patch in security"
+        },
+        {
+          "doc_id": "doc-0487",
+          "rrf_score": 0.028442,
+          "title": "injection penetration clickjacking in security"
+        },
+        {
+          "doc_id": "doc-0237",
+          "rrf_score": 0.028298,
+          "title": "threat model exploit in security"
+        },
+        {
+          "doc_id": "doc-0197",
+          "rrf_score": 0.028139,
+          "title": "exploit penetration SQL injection in security"
+        }
+      ],
+      "latency_ms": 3.573
+    },
+    {
+      "query_id": "query-0008",
+      "query": "precision recall metric sampling",
+      "relevant_ids": [
+        "doc-0058",
+        "doc-0018",
+        "doc-0368",
+        "doc-0388",
+        "doc-0398"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0308",
+          "rrf_score": 0.030622,
+          "title": "clustering feature tradeoff in data science"
+        },
+        {
+          "doc_id": "doc-0178",
+          "rrf_score": 0.029958,
+          "title": "precision recall permutation metric in data science"
+        },
+        {
+          "doc_id": "doc-0008",
+          "rrf_score": 0.028958,
+          "title": "tradeoff feature reduction in data science"
+        },
+        {
+          "doc_id": "doc-0398",
+          "rrf_score": 0.028446,
+          "title": "dimensionality pipeline probabilistic confusion matrix in data science"
+        },
+        {
+          "doc_id": "doc-0328",
+          "rrf_score": 0.027242,
+          "title": "feature reduction in data science"
+        }
+      ],
+      "latency_ms": 2.756
+    },
+    {
+      "query_id": "query-0009",
+      "query": "constraint adapter onboarding RecyclerView layout",
+      "relevant_ids": [
+        "doc-0159",
+        "doc-0479",
+        "doc-0449",
+        "doc-0029",
+        "doc-0239"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0209",
+          "rrf_score": 0.030303,
+          "title": "portrait landscape compose state flow in mobile development"
+        },
+        {
+          "doc_id": "doc-0389",
+          "rrf_score": 0.028021,
+          "title": "broadcast navigation component service in mobile development"
+        },
+        {
+          "doc_id": "doc-0259",
+          "rrf_score": 0.027425,
+          "title": "RecyclerView service adapter work manager in mobile development"
+        },
+        {
+          "doc_id": "doc-0019",
+          "rrf_score": 0.027047,
+          "title": "broadcast portrait landscape layout in mobile development"
+        },
+        {
+          "doc_id": "doc-0139",
+          "rrf_score": 0.026736,
+          "title": "Room RecyclerView receiver in mobile development"
+        }
+      ],
+      "latency_ms": 8.229
+    },
+    {
+      "query_id": "query-0010",
+      "query": "accuracy relu transformer",
+      "relevant_ids": [
+        "doc-0140",
+        "doc-0400",
+        "doc-0320",
+        "doc-0180",
+        "doc-0480"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0190",
+          "rrf_score": 0.029469,
+          "title": "embedding recurrent learning rate convolution in machine learning"
+        },
+        {
+          "doc_id": "doc-0160",
+          "rrf_score": 0.029462,
+          "title": "hyperparameter dropout training in machine learning"
+        },
+        {
+          "doc_id": "doc-0030",
+          "rrf_score": 0.029418,
+          "title": "gradient accuracy attention weight in machine learning"
+        },
+        {
+          "doc_id": "doc-0430",
+          "rrf_score": 0.028309,
+          "title": "gradient validation loss in machine learning"
+        },
+        {
+          "doc_id": "doc-0290",
+          "rrf_score": 0.027971,
+          "title": "accuracy momentum loss transformer in machine learning"
+        }
+      ],
+      "latency_ms": 1.733
+    },
+    {
+      "query_id": "query-0011",
+      "query": "btree scan",
+      "relevant_ids": [
+        "doc-0101",
+        "doc-0041",
+        "doc-0011",
+        "doc-0221",
+        "doc-0381"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0451",
+          "rrf_score": 0.030579,
+          "title": "shard trigger in databases"
+        },
+        {
+          "doc_id": "doc-0101",
+          "rrf_score": 0.030118,
+          "title": "merge compaction trigger query in databases"
+        },
+        {
+          "doc_id": "doc-0291",
+          "rrf_score": 0.029437,
+          "title": "btree replica log in databases"
+        },
+        {
+          "doc_id": "doc-0471",
+          "rrf_score": 0.02901,
+          "title": "atomicity hash in databases"
+        },
+        {
+          "doc_id": "doc-0321",
+          "rrf_score": 0.028787,
+          "title": "durability nested query in databases"
+        }
+      ],
+      "latency_ms": 1.265
+    },
+    {
+      "query_id": "query-0012",
+      "query": "static collection",
+      "relevant_ids": [
+        "doc-0132",
+        "doc-0172",
+        "doc-0472",
+        "doc-0432",
+        "doc-0452"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0102",
+          "rrf_score": 0.032258,
+          "title": "analysis trait pattern in programming languages"
+        },
+        {
+          "doc_id": "doc-0182",
+          "rrf_score": 0.032018,
+          "title": "closure static trait lexer in programming languages"
+        },
+        {
+          "doc_id": "doc-0072",
+          "rrf_score": 0.02753,
+          "title": "compiler stack in programming languages"
+        },
+        {
+          "doc_id": "doc-0202",
+          "rrf_score": 0.027364,
+          "title": "stack codegen in programming languages"
+        },
+        {
+          "doc_id": "doc-0392",
+          "rrf_score": 0.027032,
+          "title": "garbage compiler collection in programming languages"
+        }
+      ],
+      "latency_ms": 4.092
+    },
+    {
+      "query_id": "query-0013",
+      "query": "clock tolerance byzantine fault log entry",
+      "relevant_ids": [
+        "doc-0013",
+        "doc-0403",
+        "doc-0083",
+        "doc-0133",
+        "doc-0123"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0293",
+          "rrf_score": 0.029139,
+          "title": "quorum membership tolerance in distributed systems"
+        },
+        {
+          "doc_id": "doc-0403",
+          "rrf_score": 0.028624,
+          "title": "log entry Term in distributed systems"
+        },
+        {
+          "doc_id": "doc-0323",
+          "rrf_score": 0.027826,
+          "title": "protocol quorum vector CAP in distributed systems"
+        },
+        {
+          "doc_id": "doc-0063",
+          "rrf_score": 0.027623,
+          "title": "partition snapshot in distributed systems"
+        },
+        {
+          "doc_id": "doc-0483",
+          "rrf_score": 0.027619,
+          "title": "majority CAP in distributed systems"
+        }
+      ],
+      "latency_ms": 4.682
+    },
+    {
+      "query_id": "query-0014",
+      "query": "long polling response OAuth PUT",
+      "relevant_ids": [
+        "doc-0474",
+        "doc-0154",
+        "doc-0344",
+        "doc-0404",
+        "doc-0004"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0414",
+          "rrf_score": 0.031778,
+          "title": "DELETE SSE server in web development"
+        },
+        {
+          "doc_id": "doc-0404",
+          "rrf_score": 0.030118,
+          "title": "CSRF sent ETag in web development"
+        },
+        {
+          "doc_id": "doc-0294",
+          "rrf_score": 0.02938,
+          "title": "DELETE PUT in web development"
+        },
+        {
+          "doc_id": "doc-0054",
+          "rrf_score": 0.028543,
+          "title": "keepalive cookie in web development"
+        },
+        {
+          "doc_id": "doc-0494",
+          "rrf_score": 0.027673,
+          "title": "server cookie request XSS in web development"
+        }
+      ],
+      "latency_ms": 3.738
+    },
+    {
+      "query_id": "query-0015",
+      "query": "driver variable CFS context",
+      "relevant_ids": [
+        "doc-0315",
+        "doc-0345",
+        "doc-0485",
+        "doc-0365",
+        "doc-0425"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0315",
+          "rrf_score": 0.030777,
+          "title": "killer device cache line condition in operating systems"
+        },
+        {
+          "doc_id": "doc-0355",
+          "rrf_score": 0.029907,
+          "title": "syscall interrupt cache line spinlock in operating systems"
+        },
+        {
+          "doc_id": "doc-0015",
+          "rrf_score": 0.02895,
+          "title": "completely ioctl context device in operating systems"
+        },
+        {
+          "doc_id": "doc-0295",
+          "rrf_score": 0.027651,
+          "title": "sbrk variable in operating systems"
+        },
+        {
+          "doc_id": "doc-0025",
+          "rrf_score": 0.026374,
+          "title": "killer scheduler thread in operating systems"
+        }
+      ],
+      "latency_ms": 2.796
+    },
+    {
+      "query_id": "query-0016",
+      "query": "control DNS",
+      "relevant_ids": [
+        "doc-0376",
+        "doc-0056",
+        "doc-0176",
+        "doc-0486",
+        "doc-0106"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0156",
+          "rrf_score": 0.030777,
+          "title": "balancer subnet SYN in networking"
+        },
+        {
+          "doc_id": "doc-0146",
+          "rrf_score": 0.029287,
+          "title": "UDP window in networking"
+        },
+        {
+          "doc_id": "doc-0306",
+          "rrf_score": 0.027623,
+          "title": "control TLS in networking"
+        },
+        {
+          "doc_id": "doc-0196",
+          "rrf_score": 0.027382,
+          "title": "ACK congestion MTU in networking"
+        },
+        {
+          "doc_id": "doc-0266",
+          "rrf_score": 0.026709,
+          "title": "load protocol handshake in networking"
+        }
+      ],
+      "latency_ms": 2.827
+    },
+    {
+      "query_id": "query-0017",
+      "query": "certificate authorization",
+      "relevant_ids": [
+        "doc-0047",
+        "doc-0247",
+        "doc-0187",
+        "doc-0457",
+        "doc-0127"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0347",
+          "rrf_score": 0.030092,
+          "title": "engineering CVE in security"
+        },
+        {
+          "doc_id": "doc-0487",
+          "rrf_score": 0.029851,
+          "title": "injection penetration clickjacking in security"
+        },
+        {
+          "doc_id": "doc-0177",
+          "rrf_score": 0.028958,
+          "title": "phishing GDPR SQL injection testing in security"
+        },
+        {
+          "doc_id": "doc-0257",
+          "rrf_score": 0.02895,
+          "title": "assessment social threat model in security"
+        },
+        {
+          "doc_id": "doc-0107",
+          "rrf_score": 0.028589,
+          "title": "authorization exploit testing in security"
+        }
+      ],
+      "latency_ms": 3.336
+    },
+    {
+      "query_id": "query-0018",
+      "query": "importance metric F1 feature normalization",
+      "relevant_ids": [
+        "doc-0048",
+        "doc-0478",
+        "doc-0248",
+        "doc-0488",
+        "doc-0028"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0448",
+          "rrf_score": 0.030118,
+          "title": "imputation feature in data science"
+        },
+        {
+          "doc_id": "doc-0228",
+          "rrf_score": 0.029762,
+          "title": "pipeline t-SNE permutation in data science"
+        },
+        {
+          "doc_id": "doc-0488",
+          "rrf_score": 0.028543,
+          "title": "detection outlier UMAP in data science"
+        },
+        {
+          "doc_id": "doc-0388",
+          "rrf_score": 0.028439,
+          "title": "variance sampling regression in data science"
+        },
+        {
+          "doc_id": "doc-0258",
+          "rrf_score": 0.028283,
+          "title": "PCA F1 imputation LIME in data science"
+        }
+      ],
+      "latency_ms": 2.359
+    },
+    {
+      "query_id": "query-0019",
+      "query": "lifecycle responsive theming swipe refresh",
+      "relevant_ids": [
+        "doc-0119",
+        "doc-0209",
+        "doc-0409",
+        "doc-0029",
+        "doc-0469"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0389",
+          "rrf_score": 0.032787,
+          "title": "broadcast navigation component service in mobile development"
+        },
+        {
+          "doc_id": "doc-0349",
+          "rrf_score": 0.029387,
+          "title": "gesture theming in mobile development"
+        },
+        {
+          "doc_id": "doc-0449",
+          "rrf_score": 0.02904,
+          "title": "responsive layout ViewModel in mobile development"
+        },
+        {
+          "doc_id": "doc-0109",
+          "rrf_score": 0.02895,
+          "title": "work manager lifecycle in mobile development"
+        },
+        {
+          "doc_id": "doc-0189",
+          "rrf_score": 0.02886,
+          "title": "ViewHolder service receiver theming in mobile development"
+        }
+      ],
+      "latency_ms": 3.161
+    },
+    {
+      "query_id": "query-0020",
+      "query": "softmax relu loss vanishing sigmoid",
+      "relevant_ids": [
+        "doc-0470",
+        "doc-0070",
+        "doc-0410",
+        "doc-0480",
+        "doc-0300"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0190",
+          "rrf_score": 0.032787,
+          "title": "embedding recurrent learning rate convolution in machine learning"
+        },
+        {
+          "doc_id": "doc-0270",
+          "rrf_score": 0.031498,
+          "title": "learning activation divergence learning rate in machine learning"
+        },
+        {
+          "doc_id": "doc-0130",
+          "rrf_score": 0.028694,
+          "title": "divergence loss in machine learning"
+        },
+        {
+          "doc_id": "doc-0140",
+          "rrf_score": 0.028205,
+          "title": "attention momentum softmax neural in machine learning"
+        },
+        {
+          "doc_id": "doc-0490",
+          "rrf_score": 0.028039,
+          "title": "convolution deep transformer adaptive in machine learning"
+        }
+      ],
+      "latency_ms": 1.017
+    },
+    {
+      "query_id": "query-0021",
+      "query": "join lock",
+      "relevant_ids": [
+        "doc-0351",
+        "doc-0281",
+        "doc-0081",
+        "doc-0181",
+        "doc-0401"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0171",
+          "rrf_score": 0.030886,
+          "title": "atomicity consistency in databases"
+        },
+        {
+          "doc_id": "doc-0231",
+          "rrf_score": 0.03009,
+          "title": "deadlock recovery in databases"
+        },
+        {
+          "doc_id": "doc-0071",
+          "rrf_score": 0.029911,
+          "title": "durability compaction deadlock lock in databases"
+        },
+        {
+          "doc_id": "doc-0131",
+          "rrf_score": 0.02886,
+          "title": "checkpoint merge partition in databases"
+        },
+        {
+          "doc_id": "doc-0091",
+          "rrf_score": 0.028039,
+          "title": "commit compaction recovery shard in databases"
+        }
+      ],
+      "latency_ms": 2.282
+    },
+    {
+      "query_id": "query-0022",
+      "query": "stack inheritance inline generational reference",
+      "relevant_ids": [
+        "doc-0322",
+        "doc-0222",
+        "doc-0072",
+        "doc-0412",
+        "doc-0392"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0002",
+          "rrf_score": 0.031319,
+          "title": "matching heap allocation optimization parser in programming languages"
+        },
+        {
+          "doc_id": "doc-0072",
+          "rrf_score": 0.02971,
+          "title": "compiler stack in programming languages"
+        },
+        {
+          "doc_id": "doc-0292",
+          "rrf_score": 0.029324,
+          "title": "analysis stack reference borrow in programming languages"
+        },
+        {
+          "doc_id": "doc-0322",
+          "rrf_score": 0.029214,
+          "title": "inheritance AST runtime static in programming languages"
+        },
+        {
+          "doc_id": "doc-0162",
+          "rrf_score": 0.029206,
+          "title": "interface lexer in programming languages"
+        }
+      ],
+      "latency_ms": 7.325
+    },
+    {
+      "query_id": "query-0023",
+      "query": "split vector gossip consensus linearizability",
+      "relevant_ids": [
+        "doc-0003",
+        "doc-0043",
+        "doc-0343",
+        "doc-0033",
+        "doc-0053"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0133",
+          "rrf_score": 0.032018,
+          "title": "Term vector Raft in distributed systems"
+        },
+        {
+          "doc_id": "doc-0333",
+          "rrf_score": 0.031778,
+          "title": "Lamport linearizability in distributed systems"
+        },
+        {
+          "doc_id": "doc-0393",
+          "rrf_score": 0.029412,
+          "title": "consensus vector in distributed systems"
+        },
+        {
+          "doc_id": "doc-0183",
+          "rrf_score": 0.028694,
+          "title": "append entries brain in distributed systems"
+        },
+        {
+          "doc_id": "doc-0373",
+          "rrf_score": 0.02837,
+          "title": "leader quorum Paxos serializability in distributed systems"
+        }
+      ],
+      "latency_ms": 4.103
+    },
+    {
+      "query_id": "query-0024",
+      "query": "status DELETE events JWT code",
+      "relevant_ids": [
+        "doc-0124",
+        "doc-0004",
+        "doc-0414",
+        "doc-0204",
+        "doc-0164"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0104",
+          "rrf_score": 0.029828,
+          "title": "API request ETag in web development"
+        },
+        {
+          "doc_id": "doc-0124",
+          "rrf_score": 0.02837,
+          "title": "JWT cookie payload in web development"
+        },
+        {
+          "doc_id": "doc-0434",
+          "rrf_score": 0.027149,
+          "title": "SSE header sent in web development"
+        },
+        {
+          "doc_id": "doc-0004",
+          "rrf_score": 0.027119,
+          "title": "header SSE long polling API in web development"
+        },
+        {
+          "doc_id": "doc-0204",
+          "rrf_score": 0.026077,
+          "title": "status caching HTTP PATCH in web development"
+        }
+      ],
+      "latency_ms": 5.07
+    },
+    {
+      "query_id": "query-0025",
+      "query": "variable condition device",
+      "relevant_ids": [
+        "doc-0415",
+        "doc-0005",
+        "doc-0495",
+        "doc-0355",
+        "doc-0345"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0335",
+          "rrf_score": 0.032002,
+          "title": "condition completely scheduler semaphore in operating systems"
+        },
+        {
+          "doc_id": "doc-0005",
+          "rrf_score": 0.032002,
+          "title": "condition ioctl scheduler kernel in operating systems"
+        },
+        {
+          "doc_id": "doc-0465",
+          "rrf_score": 0.029877,
+          "title": "context sbrk completely in operating systems"
+        },
+        {
+          "doc_id": "doc-0315",
+          "rrf_score": 0.029857,
+          "title": "killer device cache line condition in operating systems"
+        },
+        {
+          "doc_id": "doc-0085",
+          "rrf_score": 0.028139,
+          "title": "thread mmap killer in operating systems"
+        }
+      ],
+      "latency_ms": 5.232
+    },
+    {
+      "query_id": "query-0026",
+      "query": "TCP start handshake DNS",
+      "relevant_ids": [
+        "doc-0396",
+        "doc-0226",
+        "doc-0156",
+        "doc-0066",
+        "doc-0086"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0386",
+          "rrf_score": 0.030077,
+          "title": "TLS timeout TCP in networking"
+        },
+        {
+          "doc_id": "doc-0376",
+          "rrf_score": 0.028531,
+          "title": "TLS load in networking"
+        },
+        {
+          "doc_id": "doc-0006",
+          "rrf_score": 0.028475,
+          "title": "load certificate in networking"
+        },
+        {
+          "doc_id": "doc-0306",
+          "rrf_score": 0.028021,
+          "title": "control TLS in networking"
+        },
+        {
+          "doc_id": "doc-0086",
+          "rrf_score": 0.027493,
+          "title": "NAT mask SYN in networking"
+        }
+      ],
+      "latency_ms": 0.813
+    },
+    {
+      "query_id": "query-0027",
+      "query": "salt testing vector",
+      "relevant_ids": [
+        "doc-0257",
+        "doc-0057",
+        "doc-0077",
+        "doc-0017",
+        "doc-0217"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0137",
+          "rrf_score": 0.028778,
+          "title": "XSS vector in security"
+        },
+        {
+          "doc_id": "doc-0037",
+          "rrf_score": 0.028372,
+          "title": "injection GDPR zero day in security"
+        },
+        {
+          "doc_id": "doc-0107",
+          "rrf_score": 0.028169,
+          "title": "authorization exploit testing in security"
+        },
+        {
+          "doc_id": "doc-0147",
+          "rrf_score": 0.027971,
+          "title": "exploit certificate in security"
+        },
+        {
+          "doc_id": "doc-0307",
+          "rrf_score": 0.027864,
+          "title": "risk CVE SQL injection social in security"
+        }
+      ],
+      "latency_ms": 2.206
+    },
+    {
+      "query_id": "query-0028",
+      "query": "metric t-SNE F1 PCA variance",
+      "relevant_ids": [
+        "doc-0008",
+        "doc-0048",
+        "doc-0078",
+        "doc-0338",
+        "doc-0398"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0048",
+          "rrf_score": 0.029631,
+          "title": "PCA tradeoff classification in data science"
+        },
+        {
+          "doc_id": "doc-0018",
+          "rrf_score": 0.029139,
+          "title": "SHAP imputation probabilistic feature in data science"
+        },
+        {
+          "doc_id": "doc-0338",
+          "rrf_score": 0.029083,
+          "title": "LIME sampling in data science"
+        },
+        {
+          "doc_id": "doc-0238",
+          "rrf_score": 0.02895,
+          "title": "outlier LIME F1 in data science"
+        },
+        {
+          "doc_id": "doc-0088",
+          "rrf_score": 0.027912,
+          "title": "fairness calibration SHAP in data science"
+        }
+      ],
+      "latency_ms": 1.251
+    },
+    {
+      "query_id": "query-0029",
+      "query": "intent Room touch",
+      "relevant_ids": [
+        "doc-0319",
+        "doc-0139",
+        "doc-0029",
+        "doc-0299",
+        "doc-0109"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0179",
+          "rrf_score": 0.031281,
+          "title": "gesture navigation component work manager adapter in mobile development"
+        },
+        {
+          "doc_id": "doc-0349",
+          "rrf_score": 0.030886,
+          "title": "gesture theming in mobile development"
+        },
+        {
+          "doc_id": "doc-0379",
+          "rrf_score": 0.028814,
+          "title": "adapter LiveData in mobile development"
+        },
+        {
+          "doc_id": "doc-0299",
+          "rrf_score": 0.028219,
+          "title": "Room state flow content provider gesture in mobile development"
+        },
+        {
+          "doc_id": "doc-0139",
+          "rrf_score": 0.027673,
+          "title": "Room RecyclerView receiver in mobile development"
+        }
+      ],
+      "latency_ms": 4.875
+    },
+    {
+      "query_id": "query-0030",
+      "query": "embedding relu loss softmax sigmoid",
+      "relevant_ids": [
+        "doc-0110",
+        "doc-0330",
+        "doc-0260",
+        "doc-0180",
+        "doc-0470"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0270",
+          "rrf_score": 0.032266,
+          "title": "learning activation divergence learning rate in machine learning"
+        },
+        {
+          "doc_id": "doc-0190",
+          "rrf_score": 0.031545,
+          "title": "embedding recurrent learning rate convolution in machine learning"
+        },
+        {
+          "doc_id": "doc-0430",
+          "rrf_score": 0.029911,
+          "title": "gradient validation loss in machine learning"
+        },
+        {
+          "doc_id": "doc-0230",
+          "rrf_score": 0.028485,
+          "title": "underfitting convergence dropout in machine learning"
+        },
+        {
+          "doc_id": "doc-0020",
+          "rrf_score": 0.028219,
+          "title": "descent relu sigmoid regularization in machine learning"
+        }
+      ],
+      "latency_ms": 1.326
+    },
+    {
+      "query_id": "query-0031",
+      "query": "primary  WAL",
+      "relevant_ids": [
+        "doc-0141",
+        "doc-0381",
+        "doc-0311",
+        "doc-0001",
+        "doc-0041"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0391",
+          "rrf_score": 0.032522,
+          "title": "index primary trigger ACID in databases"
+        },
+        {
+          "doc_id": "doc-0171",
+          "rrf_score": 0.032002,
+          "title": "atomicity consistency in databases"
+        },
+        {
+          "doc_id": "doc-0021",
+          "rrf_score": 0.030798,
+          "title": "lock isolation buffer pool constraint in databases"
+        },
+        {
+          "doc_id": "doc-0051",
+          "rrf_score": 0.030679,
+          "title": "commit consistency latch  WAL in databases"
+        },
+        {
+          "doc_id": "doc-0261",
+          "rrf_score": 0.029199,
+          "title": "log compaction in databases"
+        }
+      ],
+      "latency_ms": 0.432
+    },
+    {
+      "query_id": "query-0032",
+      "query": "inline mark static",
+      "relevant_ids": [
+        "doc-0012",
+        "doc-0242",
+        "doc-0062",
+        "doc-0122",
+        "doc-0412"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0162",
+          "rrf_score": 0.032018,
+          "title": "interface lexer in programming languages"
+        },
+        {
+          "doc_id": "doc-0432",
+          "rrf_score": 0.030622,
+          "title": "sweep codegen parser in programming languages"
+        },
+        {
+          "doc_id": "doc-0092",
+          "rrf_score": 0.030092,
+          "title": "ownership runtime dispatch pattern in programming languages"
+        },
+        {
+          "doc_id": "doc-0002",
+          "rrf_score": 0.029762,
+          "title": "matching heap allocation optimization parser in programming languages"
+        },
+        {
+          "doc_id": "doc-0312",
+          "rrf_score": 0.028992,
+          "title": "analysis compiler in programming languages"
+        }
+      ],
+      "latency_ms": 4.631
+    },
+    {
+      "query_id": "query-0033",
+      "query": "leader consensus Paxos Lamport vector",
+      "relevant_ids": [
+        "doc-0223",
+        "doc-0303",
+        "doc-0203",
+        "doc-0043",
+        "doc-0103"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0203",
+          "rrf_score": 0.028177,
+          "title": "majority brain split election in distributed systems"
+        },
+        {
+          "doc_id": "doc-0093",
+          "rrf_score": 0.027973,
+          "title": "majority gossip in distributed systems"
+        },
+        {
+          "doc_id": "doc-0493",
+          "rrf_score": 0.027973,
+          "title": "vector tolerance in distributed systems"
+        },
+        {
+          "doc_id": "doc-0383",
+          "rrf_score": 0.027365,
+          "title": "eventual tolerance in distributed systems"
+        },
+        {
+          "doc_id": "doc-0323",
+          "rrf_score": 0.027289,
+          "title": "protocol quorum vector CAP in distributed systems"
+        }
+      ],
+      "latency_ms": 1.828
+    },
+    {
+      "query_id": "query-0034",
+      "query": "request CORS endpoint header idempotent",
+      "relevant_ids": [
+        "doc-0154",
+        "doc-0014",
+        "doc-0084",
+        "doc-0234",
+        "doc-0184"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0334",
+          "rrf_score": 0.030536,
+          "title": "PATCH API in web development"
+        },
+        {
+          "doc_id": "doc-0094",
+          "rrf_score": 0.028718,
+          "title": "pipeline keepalive in web development"
+        },
+        {
+          "doc_id": "doc-0104",
+          "rrf_score": 0.028624,
+          "title": "API request ETag in web development"
+        },
+        {
+          "doc_id": "doc-0414",
+          "rrf_score": 0.028324,
+          "title": "DELETE SSE server in web development"
+        },
+        {
+          "doc_id": "doc-0364",
+          "rrf_score": 0.027119,
+          "title": "XSS POST idempotent request in web development"
+        }
+      ],
+      "latency_ms": 3.614
+    },
+    {
+      "query_id": "query-0035",
+      "query": "scheduler semaphore variable mmap",
+      "relevant_ids": [
+        "doc-0395",
+        "doc-0375",
+        "doc-0405",
+        "doc-0005",
+        "doc-0445"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0365",
+          "rrf_score": 0.029139,
+          "title": "kernel semaphore cache line in operating systems"
+        },
+        {
+          "doc_id": "doc-0345",
+          "rrf_score": 0.028992,
+          "title": "killer kernel context in operating systems"
+        },
+        {
+          "doc_id": "doc-0025",
+          "rrf_score": 0.028531,
+          "title": "killer scheduler thread in operating systems"
+        },
+        {
+          "doc_id": "doc-0095",
+          "rrf_score": 0.027778,
+          "title": "futex mutex context in operating systems"
+        },
+        {
+          "doc_id": "doc-0475",
+          "rrf_score": 0.027629,
+          "title": "handler variable condition in operating systems"
+        }
+      ],
+      "latency_ms": 1.17
+    },
+    {
+      "query_id": "query-0036",
+      "query": "start FIN mask routing",
+      "relevant_ids": [
+        "doc-0136",
+        "doc-0326",
+        "doc-0126",
+        "doc-0336",
+        "doc-0046"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0046",
+          "rrf_score": 0.031498,
+          "title": "firewall FIN in networking"
+        },
+        {
+          "doc_id": "doc-0206",
+          "rrf_score": 0.030536,
+          "title": "window protocol slow in networking"
+        },
+        {
+          "doc_id": "doc-0006",
+          "rrf_score": 0.029274,
+          "title": "load certificate in networking"
+        },
+        {
+          "doc_id": "doc-0106",
+          "rrf_score": 0.027972,
+          "title": "VPN OSPF NAT in networking"
+        },
+        {
+          "doc_id": "doc-0086",
+          "rrf_score": 0.027757,
+          "title": "NAT mask SYN in networking"
+        }
+      ],
+      "latency_ms": 2.793
+    },
+    {
+      "query_id": "query-0037",
+      "query": "hash authentication certificate",
+      "relevant_ids": [
+        "doc-0087",
+        "doc-0367",
+        "doc-0277",
+        "doc-0027",
+        "doc-0037"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0347",
+          "rrf_score": 0.030769,
+          "title": "engineering CVE in security"
+        },
+        {
+          "doc_id": "doc-0357",
+          "rrf_score": 0.030214,
+          "title": "engineering hash CVE supply chain in security"
+        },
+        {
+          "doc_id": "doc-0037",
+          "rrf_score": 0.028446,
+          "title": "injection GDPR zero day in security"
+        },
+        {
+          "doc_id": "doc-0097",
+          "rrf_score": 0.027864,
+          "title": "audit patch in security"
+        },
+        {
+          "doc_id": "doc-0197",
+          "rrf_score": 0.027588,
+          "title": "exploit penetration SQL injection in security"
+        }
+      ],
+      "latency_ms": 4.21
+    },
+    {
+      "query_id": "query-0038",
+      "query": "confusion matrix detection bias",
+      "relevant_ids": [
+        "doc-0258",
+        "doc-0218",
+        "doc-0198",
+        "doc-0298",
+        "doc-0238"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0038",
+          "rrf_score": 0.030282,
+          "title": "outlier reduction in data science"
+        },
+        {
+          "doc_id": "doc-0368",
+          "rrf_score": 0.029387,
+          "title": "variance sampling F1 detection in data science"
+        },
+        {
+          "doc_id": "doc-0358",
+          "rrf_score": 0.028543,
+          "title": "ROC normalization in data science"
+        },
+        {
+          "doc_id": "doc-0488",
+          "rrf_score": 0.028125,
+          "title": "detection outlier UMAP in data science"
+        },
+        {
+          "doc_id": "doc-0198",
+          "rrf_score": 0.02753,
+          "title": "LIME clustering outlier detection in data science"
+        }
+      ],
+      "latency_ms": 6.014
+    },
+    {
+      "query_id": "query-0039",
+      "query": "constraint LiveData portrait landscape widget navigation component",
+      "relevant_ids": [
+        "doc-0089",
+        "doc-0469",
+        "doc-0449",
+        "doc-0329",
+        "doc-0219"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0389",
+          "rrf_score": 0.031545,
+          "title": "broadcast navigation component service in mobile development"
+        },
+        {
+          "doc_id": "doc-0149",
+          "rrf_score": 0.031514,
+          "title": "widget navigation component state flow portrait landscape in mobile development"
+        },
+        {
+          "doc_id": "doc-0319",
+          "rrf_score": 0.031498,
+          "title": "portrait landscape widget in mobile development"
+        },
+        {
+          "doc_id": "doc-0449",
+          "rrf_score": 0.029418,
+          "title": "responsive layout ViewModel in mobile development"
+        },
+        {
+          "doc_id": "doc-0409",
+          "rrf_score": 0.028739,
+          "title": "touch theming layout in mobile development"
+        }
+      ],
+      "latency_ms": 6.168
+    },
+    {
+      "query_id": "query-0040",
+      "query": "descent softmax recurrent",
+      "relevant_ids": [
+        "doc-0440",
+        "doc-0450",
+        "doc-0170",
+        "doc-0000",
+        "doc-0470"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0160",
+          "rrf_score": 0.032258,
+          "title": "hyperparameter dropout training in machine learning"
+        },
+        {
+          "doc_id": "doc-0310",
+          "rrf_score": 0.030077,
+          "title": "softmax recurrent momentum validation in machine learning"
+        },
+        {
+          "doc_id": "doc-0100",
+          "rrf_score": 0.029437,
+          "title": "transformer hyperparameter gradient in machine learning"
+        },
+        {
+          "doc_id": "doc-0400",
+          "rrf_score": 0.029206,
+          "title": "batch momentum in machine learning"
+        },
+        {
+          "doc_id": "doc-0140",
+          "rrf_score": 0.028783,
+          "title": "attention momentum softmax neural in machine learning"
+        }
+      ],
+      "latency_ms": 4.422
+    },
+    {
+      "query_id": "query-0041",
+      "query": "rollback loop btree",
+      "relevant_ids": [
+        "doc-0351",
+        "doc-0371",
+        "doc-0401",
+        "doc-0041",
+        "doc-0481"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0311",
+          "rrf_score": 0.030118,
+          "title": "primary engine rollback in databases"
+        },
+        {
+          "doc_id": "doc-0221",
+          "rrf_score": 0.02971,
+          "title": "compaction deadlock scan recovery in databases"
+        },
+        {
+          "doc_id": "doc-0491",
+          "rrf_score": 0.029206,
+          "title": "loop primary rollback in databases"
+        },
+        {
+          "doc_id": "doc-0041",
+          "rrf_score": 0.027778,
+          "title": "primary constraint rollback in databases"
+        },
+        {
+          "doc_id": "doc-0411",
+          "rrf_score": 0.027778,
+          "title": "recovery consistency merge in databases"
+        }
+      ],
+      "latency_ms": 0.67
+    },
+    {
+      "query_id": "query-0042",
+      "query": "sweep monad inheritance",
+      "relevant_ids": [
+        "doc-0122",
+        "doc-0172",
+        "doc-0252",
+        "doc-0372",
+        "doc-0322"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0152",
+          "rrf_score": 0.031099,
+          "title": "sweep compiler in programming languages"
+        },
+        {
+          "doc_id": "doc-0172",
+          "rrf_score": 0.029631,
+          "title": "optimization compiler stack type in programming languages"
+        },
+        {
+          "doc_id": "doc-0322",
+          "rrf_score": 0.029287,
+          "title": "inheritance AST runtime static in programming languages"
+        },
+        {
+          "doc_id": "doc-0162",
+          "rrf_score": 0.028694,
+          "title": "interface lexer in programming languages"
+        },
+        {
+          "doc_id": "doc-0282",
+          "rrf_score": 0.02837,
+          "title": "runtime codegen compiler lexer in programming languages"
+        }
+      ],
+      "latency_ms": 1.864
+    },
+    {
+      "query_id": "query-0043",
+      "query": "byzantine eventual fault vector minority",
+      "relevant_ids": [
+        "doc-0403",
+        "doc-0023",
+        "doc-0163",
+        "doc-0053",
+        "doc-0353"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0233",
+          "rrf_score": 0.031498,
+          "title": "linearizability eventual in distributed systems"
+        },
+        {
+          "doc_id": "doc-0453",
+          "rrf_score": 0.02938,
+          "title": "brain replication consensus Raft in distributed systems"
+        },
+        {
+          "doc_id": "doc-0463",
+          "rrf_score": 0.028309,
+          "title": "Term Lamport in distributed systems"
+        },
+        {
+          "doc_id": "doc-0383",
+          "rrf_score": 0.027885,
+          "title": "eventual tolerance in distributed systems"
+        },
+        {
+          "doc_id": "doc-0313",
+          "rrf_score": 0.027118,
+          "title": "quorum append entries heartbeat election in distributed systems"
+        }
+      ],
+      "latency_ms": 2.867
+    },
+    {
+      "query_id": "query-0044",
+      "query": "token websocket method keepalive",
+      "relevant_ids": [
+        "doc-0144",
+        "doc-0444",
+        "doc-0384",
+        "doc-0474",
+        "doc-0434"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0004",
+          "rrf_score": 0.030536,
+          "title": "header SSE long polling API in web development"
+        },
+        {
+          "doc_id": "doc-0204",
+          "rrf_score": 0.02938,
+          "title": "status caching HTTP PATCH in web development"
+        },
+        {
+          "doc_id": "doc-0124",
+          "rrf_score": 0.029211,
+          "title": "JWT cookie payload in web development"
+        },
+        {
+          "doc_id": "doc-0134",
+          "rrf_score": 0.02904,
+          "title": "CORS REST long polling cookie in web development"
+        },
+        {
+          "doc_id": "doc-0334",
+          "rrf_score": 0.028439,
+          "title": "PATCH API in web development"
+        }
+      ],
+      "latency_ms": 0.884
+    },
+    {
+      "query_id": "query-0045",
+      "query": "semaphore swap device scheduler mutex",
+      "relevant_ids": [
+        "doc-0315",
+        "doc-0375",
+        "doc-0275",
+        "doc-0075",
+        "doc-0405"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0165",
+          "rrf_score": 0.030777,
+          "title": "killer nice value page in operating systems"
+        },
+        {
+          "doc_id": "doc-0365",
+          "rrf_score": 0.029412,
+          "title": "kernel semaphore cache line in operating systems"
+        },
+        {
+          "doc_id": "doc-0245",
+          "rrf_score": 0.028986,
+          "title": "preemption CFS interrupt process in operating systems"
+        },
+        {
+          "doc_id": "doc-0205",
+          "rrf_score": 0.028439,
+          "title": "cache line thread mmap in operating systems"
+        },
+        {
+          "doc_id": "doc-0445",
+          "rrf_score": 0.028021,
+          "title": "ioctl nice value in operating systems"
+        }
+      ],
+      "latency_ms": 1.516
+    },
+    {
+      "query_id": "query-0046",
+      "query": "socket tunneling",
+      "relevant_ids": [
+        "doc-0126",
+        "doc-0316",
+        "doc-0246",
+        "doc-0346",
+        "doc-0196"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0196",
+          "rrf_score": 0.031545,
+          "title": "ACK congestion MTU in networking"
+        },
+        {
+          "doc_id": "doc-0236",
+          "rrf_score": 0.030835,
+          "title": "tunneling slow in networking"
+        },
+        {
+          "doc_id": "doc-0496",
+          "rrf_score": 0.029469,
+          "title": "start congestion port handshake in networking"
+        },
+        {
+          "doc_id": "doc-0056",
+          "rrf_score": 0.028778,
+          "title": "slow retransmission in networking"
+        },
+        {
+          "doc_id": "doc-0256",
+          "rrf_score": 0.02837,
+          "title": "subnet control start SYN in networking"
+        }
+      ],
+      "latency_ms": 1.864
+    },
+    {
+      "query_id": "query-0047",
+      "query": "testing threat model zero day penetration",
+      "relevant_ids": [
+        "doc-0187",
+        "doc-0267",
+        "doc-0207",
+        "doc-0157",
+        "doc-0497"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0417",
+          "rrf_score": 0.031054,
+          "title": "SQL injection audit in security"
+        },
+        {
+          "doc_id": "doc-0107",
+          "rrf_score": 0.030679,
+          "title": "authorization exploit testing in security"
+        },
+        {
+          "doc_id": "doc-0117",
+          "rrf_score": 0.029762,
+          "title": "engineering supply chain social in security"
+        },
+        {
+          "doc_id": "doc-0077",
+          "rrf_score": 0.029643,
+          "title": "vector injection audit in security"
+        },
+        {
+          "doc_id": "doc-0297",
+          "rrf_score": 0.028043,
+          "title": "risk vector compliance salt in security"
+        }
+      ],
+      "latency_ms": 12.591
+    },
+    {
+      "query_id": "query-0048",
+      "query": "feature threshold feature",
+      "relevant_ids": [
+        "doc-0358",
+        "doc-0218",
+        "doc-0328",
+        "doc-0038",
+        "doc-0018"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0198",
+          "rrf_score": 0.031545,
+          "title": "LIME clustering outlier detection in data science"
+        },
+        {
+          "doc_id": "doc-0428",
+          "rrf_score": 0.029514,
+          "title": "F1 importance variance normalization in data science"
+        },
+        {
+          "doc_id": "doc-0278",
+          "rrf_score": 0.028958,
+          "title": "SHAP AUC clustering in data science"
+        },
+        {
+          "doc_id": "doc-0028",
+          "rrf_score": 0.028577,
+          "title": "clustering imputation importance F1 in data science"
+        },
+        {
+          "doc_id": "doc-0058",
+          "rrf_score": 0.028034,
+          "title": "detection confusion matrix precision recall ROC in data science"
+        }
+      ],
+      "latency_ms": 2.74
+    },
+    {
+      "query_id": "query-0049",
+      "query": "accessibility coroutine fragment coach mark responsive",
+      "relevant_ids": [
+        "doc-0269",
+        "doc-0109",
+        "doc-0199",
+        "doc-0009",
+        "doc-0129"
+      ],
+      "results": [
+        {
+          "doc_id": "doc-0229",
+          "rrf_score": 0.029907,
+          "title": "accessibility activity receiver in mobile development"
+        },
+        {
+          "doc_id": "doc-0319",
+          "rrf_score": 0.028624,
+          "title": "portrait landscape widget in mobile development"
+        },
+        {
+          "doc_id": "doc-0159",
+          "rrf_score": 0.028595,
+          "title": "gesture ViewHolder content provider in mobile development"
+        },
+        {
+          "doc_id": "doc-0029",
+          "rrf_score": 0.028531,
+          "title": "coach mark LiveData ViewModel view binding in mobile development"
+        },
+        {
+          "doc_id": "doc-0259",
+          "rrf_score": 0.028485,
+          "title": "RecyclerView service adapter work manager in mobile development"
+        }
+      ],
+      "latency_ms": 10.135
+    }
+  ]
+}

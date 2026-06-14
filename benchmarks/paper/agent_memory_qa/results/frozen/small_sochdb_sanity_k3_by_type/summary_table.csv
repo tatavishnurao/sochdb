@@ -1,0 +1,5 @@
+system,exact_match,f1,cited_memory_recall,evidence_hit_rate,avg_context_tokens
+no_memory,0.000,0.000,0.000,0.000,0.0
+recent_history,0.188,0.188,0.198,0.250,91.0
+vector_rag,0.875,0.875,0.792,0.875,102.2
+sochdb,1.000,1.000,0.885,1.000,99.9
