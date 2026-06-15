@@ -31,7 +31,7 @@
 //! ```rust,ignore
 //! use sochdb::DurableConnection;
 //!
-//! // Open a production-ready connection with WAL durability
+//! // Open a durable connection (WAL durability + MVCC + crash recovery)
 //! let conn = DurableConnection::open("./data")?;
 //!
 //! // Transactions are durable (survive crashes)
@@ -3066,18 +3066,23 @@ impl<'a> EmbeddedQueryBuilder<'a> {
 }
 
 // ============================================================================
-// DurableConnection - Production-grade connection with real WAL + MVCC
+// DurableConnection - durable connection with real WAL + MVCC
 // ============================================================================
 
 use sochdb_storage::durable_storage::DurableStorage;
 
 /// A durable connection that uses the real WAL + MVCC storage layer.
 ///
-/// This is the production-grade connection that actually persists data:
+/// This connection actually persists data, with the durability guarantees the
+/// live storage build provides:
 /// - WAL for durability (fsync before commit returns)
 /// - MVCC for snapshot isolation
 /// - Group commit for batched writes
 /// - Crash recovery via WAL replay
+///
+/// It does NOT provide at-rest encryption, point-in-time recovery, ARIES
+/// checkpointing, or WAL fencing (those modules are quarantined/unwired). See
+/// `sochdb_storage::durability_capabilities` for the authoritative matrix.
 ///
 /// ## Configuration Presets
 ///

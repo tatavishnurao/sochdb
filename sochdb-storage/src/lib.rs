@@ -280,6 +280,65 @@ pub use durable_storage::{
     ArenaMvccMemTable, DurableStorage, EphemeralHandle, MvccMemTable, TransactionMode,
 };
 
+// ============================================================================
+// Truth-in-capabilities: durability feature matrix (Task 3A)
+// ============================================================================
+
+/// Durability features actually wired into THIS build's live storage path.
+///
+/// Prose like "production-grade" must not be read as implying features that are
+/// quarantined behind the empty, non-default `experimental` feature and
+/// unreferenced by the live write/recovery path. Query this matrix instead of
+/// trusting documentation strings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DurabilityCapabilities {
+    /// Crash-consistent WAL recovery (txn_wal / RecoveryStats / durability_contract). Live.
+    pub crash_recovery: bool,
+    /// At-rest encryption (AES-256-GCM-SIV). The `encryption` module exists but
+    /// is quarantined behind `experimental` and unwired — not on the live path.
+    pub at_rest_encryption: bool,
+    /// Point-in-time recovery via WAL archiving. `pitr` module, quarantined/unwired.
+    pub point_in_time_recovery: bool,
+    /// ARIES-style checkpointing. `aries_recovery` / `checkpoint` modules, quarantined/unwired.
+    pub aries_checkpoint: bool,
+    /// Epoch-based WAL fencing (split-brain detection). `wal_fencing` module, quarantined/unwired.
+    pub wal_fencing: bool,
+}
+
+/// The durability capabilities of the current build — a function of what is
+/// actually wired, not of documentation. The quarantined subsystems require the
+/// `experimental` feature AND live wiring that does not yet exist (Task 3B), so
+/// they report `false` here regardless of feature flags.
+pub const fn durability_capabilities() -> DurabilityCapabilities {
+    DurabilityCapabilities {
+        crash_recovery: true,
+        at_rest_encryption: false,
+        point_in_time_recovery: false,
+        aries_checkpoint: false,
+        wal_fencing: false,
+    }
+}
+
+#[cfg(test)]
+mod durability_capabilities_tests {
+    use super::durability_capabilities;
+
+    #[test]
+    fn live_build_durability_matrix_is_honest() {
+        let caps = durability_capabilities();
+        // The one durability guarantee the live path actually provides.
+        assert!(
+            caps.crash_recovery,
+            "live path must provide crash-consistent WAL recovery"
+        );
+        // Quarantined/unwired — must NOT be advertised as present on the live build.
+        assert!(!caps.at_rest_encryption);
+        assert!(!caps.point_in_time_recovery);
+        assert!(!caps.aries_checkpoint);
+        assert!(!caps.wal_fencing);
+    }
+}
+
 // Re-exports for concurrent MVCC (Task: Concurrent Embedded)
 pub use mvcc_concurrent::{
     ConcurrentMvcc, ConcurrentVersionChain, ConcurrentVersionEntry, HlcTimestamp, ReaderSlot,
