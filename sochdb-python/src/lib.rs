@@ -195,7 +195,7 @@ impl PyRRFFusion {
 ///     >>> from sochdb import HnswIndex
 ///     >>>
 ///     >>> # Create index
-///     >>> index = HnswIndex(dimension=768, m=32, ef_construction=200)
+///     >>> index = HnswIndex(dimension=768, m=32, ef_construction=256)
 ///     >>>
 ///     >>> # Insert vectors (zero-copy from numpy)
 ///     >>> embeddings = np.random.randn(10000, 768).astype(np.float32)
@@ -218,23 +218,31 @@ impl PyHnswIndex {
     /// Args:
     ///     dimension: Vector dimension (e.g., 768 for text embeddings).
     ///     m: Max connections per node (default: 32). Higher = better recall, more memory.
-    ///     ef_construction: Construction search depth (default: 200). Higher = better quality, slower build.
+    ///     ef_construction: Construction search depth (default: 256). Higher = better quality, slower build.
+    ///     ef_search: Search-time beam width (default: 500). Higher = better recall, slower query. May be changed later via `set_ef_search`.
     ///     metric: Distance metric ("cosine", "euclidean", "dot"). Default: "cosine".
     ///     precision: Quantization precision ("f32", "f16", "bf16"). Default: "f32".
     ///
     /// Example:
-    ///     >>> index = HnswIndex(768, m=32, ef_construction=200)
+    ///     >>> index = HnswIndex(768, m=32, ef_construction=256, ef_search=200)
     #[new]
-    #[pyo3(signature = (dimension, m=32, ef_construction=200, metric="cosine", precision="f32"))]
+    #[pyo3(signature = (dimension, m=32, ef_construction=256, ef_search=500, metric="cosine", precision="f32"))]
     fn new(
         dimension: usize,
         m: usize,
         ef_construction: usize,
+        ef_search: usize,
         metric: &str,
         precision: &str,
     ) -> PyResult<Self> {
         if dimension == 0 {
             return Err(PyValueError::new_err("dimension must be > 0"));
+        }
+        if ef_construction == 0 {
+            return Err(PyValueError::new_err("ef_construction must be > 0"));
+        }
+        if ef_search == 0 {
+            return Err(PyValueError::new_err("ef_search must be > 0"));
         }
 
         let distance_metric = match metric.to_lowercase().as_str() {
@@ -266,6 +274,7 @@ impl PyHnswIndex {
             max_connections_layer0: m * 2,
             level_multiplier: 1.0 / (m as f32).ln(),
             ef_construction,
+            ef_search,
             metric: distance_metric,
             quantization_precision: Some(quant_precision),
             ..Default::default()
@@ -278,6 +287,23 @@ impl PyHnswIndex {
             dimension,
             next_id: std::sync::atomic::AtomicU64::new(0),
         })
+    }
+
+    /// Set the search-time beam width (ef_search).
+    ///
+    /// Args:
+    ///     ef: Search depth. Higher = better recall, slower query.
+    ///         Typical values: 50-1000. Default at construction: 500.
+    ///
+    /// Example:
+    ///     >>> index = HnswIndex(768)
+    ///     >>> index.set_ef_search(200)  # lower latency, lower recall
+    fn set_ef_search(&self, ef: usize) -> PyResult<()> {
+        if ef == 0 {
+            return Err(PyValueError::new_err("ef_search must be > 0"));
+        }
+        self.inner.set_ef_search(ef);
+        Ok(())
     }
 
     /// Insert a batch of vectors with auto-generated IDs.
@@ -877,7 +903,7 @@ impl PyHnswIndex {
 /// Args:
 ///     embeddings: 2D float32 array of shape (N, D).
 ///     m: HNSW max connections (default: 32).
-///     ef_construction: Construction depth (default: 200).
+///     ef_construction: Construction depth (default: 256).
 ///     metric: Distance metric (default: "cosine").
 ///     ids: Optional 1D uint64 array of IDs.
 ///
@@ -886,10 +912,10 @@ impl PyHnswIndex {
 ///
 /// Example:
 ///     >>> embeddings = np.random.randn(10000, 768).astype(np.float32)
-///     >>> index = build_index(embeddings, m=32, ef_construction=200)
+///     >>> index = build_index(embeddings, m=32, ef_construction=256)
 ///     >>> index.save("my_index.hnsw")
 #[pyfunction]
-#[pyo3(signature = (embeddings, m=32, ef_construction=200, metric="cosine", ids=None))]
+#[pyo3(signature = (embeddings, m=32, ef_construction=256, metric="cosine", ids=None))]
 fn build_index<'py>(
     py: Python<'py>,
     embeddings: PyReadonlyArray2<'py, f32>,
@@ -901,7 +927,7 @@ fn build_index<'py>(
     let shape = embeddings.shape();
     let d = shape[1];
 
-    let index = PyHnswIndex::new(d, m, ef_construction, metric, "f32")?;
+    let index = PyHnswIndex::new(d, m, ef_construction, 500, metric, "f32")?;
 
     if let Some(id_array) = ids {
         index.insert_batch_with_ids(py, id_array, embeddings)?;

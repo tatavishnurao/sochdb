@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import numpy as np
 from rank_bm25 import BM25Okapi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -259,12 +260,15 @@ def safe_name(s: str) -> str:
 
 def import_sochdb_client():
     import sochdb
-    if not hasattr(sochdb, "SochDBClient"):
-        raise ImportError(
-            "sochdb package does not export SochDBClient. Install:\n"
-            "uv pip install git+https://github.com/sochdb/sochdb-python-sdk.git"
-        )
-    return sochdb.SochDBClient
+    if hasattr(sochdb, "SochDBClient"):
+        return sochdb.SochDBClient
+    from sochdb.grpc_client import SochDBClient
+    return SochDBClient
+
+
+def import_local_hnsw():
+    from sochdb import HnswIndex
+    return HnswIndex
 
 
 def parse_port(value: Optional[str]) -> int:
@@ -1645,7 +1649,7 @@ def main():
     parser.add_argument("--debug-candidates", action="store_true")
     parser.add_argument("--candidate-debug-limit", type=int, default=100)
 
-    parser.add_argument("--vector-backend", choices=["local", "sochdb"], default="local")
+    parser.add_argument("--vector-backend", choices=["local", "sochdb", "local_hnsw"], default="local")
     parser.add_argument("--host", default=os.getenv("SOCHDB_HOST", "65.108.78.80"))
     parser.add_argument("--port", type=parse_port, default=parse_port(os.getenv("SOCHDB_PORT")))
     parser.add_argument("--collection-prefix", default="locomo_hybrid")
@@ -1656,6 +1660,24 @@ def main():
         default="single",
     )
     parser.add_argument("--sochdb-ef", type=int, default=0)
+    parser.add_argument(
+        "--local-hnsw-m",
+        type=int,
+        default=32,
+        help="HNSW M (max connections per node) for --vector-backend local_hnsw",
+    )
+    parser.add_argument(
+        "--local-hnsw-ef-construction",
+        type=int,
+        default=256,
+        help="HNSW ef_construction for --vector-backend local_hnsw",
+    )
+    parser.add_argument(
+        "--local-hnsw-ef-search",
+        type=int,
+        default=500,
+        help="HNSW ef_search for --vector-backend local_hnsw (set after construction)",
+    )
 
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--candidate-k", type=int, default=50)
@@ -1787,9 +1809,13 @@ def main():
     )
 
     client = None
+    local_hnsw_indices = {}
+    LocalHnswIndex = None
     if args.vector_backend == "sochdb":
         SochDBClient = import_sochdb_client()
         client = SochDBClient(address=f"{args.host}:{args.port}", secure=args.use_tls)
+    elif args.vector_backend == "local_hnsw":
+        LocalHnswIndex = import_local_hnsw()
 
     output_rows = []
 
@@ -1887,6 +1913,22 @@ def main():
         if args.vector_backend == "sochdb":
             create_sochdb_index(client, index_name, args.embedding_dim)
             insert_sochdb_vectors(client, index_name, record_ids, record_vecs)
+        elif args.vector_backend == "local_hnsw":
+            hnsw_idx = LocalHnswIndex(
+                args.embedding_dim,
+                m=args.local_hnsw_m,
+                ef_construction=args.local_hnsw_ef_construction,
+                ef_search=args.local_hnsw_ef_search,
+            )
+            ids_arr = np.array(record_ids, dtype=np.uint64)
+            vecs_arr = np.array(record_vecs, dtype=np.float32)
+            hnsw_idx.insert_batch_with_ids(ids_arr, vecs_arr)
+            local_hnsw_indices[sample_id] = hnsw_idx
+            print(
+                f"  local_hnsw: built index dim={args.embedding_dim} n={len(record_ids)} "
+                f"m={args.local_hnsw_m} ef_construction={args.local_hnsw_ef_construction} "
+                f"ef_search={args.local_hnsw_ef_search}"
+            )
 
         question_texts = [q["question"] for q in sample_questions]
         print("embedding questions...")
@@ -1964,6 +2006,13 @@ def main():
                         record_vecs,
                         view_candidate_k,
                     )
+                elif args.vector_backend == "local_hnsw":
+                    vs = time.perf_counter()
+                    q_arr = np.array(variant_vec, dtype=np.float32)
+                    hnsw_ids, hnsw_dists = local_hnsw_indices[sample_id].search(q_arr, view_candidate_k)
+                    v_vector_ranked = [int(rid) for rid in hnsw_ids]
+                    v_vector_search_wall_ms = (time.perf_counter() - vs) * 1000.0
+                    v_vector_search_amortized_ms = v_vector_search_wall_ms
                 else:
                     if args.sochdb_search_mode == "batch":
                         if batch_vector_ranked is None:
