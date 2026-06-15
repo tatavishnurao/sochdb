@@ -31,8 +31,9 @@
 //!
 //! The SDK provides two connection types:
 //!
-//! - **`Connection`** (alias for `DurableConnection`): Production-grade with WAL durability,
-//!   MVCC transactions, crash recovery. **Use this for production.**
+//! - **`Connection`** (alias for `DurableConnection`): durable WAL + MVCC transactions +
+//!   crash recovery. **Use this for persistent data.** (No at-rest encryption, PITR, or
+//!   WAL fencing — see `sochdb_storage::durability_capabilities`.)
 //!
 //! - **`InMemoryConnection`** (alias for `SochConnection`): Fast in-memory storage for testing.
 //!   Data is not persisted. **Use only for tests or ephemeral data.**

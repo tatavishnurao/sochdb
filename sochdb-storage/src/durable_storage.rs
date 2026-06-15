@@ -17,13 +17,19 @@
 
 //! Durable Storage Layer
 //!
-//! This module wires together all storage components into a production-ready
-//! durable storage engine:
+//! Wires together the live storage components into a durable engine:
 //!
-//! - WAL (txn_wal.rs) for durability
+//! - WAL (txn_wal.rs) for crash-consistent durability + recovery
 //! - Group Commit for throughput
 //! - MVCC for isolation
 //! - LSCS for columnar efficiency
+//!
+//! Truth-in-capabilities: the live path provides crash-consistent WAL recovery,
+//! but NOT at-rest encryption, point-in-time recovery, ARIES checkpointing, or
+//! WAL fencing — those modules exist but are quarantined behind the empty,
+//! non-default `experimental` feature and are unwired. Query
+//! [`crate::durability_capabilities`] rather than relying on prose like
+//! "production-grade".
 //!
 //! ## Architecture
 //!
