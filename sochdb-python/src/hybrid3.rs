@@ -254,12 +254,12 @@ impl PyThreeLaneHybridIndex {
     ///
     /// Args:
     ///     dimension: Embedding dimension.
-    ///     m: HNSW max connections per node (default 16).
-    ///     ef_construction: HNSW construction beam width (default 200).
+    ///     m: HNSW max connections per node (default 32).
+    ///     ef_construction: HNSW construction beam width (default 256).
     ///     ef_search: HNSW query beam width (default 128).
     ///     metric: Distance metric ("cosine", "euclidean", "dot").
     #[new]
-    #[pyo3(signature = (dimension, m=16, ef_construction=200, ef_search=128, metric="cosine"))]
+    #[pyo3(signature = (dimension, m=32, ef_construction=256, ef_search=128, metric="cosine"))]
     fn new(
         dimension: usize,
         m: usize,
@@ -286,6 +286,7 @@ impl PyThreeLaneHybridIndex {
             max_connections_layer0: m * 2,
             level_multiplier: 1.0 / (m as f32).ln(),
             ef_construction,
+            ef_search,
             metric: distance_metric,
             quantization_precision: Some(Precision::F32),
             ..Default::default()
