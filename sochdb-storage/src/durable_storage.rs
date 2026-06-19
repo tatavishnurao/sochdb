@@ -2809,6 +2809,21 @@ impl DurableStorage {
         policy: crate::index_policy::IndexPolicy,
         group_commit: bool,
     ) -> Result<Self> {
+        Self::open_with_policy_encrypted(path, policy, group_commit, StorageEncryption::disabled())
+    }
+
+    /// Policy-based open with at-rest encryption configured.
+    ///
+    /// Identical to [`Self::open_with_policy`] but threads a [`StorageEncryption`]
+    /// down to the keyring/WAL so the embedded `Database` kernel can open (or
+    /// create) an encrypted database. `StorageEncryption::disabled()` is exactly
+    /// the plaintext behaviour.
+    pub fn open_with_policy_encrypted<P: AsRef<Path>>(
+        path: P,
+        policy: crate::index_policy::IndexPolicy,
+        group_commit: bool,
+        encryption: StorageEncryption,
+    ) -> Result<Self> {
         use crate::index_policy::IndexPolicy;
 
         // Derive configuration from policy
@@ -2829,7 +2844,7 @@ impl DurableStorage {
 
         if group_commit {
             let mut storage =
-                Self::open_with_full_config(path, enable_ordered_index, memtable_type)?;
+                Self::open_with_encryption(path, enable_ordered_index, memtable_type, encryption)?;
 
             let wal = storage.wal.clone();
             let gc = EventDrivenGroupCommit::new(move |txn_ids: &[u64]| {
@@ -2847,7 +2862,7 @@ impl DurableStorage {
             storage.group_commit = Some(Arc::new(gc));
             Ok(storage)
         } else {
-            Self::open_with_full_config(path, enable_ordered_index, memtable_type)
+            Self::open_with_encryption(path, enable_ordered_index, memtable_type, encryption)
         }
     }
 
@@ -2865,6 +2880,20 @@ impl DurableStorage {
         path: P,
         policy: crate::index_policy::IndexPolicy,
     ) -> Result<Self> {
+        Self::open_for_concurrent_encrypted(path, policy, StorageEncryption::disabled())
+    }
+
+    /// Concurrent-mode open with at-rest encryption configured.
+    ///
+    /// Identical to [`Self::open_for_concurrent`] but threads a
+    /// [`StorageEncryption`] through, so an encrypted database can also be opened
+    /// in concurrent (multi-reader) mode rather than failing closed for lack of a
+    /// key channel.
+    pub fn open_for_concurrent_encrypted<P: AsRef<Path>>(
+        path: P,
+        policy: crate::index_policy::IndexPolicy,
+        encryption: StorageEncryption,
+    ) -> Result<Self> {
         use crate::index_policy::IndexPolicy;
 
         let (enable_ordered_index, memtable_type) = match policy {
@@ -2879,7 +2908,7 @@ impl DurableStorage {
             enable_ordered_index,
             memtable_type,
             false,
-            StorageEncryption::disabled(),
+            encryption,
         )
     }
 

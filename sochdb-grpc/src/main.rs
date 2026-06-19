@@ -190,6 +190,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
+    // Load secrets (JWT, API keys, and the at-rest encryption KEK) from a
+    // Kubernetes Secrets mount or environment variables. Hoisted above the
+    // PG-wire open so the persistent SQL database can be opened with at-rest
+    // encryption when SOCHDB_ENCRYPTION_KEY (or a mounted `encryption-key`) is
+    // configured.
+    let secrets = if let Some(ref path) = args.secrets_path {
+        let provider = sochdb_grpc::security::SecretsProvider::from_mount(path);
+        if let Err(e) = provider.refresh() {
+            tracing::warn!("Failed to load secrets from {}: {}", path, e);
+        }
+        Some(provider)
+    } else {
+        let provider = sochdb_grpc::security::SecretsProvider::from_env();
+        let _ = provider.refresh();
+        Some(provider)
+    };
+
     // Start PG wire protocol server (Task 5)
     let _pg_handle = if args.pg_port > 0 {
         let pg_addr = format!("{}:{}", args.host, args.pg_port).parse()?;
@@ -218,8 +235,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // the database cannot be opened, refuse to start rather than
                 // silently degrading to the echo executor (which would return
                 // fabricated rows that look like real results).
-                let db = sochdb_storage::Database::open(dir)
-                    .map_err(|e| format!("failed to open PG SQL database at '{}': {}", dir, e))?;
+                // At-rest encryption: if a KEK is configured (SOCHDB_ENCRYPTION_KEY
+                // or a mounted `encryption-key`), open the SQL database encrypted.
+                // Absent a key it opens plaintext (back-compatible); the keyring
+                // still fails closed if this dir was previously encrypted.
+                let encryption = match secrets.as_ref().and_then(|s| s.encryption_key()) {
+                    Some(mut kek) => {
+                        use zeroize::Zeroize;
+                        let enc = sochdb_storage::StorageEncryption::with_kek(
+                            sochdb_storage::EncryptionKey::new(kek),
+                            "env:SOCHDB_ENCRYPTION_KEY",
+                        );
+                        kek.zeroize(); // wipe the transient stack copy of the KEK
+                        tracing::info!("PG SQL database: at-rest encryption ENABLED");
+                        enc
+                    }
+                    None => sochdb_storage::StorageEncryption::disabled(),
+                };
+                let db = sochdb_storage::Database::open_with_config_and_encryption(
+                    dir,
+                    sochdb_storage::DatabaseConfig::default(),
+                    encryption,
+                )
+                .map_err(|e| format!("failed to open PG SQL database at '{}': {}", dir, e))?;
                 tracing::info!(
                     "PG wire protocol executing real SQL against database at '{}'",
                     dir
@@ -261,19 +299,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let trace_server = TraceServer::new();
     let checkpoint_server = CheckpointServer::new();
     let mcp_server = McpServer::new();
-
-    // Load secrets from Kubernetes Secrets mount or environment variables
-    let secrets = if let Some(ref path) = args.secrets_path {
-        let provider = sochdb_grpc::security::SecretsProvider::from_mount(path);
-        if let Err(e) = provider.refresh() {
-            tracing::warn!("Failed to load secrets from {}: {}", path, e);
-        }
-        Some(provider)
-    } else {
-        let provider = sochdb_grpc::security::SecretsProvider::from_env();
-        let _ = provider.refresh();
-        Some(provider)
-    };
 
     // Create CDC log for subscriptions
     let cdc_log = sochdb_storage::cdc::CdcLog::new(sochdb_storage::cdc::CdcConfig {
