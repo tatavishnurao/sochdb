@@ -88,6 +88,34 @@ fn log_insert_path(path: &str, contiguous: bool, n: usize) {
 // HnswIndex Python Wrapper
 // =============================================================================
 
+/// A single search result with optional metadata.
+#[pyclass(name = "SearchResult")]
+#[derive(Clone, Debug)]
+pub struct PySearchResult {
+    /// Vector ID
+    #[pyo3(get)]
+    pub id: u64,
+    /// Distance to query
+    #[pyo3(get)]
+    pub distance: f32,
+    /// Optional parent/source ID
+    #[pyo3(get)]
+    pub parent_id: Option<u64>,
+    /// Optional view type
+    #[pyo3(get)]
+    pub view_type: Option<String>,
+}
+
+#[pymethods]
+impl PySearchResult {
+    fn __repr__(&self) -> String {
+        format!(
+            "SearchResult(id={}, distance={:.4}, parent_id={:?}, view_type={:?})",
+            self.id, self.distance, self.parent_id, self.view_type
+        )
+    }
+}
+
 /// HNSW Vector Index with approximate nearest neighbor search.
 ///
 /// This is a high-performance vector index using Hierarchical Navigable
@@ -122,24 +150,33 @@ impl PyHnswIndex {
     ///     dimension: Vector dimension (e.g., 768 for text embeddings).
     ///     m: Max connections per node (default: 16). Higher = better recall, more memory.
     ///     ef_construction: Construction search depth (default: 100). Higher = better quality, slower build.
+    ///     ef_search: Search-time beam width (default: 500). Higher = better recall, slower query. May be changed later via `set_ef_search`.
     ///     metric: Distance metric ("cosine", "euclidean", "dot"). Default: "cosine".
     ///     precision: Quantization precision ("f32", "f16", "bf16"). Default: "f32".
     ///
     /// Example:
-    ///     >>> index = HnswIndex(768, m=32, ef_construction=200)
+    ///     >>> index = HnswIndex(768, m=32, ef_construction=256, ef_search=200)
     #[new]
-    #[pyo3(signature = (dimension, m=16, ef_construction=100, metric="cosine", precision="f32"))]
+    #[pyo3(signature = (dimension, m=16, ef_construction=100, ef_search=500, metric="cosine", precision="f32"))]
     fn new(
         dimension: usize,
         m: usize,
         ef_construction: usize,
+        ef_search: usize,
         metric: &str,
         precision: &str,
     ) -> PyResult<Self> {
         if dimension == 0 {
             return Err(PyValueError::new_err("dimension must be > 0"));
         }
-        
+        if ef_construction == 0 {
+            return Err(PyValueError::new_err("ef_construction must be > 0"));
+        }
+        if ef_search == 0 {
+            return Err(PyValueError::new_err("ef_search must be > 0"));
+        }
+
+
         let distance_metric = match metric.to_lowercase().as_str() {
             "cosine" => DistanceMetric::Cosine,
             "euclidean" | "l2" => DistanceMetric::Euclidean,
@@ -162,6 +199,7 @@ impl PyHnswIndex {
             max_connections: m,
             max_connections_layer0: m * 2,
             ef_construction,
+            ef_search,
             metric: distance_metric,
             quantization_precision: Some(quant_precision),
             ..Default::default()
@@ -175,7 +213,25 @@ impl PyHnswIndex {
             next_id: std::sync::atomic::AtomicU64::new(0),
         })
     }
-    
+
+    /// Set the search-time beam width (ef_search).
+    ///
+    /// Args:
+    ///     ef: Search depth. Higher = better recall, slower query.
+    ///         Typical values: 50-1000. Default at construction: 500.
+    ///
+    /// Example:
+    ///     >>> index = HnswIndex(768)
+    ///     >>> index.set_ef_search(200)  # lower latency, lower recall
+    fn set_ef_search(&self, ef: usize) -> PyResult<()> {
+        if ef == 0 {
+            return Err(PyValueError::new_err("ef_search must be > 0"));
+        }
+        self.inner.set_ef_search(ef);
+        Ok(())
+    }
+
+
     /// Insert a batch of vectors with auto-generated IDs.
     ///
     /// This is the fastest insertion method - uses zero-copy NumPy access
@@ -393,7 +449,78 @@ impl PyHnswIndex {
         
         Ok((ids_array.into(), dists_array.into()))
     }
-    
+
+    /// Search for k nearest neighbors and return metadata for each result.
+    ///
+    /// Args:
+    ///     query: 1D float32 array of dimension D.
+    ///     k: Number of neighbors to return.
+    ///     ef_search: Search depth (default: k * 2). Higher = better recall, slower.
+    ///
+    /// Returns:
+    ///     List of SearchResult objects with id, distance, parent_id, view_type.
+    ///
+    /// Example:
+    ///     >>> query = np.random.randn(768).astype(np.float32)
+    ///     >>> results = index.search_with_metadata(query, k=10)
+    ///     >>> for r in results:
+    ///     ...     print(f"ID {r.id}: distance {r.distance:.4f} parent={r.parent_id} view={r.view_type}")
+    #[pyo3(signature = (query, k, ef_search=None))]
+    fn search_with_metadata<'py>(
+        &self,
+        py: Python<'py>,
+        query: PyReadonlyArray1<'py, f32>,
+        k: usize,
+        ef_search: Option<usize>,
+    ) -> PyResult<Vec<PySearchResult>> {
+        let query_slice = query
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("Query must be contiguous: {}", e)))?;
+
+        if query_slice.len() != self.dimension {
+            return Err(PyValueError::new_err(format!(
+                "Query dimension {} != index dimension {}",
+                query_slice.len(),
+                self.dimension
+            )));
+        }
+
+        let inner = Arc::clone(&self.inner);
+        let query_vec: Vec<f32> = query_slice.to_vec();
+
+        let results = py
+            .allow_threads(move || match ef_search {
+                Some(ef) => inner.search_with_ef(&query_vec, k, ef),
+                None => inner.search(&query_vec, k),
+            })
+            .map_err(|e| PyRuntimeError::new_err(e))?;
+
+        let mut out = Vec::with_capacity(results.len());
+        for (id, distance) in results {
+            let metadata = inner.get_metadata(id);
+            let mut parent_id = None;
+            let mut view_type = None;
+            if let Some(meta) = metadata {
+                for (key, value) in meta {
+                    if key == "parent_id" {
+                        parent_id = value.parse::<u64>().ok();
+                    } else if key == "view_type" {
+                        view_type = Some(value);
+                    }
+                }
+            }
+            out.push(PySearchResult {
+                id: id as u64,
+                distance,
+                parent_id,
+                view_type,
+            });
+        }
+
+        Ok(out)
+    }
+
+
     /// Batch search for multiple queries.
     ///
     /// Args:
@@ -584,9 +711,7 @@ fn build_index<'py>(
 ) -> PyResult<PyHnswIndex> {
     let shape = embeddings.shape();
     let d = shape[1];
-    
-    let index = PyHnswIndex::new(d, m, ef_construction, metric, "f32")?;
-    
+    let index = PyHnswIndex::new(d, m, ef_construction, 500, metric, "f32")?;
     if let Some(id_array) = ids {
         index.insert_batch_with_ids(py, id_array, embeddings)?;
     } else {
@@ -994,6 +1119,7 @@ impl PyTransaction {
 fn sochdb(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Vector index
     m.add_class::<PyHnswIndex>()?;
+    m.add_class::<PySearchResult>()?;
     m.add_function(wrap_pyfunction!(build_index, m)?)?;
     
     // Database API (Task 5)

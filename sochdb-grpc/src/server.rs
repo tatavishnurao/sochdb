@@ -19,20 +19,19 @@
 
 use crate::error::GrpcError;
 use crate::proto::{
-    self,
-    vector_index_service_server::{VectorIndexService, VectorIndexServiceServer},
-    CreateIndexRequest, CreateIndexResponse, DropIndexRequest, DropIndexResponse,
+    self, CreateIndexRequest, CreateIndexResponse, DropIndexRequest, DropIndexResponse,
     GetStatsRequest, GetStatsResponse, HealthCheckRequest, HealthCheckResponse,
-    HnswConfig as ProtoHnswConfig, IndexInfo, IndexStats, InsertBatchRequest,
-    InsertBatchResponse, InsertStreamRequest, InsertStreamResponse, QueryResults,
-    SearchBatchRequest, SearchBatchResponse, SearchRequest, SearchResponse, SearchResult,
+    HnswConfig as ProtoHnswConfig, IndexInfo, IndexStats, InsertBatchRequest, InsertBatchResponse,
+    InsertStreamRequest, InsertStreamResponse, QueryResults, SearchBatchRequest,
+    SearchBatchResponse, SearchRequest, SearchResponse, SearchResult,
+    vector_index_service_server::{VectorIndexService, VectorIndexServiceServer},
 };
 use dashmap::DashMap;
+use sochdb_index::hnsw::{DistanceMetric, HnswConfig, HnswIndex};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio_stream::StreamExt;
 use tonic::{Request, Response, Status, Streaming};
-use sochdb_index::hnsw::{DistanceMetric, HnswConfig, HnswIndex};
 
 /// Server version
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -61,12 +60,12 @@ impl VectorIndexServer {
             indexes: DashMap::new(),
         }
     }
-    
+
     /// Create the gRPC service
     pub fn into_service(self) -> VectorIndexServiceServer<Self> {
         VectorIndexServiceServer::new(self)
     }
-    
+
     /// Get an index by name and its dimension
     fn get_index_with_dim(&self, name: &str) -> Result<(Arc<HnswIndex>, usize), GrpcError> {
         self.indexes
@@ -74,7 +73,7 @@ impl VectorIndexServer {
             .map(|entry| (entry.index.clone(), entry.dimension))
             .ok_or_else(|| GrpcError::IndexNotFound(name.to_string()))
     }
-    
+
     /// Get an index by name
     fn get_index(&self, name: &str) -> Result<Arc<HnswIndex>, GrpcError> {
         self.indexes
@@ -82,7 +81,7 @@ impl VectorIndexServer {
             .map(|entry| entry.index.clone())
             .ok_or_else(|| GrpcError::IndexNotFound(name.to_string()))
     }
-    
+
     /// Convert proto metric to internal metric
     fn convert_metric(metric: proto::DistanceMetric) -> DistanceMetric {
         match metric {
@@ -90,6 +89,60 @@ impl VectorIndexServer {
             proto::DistanceMetric::Cosine => DistanceMetric::Cosine,
             proto::DistanceMetric::DotProduct => DistanceMetric::DotProduct,
             _ => DistanceMetric::Cosine, // Default
+        }
+    }
+    /// Stable, lower-case label for a metric, surfaced on `SearchResult.metric`
+    /// so callers can interpret `distance` without out-of-band knowledge.
+    fn metric_label(metric: proto::DistanceMetric) -> &'static str {
+        match metric {
+            proto::DistanceMetric::L2 => "euclidean",
+            proto::DistanceMetric::Cosine => "cosine",
+            proto::DistanceMetric::DotProduct => "dot_product",
+            proto::DistanceMetric::Unspecified => "unspecified",
+        }
+    }
+
+    fn metadata_pairs(metadata: &proto::VectorMetadata) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        if let Some(parent_id) = metadata.parent_id {
+            pairs.push(("parent_id".to_string(), parent_id.to_string()));
+        }
+        if let Some(view_type) = &metadata.view_type {
+            pairs.push(("view_type".to_string(), view_type.clone()));
+        }
+        pairs
+    }
+
+    fn result_metadata(index: &HnswIndex, id: u128) -> (Option<u64>, Option<String>) {
+        let Some(metadata) = index.get_metadata(id) else {
+            return (None, None);
+        };
+
+        let parent_id = metadata
+            .iter()
+            .find(|(key, _)| key == "parent_id")
+            .and_then(|(_, value)| value.parse::<u64>().ok());
+        let view_type = metadata
+            .iter()
+            .find(|(key, _)| key == "view_type")
+            .map(|(_, value)| value.clone());
+
+        (parent_id, view_type)
+    }
+
+    fn search_result(
+        index: &HnswIndex,
+        id: u128,
+        distance: f32,
+        metric: &'static str,
+    ) -> SearchResult {
+        let (parent_id, view_type) = Self::result_metadata(index, id);
+        SearchResult {
+            id: id as u64,
+            distance,
+            metric: metric.to_string(),
+            parent_id,
+            view_type,
         }
     }
 }
@@ -108,7 +161,7 @@ impl VectorIndexService for VectorIndexServer {
     ) -> Result<Response<CreateIndexResponse>, Status> {
         let req = request.into_inner();
         let name = req.name.clone();
-        
+
         // Check if index already exists
         if self.indexes.contains_key(&name) {
             return Ok(Response::new(CreateIndexResponse {
@@ -117,7 +170,7 @@ impl VectorIndexService for VectorIndexServer {
                 info: None,
             }));
         }
-        
+
         // Build config
         let proto_config = req.config.unwrap_or_default();
         let config = HnswConfig {
@@ -144,14 +197,14 @@ impl VectorIndexService for VectorIndexServer {
             metric: Self::convert_metric(req.metric()),
             ..Default::default()
         };
-        
+
         let dimension = req.dimension as usize;
         let index = HnswIndex::new(dimension, config.clone());
         let created_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         let entry = IndexEntry {
             index: Arc::new(index),
             name: name.clone(),
@@ -160,11 +213,11 @@ impl VectorIndexService for VectorIndexServer {
             config: proto_config.clone(),
             created_at,
         };
-        
+
         self.indexes.insert(name.clone(), entry);
-        
+
         tracing::info!("Created index '{}' with dimension {}", name, dimension);
-        
+
         Ok(Response::new(CreateIndexResponse {
             success: true,
             error: String::new(),
@@ -177,13 +230,13 @@ impl VectorIndexService for VectorIndexServer {
             }),
         }))
     }
-    
+
     async fn drop_index(
         &self,
         request: Request<DropIndexRequest>,
     ) -> Result<Response<DropIndexResponse>, Status> {
         let name = request.into_inner().name;
-        
+
         match self.indexes.remove(&name) {
             Some(_) => {
                 tracing::info!("Dropped index '{}'", name);
@@ -198,16 +251,16 @@ impl VectorIndexService for VectorIndexServer {
             })),
         }
     }
-    
+
     async fn insert_batch(
         &self,
         request: Request<InsertBatchRequest>,
     ) -> Result<Response<InsertBatchResponse>, Status> {
         let start = Instant::now();
         let req = request.into_inner();
-        
+
         let (index, dimension) = self.get_index_with_dim(&req.index_name)?;
-        
+
         // Validate input
         if req.vectors.len() != req.ids.len() * dimension {
             return Err(Status::invalid_argument(format!(
@@ -216,13 +269,49 @@ impl VectorIndexService for VectorIndexServer {
                 req.vectors.len()
             )));
         }
-        
+        if !req.metadata.is_empty() && req.metadata.len() != req.ids.len() {
+            return Err(Status::invalid_argument(format!(
+                "Metadata length mismatch: expected {} entries, got {}",
+                req.ids.len(),
+                req.metadata.len()
+            )));
+        }
+
         // Convert IDs to u128
         let ids: Vec<u128> = req.ids.iter().map(|&id| id as u128).collect();
-        
-        // Use flat batch insert for zero-copy performance
-        match index.insert_batch_flat(&ids, &req.vectors, dimension) {
+        let metadata_entries: Vec<(u128, Vec<(String, String)>)> = if req.metadata.is_empty() {
+            Vec::new()
+        } else {
+            ids.iter()
+                .copied()
+                .zip(req.metadata.iter())
+                .filter_map(|(id, metadata)| {
+                    let pairs = Self::metadata_pairs(metadata);
+                    if pairs.is_empty() {
+                        None
+                    } else {
+                        Some((id, pairs))
+                    }
+                })
+                .collect()
+        };
+
+        // Offload CPU-heavy HNSW insertion to blocking thread pool to avoid
+        // starving the tokio runtime (which handles health checks, streams, etc.)
+        let index_name = req.index_name.clone();
+        let vectors = req.vectors;
+        let index_for_insert = Arc::clone(&index);
+        let result = tokio::task::spawn_blocking(move || {
+            index_for_insert.insert_batch_flat(&ids, &vectors, dimension)
+        })
+        .await
+        .map_err(|e| Status::internal(format!("Task join error: {}", e)))?;
+
+        match result {
             Ok(count) => {
+                if !metadata_entries.is_empty() {
+                    index.set_metadata_batch(&metadata_entries);
+                }
                 let duration_us = start.elapsed().as_micros() as u64;
                 tracing::debug!(
                     "Inserted {} vectors into '{}' in {}µs",
@@ -243,19 +332,26 @@ impl VectorIndexService for VectorIndexServer {
             })),
         }
     }
-    
+
     async fn insert_stream(
         &self,
         request: Request<Streaming<InsertStreamRequest>>,
     ) -> Result<Response<InsertStreamResponse>, Status> {
         let start = Instant::now();
         let mut stream = request.into_inner();
-        
+
         let mut index_name: Option<String> = None;
         let mut index: Option<Arc<HnswIndex>> = None;
         let mut total_inserted = 0u32;
         let mut errors = Vec::new();
-        
+        // Micro-batch buffer: accumulate streamed vectors and flush in batches
+        // to amortize lock acquisition overhead
+        const MICRO_BATCH_SIZE: usize = 128;
+        let mut batch_ids: Vec<u128> = Vec::with_capacity(MICRO_BATCH_SIZE);
+        let mut batch_vectors: Vec<f32> = Vec::new();
+        let mut batch_metadata: Vec<(u128, Vec<(String, String)>)> = Vec::new();
+        let mut dimension: usize = 0;
+
         while let Some(result) = stream.next().await {
             match result {
                 Ok(req) => {
@@ -274,13 +370,33 @@ impl VectorIndexService for VectorIndexServer {
                             }
                         }
                     }
-                    
-                    // Insert the vector
-                    if let Some(ref idx) = index {
-                        let vector: Vec<f32> = req.vector;
-                        match idx.insert_one_from_slice(req.id as u128, &vector) {
-                            Ok(()) => total_inserted += 1,
-                            Err(e) => errors.push(format!("ID {}: {}", req.id, e)),
+                    // Buffer the vector
+                    if index.is_some() {
+                        batch_ids.push(req.id as u128);
+                        if let Some(metadata) = &req.metadata {
+                            let pairs = Self::metadata_pairs(metadata);
+                            if !pairs.is_empty() {
+                                batch_metadata.push((req.id as u128, pairs));
+                            }
+                        }
+                        batch_vectors.extend_from_slice(&req.vector);
+
+                        // Flush micro-batch when full
+                        if batch_ids.len() >= MICRO_BATCH_SIZE {
+                            if let Some(ref idx) = index {
+                                match idx.insert_batch_flat(&batch_ids, &batch_vectors, dimension) {
+                                    Ok(count) => {
+                                        if !batch_metadata.is_empty() {
+                                            idx.set_metadata_batch(&batch_metadata);
+                                        }
+                                        total_inserted += count as u32;
+                                    }
+                                    Err(e) => errors.push(e),
+                                }
+                            }
+                            batch_ids.clear();
+                            batch_vectors.clear();
+                            batch_metadata.clear();
                         }
                     }
                 }
@@ -290,9 +406,24 @@ impl VectorIndexService for VectorIndexServer {
                 }
             }
         }
-        
+
+        // Flush remaining buffered vectors
+        if !batch_ids.is_empty() {
+            if let Some(ref idx) = index {
+                match idx.insert_batch_flat(&batch_ids, &batch_vectors, dimension) {
+                    Ok(count) => {
+                        if !batch_metadata.is_empty() {
+                            idx.set_metadata_batch(&batch_metadata);
+                        }
+                        total_inserted += count as u32;
+                    }
+                    Err(e) => errors.push(e),
+                }
+            }
+        }
+
         let duration_us = start.elapsed().as_micros() as u64;
-        
+
         if let Some(name) = &index_name {
             tracing::debug!(
                 "Stream inserted {} vectors into '{}' in {}µs",
@@ -301,23 +432,23 @@ impl VectorIndexService for VectorIndexServer {
                 duration_us
             );
         }
-        
+
         Ok(Response::new(InsertStreamResponse {
             total_inserted,
             errors,
             duration_us,
         }))
     }
-    
+
     async fn search(
         &self,
         request: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
         let start = Instant::now();
         let req = request.into_inner();
-        
+
         let (index, dimension) = self.get_index_with_dim(&req.index_name)?;
-        
+
         // Validate dimension
         if req.query.len() != dimension {
             return Err(Status::invalid_argument(format!(
@@ -326,47 +457,75 @@ impl VectorIndexService for VectorIndexServer {
                 req.query.len()
             )));
         }
-        
         let k = req.k.max(1) as usize;
-        
-        // Perform search
-        let results = match index.search(&req.query, k) {
-            Ok(r) => r,
-            Err(e) => {
-                return Ok(Response::new(SearchResponse {
-                    results: vec![],
-                    duration_us: start.elapsed().as_micros() as u64,
-                    error: e,
-                }));
+
+        // Honor per-query ef override for recall tuning; fall back to index default
+        let ef = if req.ef > 0 { req.ef as usize } else { 0 };
+
+        // Get metric from the index entry
+        let metric_enum = self
+            .indexes
+            .get(&req.index_name)
+            .map(|entry| entry.metric)
+            .unwrap_or(proto::DistanceMetric::Unspecified);
+        let metric = Self::metric_label(metric_enum);
+
+        // Offload CPU-heavy HNSW search to blocking thread pool
+        let query = req.query;
+        let index_for_search = Arc::clone(&index);
+        let results = tokio::task::spawn_blocking(move || {
+            if ef > 0 {
+                index_for_search.search_with_ef(&query, k, ef.max(k))
+            } else {
+                index_for_search.search(&query, k)
             }
-        };
-        
-        let duration_us = start.elapsed().as_micros() as u64;
-        
-        Ok(Response::new(SearchResponse {
-            results: results
-                .into_iter()
-                .map(|(id, distance)| SearchResult {
-                    id: id as u64,
-                    distance,
-                })
-                .collect(),
-            duration_us,
-            error: String::new(),
-        }))
+        })
+        .await
+        .map_err(|e| Status::internal(format!("Task join error: {}", e)))?;
+
+        match results {
+            Ok(r) => {
+                let duration_us = start.elapsed().as_micros() as u64;
+                let results: Vec<SearchResult> = r
+                    .into_iter()
+                    .map(|(id, distance)| Self::search_result(&index, id, distance, metric))
+                    .collect();
+                Ok(Response::new(SearchResponse {
+                    results,
+                    duration_us,
+                    error: String::new(),
+                    metric: metric_enum.into(),
+                }))
+            }
+            Err(e) => Ok(Response::new(SearchResponse {
+                results: vec![],
+                duration_us: start.elapsed().as_micros() as u64,
+                error: e,
+                metric: metric_enum.into(),
+            })),
+        }
     }
-    
+
     async fn search_batch(
         &self,
         request: Request<SearchBatchRequest>,
     ) -> Result<Response<SearchBatchResponse>, Status> {
         let start = Instant::now();
         let req = request.into_inner();
-        
+
         let (index, dimension) = self.get_index_with_dim(&req.index_name)?;
         let num_queries = req.num_queries as usize;
         let k = req.k.max(1) as usize;
-        
+        let ef = if req.ef > 0 { req.ef as usize } else { 0 };
+
+        // Get metric from the index entry
+        let metric_enum = self
+            .indexes
+            .get(&req.index_name)
+            .map(|entry| entry.metric)
+            .unwrap_or(proto::DistanceMetric::Unspecified);
+        let metric = Self::metric_label(metric_enum);
+
         // Validate
         if req.queries.len() != num_queries * dimension {
             return Err(Status::invalid_argument(format!(
@@ -375,42 +534,50 @@ impl VectorIndexService for VectorIndexServer {
                 req.queries.len()
             )));
         }
-        
-        // Perform batch search
-        let mut all_results = Vec::with_capacity(num_queries);
-        
-        for i in 0..num_queries {
-            let query = &req.queries[i * dimension..(i + 1) * dimension];
-            let results = match index.search(query, k) {
-                Ok(r) => r,
-                Err(_) => vec![],
-            };
-            
-            all_results.push(QueryResults {
-                results: results
-                    .into_iter()
-                    .map(|(id, distance)| SearchResult {
-                        id: id as u64,
-                        distance,
-                    })
-                    .collect(),
-            });
-        }
-        
+
+        // Parallel batch search via rayon on blocking thread pool
+        let queries = req.queries;
+        let all_results = tokio::task::spawn_blocking(move || {
+            use rayon::prelude::*;
+            (0..num_queries)
+                .into_par_iter()
+                .map(|i| {
+                    let query = &queries[i * dimension..(i + 1) * dimension];
+                    let raw_results = if ef > 0 {
+                        index.search_with_ef(query, k, ef.max(k))
+                    } else {
+                        index.search(query, k)
+                    };
+                    let results = match raw_results {
+                        Ok(r) => r,
+                        Err(_) => vec![],
+                    };
+                    let results: Vec<SearchResult> = results
+                        .into_iter()
+                        .map(|(id, distance)| Self::search_result(&index, id, distance, metric))
+                        .collect();
+                    QueryResults { results }
+                })
+                .collect::<Vec<_>>()
+        })
+        .await
+        .map_err(|e| Status::internal(format!("Task join error: {}", e)))?;
+
         let duration_us = start.elapsed().as_micros() as u64;
-        
+
         Ok(Response::new(SearchBatchResponse {
             results: all_results,
             duration_us,
+            metric: metric_enum.into(),
         }))
     }
-    
+
     async fn get_stats(
         &self,
         request: Request<GetStatsRequest>,
     ) -> Result<Response<GetStatsResponse>, Status> {
         let name = request.into_inner().index_name;
-        
+
         match self.indexes.get(&name) {
             Some(entry) => {
                 let stats = entry.index.stats();
@@ -431,17 +598,470 @@ impl VectorIndexService for VectorIndexServer {
             })),
         }
     }
-    
+
     async fn health_check(
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
         let indexes: Vec<String> = self.indexes.iter().map(|e| e.name.clone()).collect();
-        
+
         Ok(Response::new(HealthCheckResponse {
             status: proto::health_check_response::Status::Serving.into(),
             version: VERSION.to_string(),
             indexes,
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prost::Message;
+
+    /// Create an index, insert vectors, search, and return the search results.
+    async fn create_insert_search(metric: proto::DistanceMetric) -> SearchResponse {
+        let server = VectorIndexServer::new();
+        let index_name = "metric_test_index";
+
+        server
+            .create_index(Request::new(CreateIndexRequest {
+                name: index_name.to_string(),
+                dimension: 4,
+                config: None,
+                metric: metric as i32,
+            }))
+            .await
+            .expect("create_index");
+
+        server
+            .insert_batch(Request::new(InsertBatchRequest {
+                index_name: index_name.to_string(),
+                ids: vec![1, 2, 3],
+                metadata: vec![],
+                #[rustfmt::skip]
+                vectors: vec![
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0, 0.0,
+                ],
+            }))
+            .await
+            .expect("insert_batch");
+
+        let resp = server
+            .search(Request::new(SearchRequest {
+                index_name: index_name.to_string(),
+                query: vec![1.0, 0.0, 0.0, 0.0],
+                k: 3,
+                ef: 0,
+            }))
+            .await
+            .expect("search")
+            .into_inner();
+
+        assert!(resp.error.is_empty(), "search error: {}", resp.error);
+        assert!(!resp.results.is_empty(), "expected at least one result");
+        resp
+    }
+
+    #[tokio::test]
+    async fn search_result_reports_cosine_metric() {
+        let resp = create_insert_search(proto::DistanceMetric::Cosine).await;
+        assert_eq!(resp.metric, proto::DistanceMetric::Cosine as i32);
+        for r in &resp.results {
+            assert_eq!(r.metric, "cosine", "every result must carry its metric");
+        }
+    }
+
+    #[tokio::test]
+    async fn search_result_reports_euclidean_metric() {
+        let resp = create_insert_search(proto::DistanceMetric::L2).await;
+        assert_eq!(resp.metric, proto::DistanceMetric::L2 as i32);
+        for r in &resp.results {
+            assert_eq!(r.metric, "euclidean");
+        }
+    }
+
+    #[tokio::test]
+    async fn search_result_reports_dot_product_metric() {
+        let resp = create_insert_search(proto::DistanceMetric::DotProduct).await;
+        assert_eq!(resp.metric, proto::DistanceMetric::DotProduct as i32);
+        for r in &resp.results {
+            assert_eq!(r.metric, "dot_product");
+        }
+    }
+
+    #[tokio::test]
+    async fn unspecified_metric_is_reported_without_guessing() {
+        let resp = create_insert_search(proto::DistanceMetric::Unspecified).await;
+        assert_eq!(resp.metric, proto::DistanceMetric::Unspecified as i32);
+        for r in &resp.results {
+            assert_eq!(r.metric, "unspecified");
+        }
+    }
+
+    #[tokio::test]
+    async fn metric_reporting_preserves_result_order_and_distances() {
+        let resp = create_insert_search(proto::DistanceMetric::Cosine).await;
+        let observed: Vec<(u64, f32)> = resp
+            .results
+            .iter()
+            .map(|result| (result.id, result.distance))
+            .collect();
+
+        assert_eq!(observed.len(), 3);
+        assert_eq!(observed[0], (1, 0.0));
+        assert_eq!(observed[1].1, 1.0);
+        assert_eq!(observed[2].1, 1.0);
+    }
+
+    #[tokio::test]
+    async fn legacy_insert_without_metadata_returns_absent_metadata() {
+        let resp = create_insert_search(proto::DistanceMetric::Cosine).await;
+        for result in &resp.results {
+            assert_eq!(result.parent_id, None);
+            assert_eq!(result.view_type, None);
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_insert_with_mixed_metadata_is_returned_by_search() {
+        let server = VectorIndexServer::new();
+        let index_name = "metadata_batch_index";
+
+        server
+            .create_index(Request::new(CreateIndexRequest {
+                name: index_name.to_string(),
+                dimension: 4,
+                config: None,
+                metric: proto::DistanceMetric::Cosine as i32,
+            }))
+            .await
+            .expect("create_index");
+
+        server
+            .insert_batch(Request::new(InsertBatchRequest {
+                index_name: index_name.to_string(),
+                ids: vec![1, 2, 3],
+                #[rustfmt::skip]
+                vectors: vec![
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0, 0.0,
+                ],
+                metadata: vec![
+                    proto::VectorMetadata {
+                        parent_id: Some(0),
+                        view_type: Some("turn".to_string()),
+                    },
+                    proto::VectorMetadata {
+                        parent_id: None,
+                        view_type: None,
+                    },
+                    proto::VectorMetadata {
+                        parent_id: Some(712),
+                        view_type: Some("event".to_string()),
+                    },
+                ],
+            }))
+            .await
+            .expect("insert_batch");
+
+        let resp = server
+            .search(Request::new(SearchRequest {
+                index_name: index_name.to_string(),
+                query: vec![1.0, 0.0, 0.0, 0.0],
+                k: 3,
+                ef: 0,
+            }))
+            .await
+            .expect("search")
+            .into_inner();
+
+        let by_id: std::collections::HashMap<u64, &SearchResult> = resp
+            .results
+            .iter()
+            .map(|result| (result.id, result))
+            .collect();
+
+        assert_eq!(by_id[&1].parent_id, Some(0));
+        assert_eq!(by_id[&1].view_type.as_deref(), Some("turn"));
+        assert_eq!(by_id[&2].parent_id, None);
+        assert_eq!(by_id[&2].view_type, None);
+        assert_eq!(by_id[&3].parent_id, Some(712));
+        assert_eq!(by_id[&3].view_type.as_deref(), Some("event"));
+    }
+
+    #[tokio::test]
+    async fn batch_insert_rejects_metadata_length_mismatch() {
+        let server = VectorIndexServer::new();
+        let index_name = "metadata_mismatch_index";
+
+        server
+            .create_index(Request::new(CreateIndexRequest {
+                name: index_name.to_string(),
+                dimension: 4,
+                config: None,
+                metric: proto::DistanceMetric::Cosine as i32,
+            }))
+            .await
+            .expect("create_index");
+
+        let err = server
+            .insert_batch(Request::new(InsertBatchRequest {
+                index_name: index_name.to_string(),
+                ids: vec![1, 2],
+                #[rustfmt::skip]
+                vectors: vec![
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                ],
+                metadata: vec![proto::VectorMetadata {
+                    parent_id: Some(1),
+                    view_type: None,
+                }],
+            }))
+            .await
+            .expect_err("metadata length mismatch should be invalid");
+
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        assert!(err.message().contains("Metadata length mismatch"));
+    }
+
+    #[test]
+    fn search_response_metric_round_trips() {
+        let response = SearchResponse {
+            results: vec![SearchResult {
+                id: 42,
+                distance: 0.25,
+                metric: "cosine".to_string(),
+                parent_id: None,
+                view_type: None,
+            }],
+            duration_us: 99,
+            error: String::new(),
+            metric: proto::DistanceMetric::Cosine as i32,
+        };
+
+        let bytes = response.encode_to_vec();
+        let decoded = SearchResponse::decode(bytes.as_slice()).expect("decode search response");
+
+        assert_eq!(decoded.metric, proto::DistanceMetric::Cosine as i32);
+        assert_eq!(decoded.duration_us, 99);
+        assert_eq!(decoded.error, "");
+        assert_eq!(decoded.results.len(), 1);
+        assert_eq!(decoded.results[0].id, 42);
+        assert_eq!(decoded.results[0].distance, 0.25);
+        assert_eq!(decoded.results[0].metric, "cosine");
+    }
+
+    #[test]
+    fn legacy_search_response_without_metric_decodes_as_unspecified() {
+        let legacy = SearchResponse {
+            results: vec![SearchResult {
+                id: 7,
+                distance: 1.5,
+                metric: String::new(),
+                parent_id: None,
+                view_type: None,
+            }],
+            duration_us: 12,
+            error: String::new(),
+            metric: proto::DistanceMetric::Unspecified as i32,
+        };
+
+        let bytes = legacy.encode_to_vec();
+        assert!(
+            !bytes.contains(&0x20),
+            "legacy fixture must not contain field 4"
+        );
+
+        let decoded = SearchResponse::decode(bytes.as_slice()).expect("decode legacy response");
+        assert_eq!(decoded.metric, proto::DistanceMetric::Unspecified as i32);
+        assert_eq!(decoded.results[0].id, 7);
+        assert_eq!(decoded.results[0].distance, 1.5);
+    }
+
+    #[test]
+    fn search_response_field_tags_remain_compatible() {
+        let response = SearchResponse {
+            results: vec![SearchResult {
+                id: 1,
+                distance: 2.0,
+                metric: "cosine".to_string(),
+                parent_id: None,
+                view_type: None,
+            }],
+            duration_us: 3,
+            error: "e".to_string(),
+            metric: proto::DistanceMetric::Cosine as i32,
+        };
+
+        let bytes = response.encode_to_vec();
+        assert!(bytes.contains(&0x0a), "results must remain field 1");
+        assert!(bytes.contains(&0x10), "duration_us must remain field 2");
+        assert!(bytes.contains(&0x1a), "error must remain field 3");
+        assert!(bytes.contains(&0x20), "metric must be field 4");
+
+        let result_bytes = response.results[0].encode_to_vec();
+        assert!(result_bytes.contains(&0x08), "id must remain field 1");
+        assert!(result_bytes.contains(&0x15), "distance must remain field 2");
+        assert!(
+            result_bytes.contains(&0x1a),
+            "metric string must remain field 3"
+        );
+    }
+
+    #[test]
+    fn search_batch_response_metric_round_trips() {
+        let response = SearchBatchResponse {
+            results: vec![QueryResults {
+                results: vec![SearchResult {
+                    id: 11,
+                    distance: -3.0,
+                    metric: "dot_product".to_string(),
+                    parent_id: None,
+                    view_type: None,
+                }],
+            }],
+            duration_us: 44,
+            metric: proto::DistanceMetric::DotProduct as i32,
+        };
+
+        let bytes = response.encode_to_vec();
+        let decoded =
+            SearchBatchResponse::decode(bytes.as_slice()).expect("decode search batch response");
+
+        assert_eq!(decoded.metric, proto::DistanceMetric::DotProduct as i32);
+        assert_eq!(decoded.duration_us, 44);
+        assert_eq!(decoded.results[0].results[0].id, 11);
+        assert_eq!(decoded.results[0].results[0].distance, -3.0);
+    }
+
+    #[tokio::test]
+    async fn search_batch_results_report_metric() {
+        let server = VectorIndexServer::new();
+        let index_name = "metric_batch_index";
+
+        server
+            .create_index(Request::new(CreateIndexRequest {
+                name: index_name.to_string(),
+                dimension: 4,
+                config: None,
+                metric: proto::DistanceMetric::Cosine as i32,
+            }))
+            .await
+            .expect("create_index");
+
+        server
+            .insert_batch(Request::new(InsertBatchRequest {
+                index_name: index_name.to_string(),
+                ids: vec![1, 2],
+                metadata: vec![],
+                #[rustfmt::skip]
+                vectors: vec![
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                ],
+            }))
+            .await
+            .expect("insert_batch");
+
+        let resp = server
+            .search_batch(Request::new(SearchBatchRequest {
+                index_name: index_name.to_string(),
+                #[rustfmt::skip]
+                queries: vec![
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                ],
+                num_queries: 2,
+                k: 2,
+                ef: 0,
+            }))
+            .await
+            .expect("search_batch")
+            .into_inner();
+
+        let mut saw_result = false;
+        assert_eq!(resp.metric, proto::DistanceMetric::Cosine as i32);
+        for query_results in &resp.results {
+            for r in &query_results.results {
+                saw_result = true;
+                assert_eq!(r.metric, "cosine");
+            }
+        }
+        assert!(saw_result, "expected at least one batch result");
+    }
+
+    #[tokio::test]
+    async fn search_batch_returns_metadata_for_mixed_presence() {
+        let server = VectorIndexServer::new();
+        let index_name = "batch_metadata_index";
+
+        server
+            .create_index(Request::new(CreateIndexRequest {
+                name: index_name.to_string(),
+                dimension: 4,
+                config: None,
+                metric: proto::DistanceMetric::Cosine as i32,
+            }))
+            .await
+            .expect("create_index");
+
+        server
+            .insert_batch(Request::new(InsertBatchRequest {
+                index_name: index_name.to_string(),
+                ids: vec![1, 2, 3],
+                #[rustfmt::skip]
+                vectors: vec![
+                    1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0, 0.0,
+                ],
+                metadata: vec![
+                    proto::VectorMetadata {
+                        parent_id: Some(0),
+                        view_type: Some("turn".to_string()),
+                    },
+                    proto::VectorMetadata {
+                        parent_id: None,
+                        view_type: None,
+                    },
+                    proto::VectorMetadata {
+                        parent_id: Some(712),
+                        view_type: Some("event".to_string()),
+                    },
+                ],
+            }))
+            .await
+            .expect("insert_batch");
+
+        let resp = server
+            .search_batch(Request::new(SearchBatchRequest {
+                index_name: index_name.to_string(),
+                #[rustfmt::skip]
+                queries: vec![
+                    1.0, 0.0, 0.0, 0.0,
+                ],
+                num_queries: 1,
+                k: 3,
+                ef: 0,
+            }))
+            .await
+            .expect("search_batch")
+            .into_inner();
+
+        assert_eq!(resp.results.len(), 1);
+        let results = &resp.results[0].results;
+        let by_id: std::collections::HashMap<u64, &SearchResult> =
+            results.iter().map(|r| (r.id, r)).collect();
+
+        assert_eq!(by_id[&1].parent_id, Some(0));
+        assert_eq!(by_id[&1].view_type.as_deref(), Some("turn"));
+        assert_eq!(by_id[&2].parent_id, None);
+        assert_eq!(by_id[&2].view_type, None);
+        assert_eq!(by_id[&3].parent_id, Some(712));
+        assert_eq!(by_id[&3].view_type.as_deref(), Some("event"));
     }
 }
