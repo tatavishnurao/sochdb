@@ -64,24 +64,24 @@ pub fn is_analytics_disabled() -> bool {
 pub fn get_anonymous_id() -> &'static str {
     ANONYMOUS_ID.get_or_init(|| {
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        
+
         // Hash machine-specific info
         if let Ok(hostname) = hostname::get() {
             hostname.to_string_lossy().hash(&mut hasher);
         }
-        
+
         std::env::consts::OS.hash(&mut hasher);
         std::env::consts::ARCH.hash(&mut hasher);
-        
+
         #[cfg(unix)]
         {
             unsafe {
                 libc::getuid().hash(&mut hasher);
             }
         }
-        
+
         format!("{:016x}", hasher.finish())
     })
 }
@@ -202,7 +202,7 @@ fn send_event(
     // Merge all properties including SDK context
     let mut event_properties = properties;
     event_properties.insert("$lib".to_string(), serde_json::json!("sochdb-rust"));
-    
+
     // PostHog capture endpoint expects this format
     let payload = serde_json::json!({
         "api_key": api_key,
@@ -258,7 +258,7 @@ mod tests {
                 v == "true" || v == "1" || v == "yes" || v == "on"
             })
             .unwrap_or(false);
-        
+
         // Just verify it doesn't panic
         assert!(result == true || result == false);
     }
@@ -279,7 +279,7 @@ mod tests {
             host: "http://localhost".to_string(),
             disabled: true,
         };
-        
+
         // This should not panic or make any network calls
         analytics.capture("test_event", None);
     }

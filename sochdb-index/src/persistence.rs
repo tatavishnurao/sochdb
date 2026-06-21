@@ -237,12 +237,13 @@ impl HnswIndex {
                 }));
             }
 
-            let dense_index = index.next_dense_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u32;
+            let dense_index = index
+                .next_dense_index
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                as u32;
             index.record_dense_id(dense_index, snode.id);
-            let quantized = QuantizedVector::from_f32(
-                ndarray::Array1::from_vec(snode.vector),
-                precision,
-            );
+            let quantized =
+                QuantizedVector::from_f32(ndarray::Array1::from_vec(snode.vector), precision);
             let vector_index = {
                 let mut store = index.vector_store.write();
                 let idx = store.len() as u32;
@@ -379,12 +380,13 @@ impl HnswIndex {
                 }));
             }
 
-            let dense_index = index.next_dense_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u32;
+            let dense_index = index
+                .next_dense_index
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                as u32;
             index.record_dense_id(dense_index, snode.id);
-            let quantized = QuantizedVector::from_f32(
-                ndarray::Array1::from_vec(snode.vector),
-                precision,
-            );
+            let quantized =
+                QuantizedVector::from_f32(ndarray::Array1::from_vec(snode.vector), precision);
             let vector_index = {
                 let mut store = index.vector_store.write();
                 let idx = store.len() as u32;

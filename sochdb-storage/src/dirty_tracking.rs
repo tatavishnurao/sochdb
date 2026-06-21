@@ -76,8 +76,8 @@
 
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
 
 use crossbeam_channel::{self, Receiver, Sender};
@@ -212,7 +212,7 @@ impl BatchedDirtyTracker {
     /// Create a new batched dirty tracker
     pub fn new() -> Arc<Self> {
         let (sender, receiver) = crossbeam_channel::bounded(1024);
-        
+
         let tracker = Arc::new(Self {
             sender,
             receiver,
@@ -227,7 +227,7 @@ impl BatchedDirtyTracker {
             ],
             stats: DirtyTrackingStats::default(),
         });
-        
+
         tracker
     }
 
@@ -309,16 +309,18 @@ impl BatchedDirtyTracker {
     pub fn advance_epoch(&self) -> (u64, Vec<KeyFingerprint>) {
         // Send epoch advance event to ensure all pending events are processed
         let _ = self.sender.try_send(DirtyEvent::AdvanceEpoch);
-        
+
         let old_epoch = self.current_epoch.fetch_add(1, Ordering::SeqCst);
         let old_idx = (old_epoch as usize) % EPOCH_RING_SIZE;
-        
+
         // Drain the old epoch
         let mut guard = self.epochs[old_idx].lock();
         let keys: Vec<_> = guard.drain().collect();
-        
-        self.stats.current_epoch.store(old_epoch + 1, Ordering::Relaxed);
-        
+
+        self.stats
+            .current_epoch
+            .store(old_epoch + 1, Ordering::Relaxed);
+
         (old_epoch, keys)
     }
 
@@ -335,9 +337,9 @@ impl BatchedDirtyTracker {
     /// Aggregator loop - runs in background thread
     fn aggregator_loop(&self) {
         use crossbeam_channel::RecvTimeoutError;
-        
+
         let timeout = std::time::Duration::from_millis(MAX_FLUSH_INTERVAL_MS);
-        
+
         while self.running.load(Ordering::Relaxed) {
             match self.receiver.recv_timeout(timeout) {
                 Ok(event) => {
@@ -351,7 +353,7 @@ impl BatchedDirtyTracker {
                 }
             }
         }
-        
+
         // Drain remaining events on shutdown
         while let Ok(event) = self.receiver.try_recv() {
             if matches!(event, DirtyEvent::Shutdown) {
@@ -367,13 +369,15 @@ impl BatchedDirtyTracker {
             DirtyEvent::Batch { txn_id: _, keys } => {
                 let epoch = self.current_epoch.load(Ordering::Relaxed);
                 let idx = (epoch as usize) % EPOCH_RING_SIZE;
-                
+
                 let mut guard = self.epochs[idx].lock();
                 let key_count = keys.len();
                 guard.extend(keys);
-                
+
                 self.stats.events_received.fetch_add(1, Ordering::Relaxed);
-                self.stats.keys_tracked.fetch_add(key_count as u64, Ordering::Relaxed);
+                self.stats
+                    .keys_tracked
+                    .fetch_add(key_count as u64, Ordering::Relaxed);
                 self.stats.batches_received.fetch_add(1, Ordering::Relaxed);
             }
             DirtyEvent::AdvanceEpoch => {
@@ -512,13 +516,13 @@ mod tests {
     #[test]
     fn test_txn_dirty_buffer() {
         let mut buffer = TxnDirtyBuffer::new(1);
-        
+
         buffer.record(KeyFingerprint::from_bytes(b"key1"));
         buffer.record(KeyFingerprint::from_bytes(b"key2"));
         buffer.record(KeyFingerprint::from_bytes(b"key3"));
-        
+
         assert_eq!(buffer.len(), 3);
-        
+
         let keys = buffer.drain();
         assert_eq!(keys.len(), 3);
         assert!(buffer.is_empty());
@@ -528,40 +532,43 @@ mod tests {
     fn test_batched_tracker_basic() {
         let tracker = BatchedDirtyTracker::new();
         tracker.start();
-        
+
         // Send some events directly
-        tracker.send_batch(1, vec![
-            KeyFingerprint::from_bytes(b"key1"),
-            KeyFingerprint::from_bytes(b"key2"),
-        ]);
-        
+        tracker.send_batch(
+            1,
+            vec![
+                KeyFingerprint::from_bytes(b"key1"),
+                KeyFingerprint::from_bytes(b"key2"),
+            ],
+        );
+
         // Give aggregator time to process
         thread::sleep(Duration::from_millis(50));
-        
+
         // Advance epoch to collect
         let (_epoch, keys) = tracker.advance_epoch();
-        
+
         // Keys should have been processed
         assert!(tracker.stats().batches_received.load(Ordering::Relaxed) >= 1);
-        
+
         tracker.stop();
     }
 
     #[test]
     fn test_epoch_rotation() {
         let tracker = BatchedDirtyTracker::new();
-        
+
         // Directly insert into epochs without starting the aggregator thread
         {
             let mut guard = tracker.epochs[0].lock();
             guard.insert(KeyFingerprint::from_bytes(b"key1"));
             guard.insert(KeyFingerprint::from_bytes(b"key2"));
         }
-        
+
         let (epoch, keys) = tracker.advance_epoch();
         assert_eq!(epoch, 0);
         assert_eq!(keys.len(), 2);
-        
+
         // New epoch should be empty
         let (epoch2, keys2) = tracker.advance_epoch();
         assert_eq!(epoch2, 1);

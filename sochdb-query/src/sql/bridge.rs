@@ -50,8 +50,8 @@ use super::ast::*;
 use super::compatibility::SqlDialect;
 use super::error::{SqlError, SqlResult};
 use super::parser::Parser;
-use std::collections::HashMap;
 use sochdb_core::SochValue;
+use std::collections::HashMap;
 
 /// Execution result types
 #[derive(Debug, Clone)]
@@ -268,9 +268,7 @@ impl<C: SqlConnection> SqlBridge<C> {
                 ));
             }
             TableRef::Join { .. } => {
-                return Err(SqlError::NotImplemented(
-                    "JOINs not yet supported".into(),
-                ));
+                return Err(SqlError::NotImplemented("JOINs not yet supported".into()));
             }
             TableRef::Function { .. } => {
                 return Err(SqlError::NotImplemented(
@@ -349,11 +347,8 @@ impl<C: SqlConnection> SqlBridge<C> {
     ) -> SqlResult<ExecutionResult> {
         let table_name = delete.table.name();
 
-        self.conn.delete(
-            table_name,
-            delete.where_clause.as_ref(),
-            params,
-        )
+        self.conn
+            .delete(table_name, delete.where_clause.as_ref(), params)
     }
 
     fn execute_create_table(&mut self, stmt: &CreateTableStmt) -> SqlResult<ExecutionResult> {
@@ -529,7 +524,11 @@ impl PlaceholderVisitor {
                     self.visit_expr(arg);
                 }
             }
-            Expr::Case { operand, conditions, else_result } => {
+            Expr::Case {
+                operand,
+                conditions,
+                else_result,
+            } => {
                 if let Some(op) = operand {
                     self.visit_expr(op);
                 }
@@ -547,7 +546,9 @@ impl PlaceholderVisitor {
                     self.visit_expr(item);
                 }
             }
-            Expr::Between { expr, low, high, .. } => {
+            Expr::Between {
+                expr, low, high, ..
+            } => {
                 self.visit_expr(expr);
                 self.visit_expr(low);
                 self.visit_expr(high);
@@ -582,7 +583,10 @@ mod tests {
 
     #[test]
     fn test_dialect_detection() {
-        assert_eq!(SqlDialect::detect("SELECT * FROM users"), SqlDialect::Standard);
+        assert_eq!(
+            SqlDialect::detect("SELECT * FROM users"),
+            SqlDialect::Standard
+        );
         assert_eq!(
             SqlDialect::detect("INSERT IGNORE INTO users VALUES (1)"),
             SqlDialect::MySQL

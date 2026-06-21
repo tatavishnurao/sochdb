@@ -1,5 +1,5 @@
 //! SochDB MCP Library
-//! 
+//!
 //! This module exposes the MCP server for embedding in other applications
 //! like SochDB Studio.
 
@@ -9,5 +9,5 @@ pub mod mcp;
 pub mod tools;
 
 // Re-export key types for embedding
-pub use mcp::McpServer;
 pub use jsonrpc::{RpcRequest, RpcResponse};
+pub use mcp::McpServer;

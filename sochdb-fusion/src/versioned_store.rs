@@ -71,8 +71,8 @@
 //! ```
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use parking_lot::RwLock;
 
@@ -757,11 +757,7 @@ mod tests {
     #[test]
     fn test_all_objects() {
         let store = VersionedObjectStore::with_config(StoreConfig::uncompressed());
-        let objects = vec![
-            make_entity("A"),
-            make_entity("B"),
-            make_entity("C"),
-        ];
+        let objects = vec![make_entity("A"), make_entity("B"), make_entity("C")];
         store.put_batch(objects).unwrap();
 
         let all = store.all_objects().unwrap();

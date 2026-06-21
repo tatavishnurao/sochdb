@@ -31,7 +31,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::connection::{Timestamp, SochConnection, TxnId};
+use crate::connection::{SochConnection, Timestamp, TxnId};
 use crate::error::{ClientError, Result};
 
 /// Transaction isolation levels

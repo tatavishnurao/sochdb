@@ -52,13 +52,13 @@ pub struct BM25Config {
     /// Higher values give more weight to term frequency
     /// Typical range: 1.2 - 2.0
     pub k1: f32,
-    
+
     /// Length normalization parameter (b)
     /// 0.0 = no length normalization
     /// 1.0 = full length normalization
     /// Typical value: 0.75
     pub b: f32,
-    
+
     /// Minimum IDF to filter out very common terms
     pub min_idf: f32,
 }
@@ -82,7 +82,7 @@ impl BM25Config {
             min_idf: 0.0,
         }
     }
-    
+
     /// Elasticsearch-style parameters
     pub fn elasticsearch() -> Self {
         Self {
@@ -91,7 +91,7 @@ impl BM25Config {
             min_idf: 0.0,
         }
     }
-    
+
     /// Parameters optimized for short queries
     pub fn short_queries() -> Self {
         Self {
@@ -110,16 +110,16 @@ impl BM25Config {
 pub struct BM25Scorer {
     /// Configuration
     config: BM25Config,
-    
+
     /// Total number of documents
     num_docs: usize,
-    
+
     /// Average document length (in tokens)
     avg_doc_len: f32,
-    
+
     /// Document frequency for each term
     doc_freqs: HashMap<String, usize>,
-    
+
     /// Precomputed IDF scores for terms
     idf_cache: HashMap<String, f32>,
 }
@@ -135,7 +135,7 @@ impl BM25Scorer {
             idf_cache: HashMap::new(),
         }
     }
-    
+
     /// Build the scorer from a collection of documents
     pub fn build<I, D, T>(documents: I, config: BM25Config) -> Self
     where
@@ -147,12 +147,13 @@ impl BM25Scorer {
         let mut total_len = 0usize;
         let mut num_docs = 0usize;
         let mut doc_freqs: HashMap<String, usize> = HashMap::new();
-        
+
         for doc in documents {
             num_docs += 1;
-            let mut seen_terms: std::collections::HashSet<String> = std::collections::HashSet::new();
+            let mut seen_terms: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
             let mut doc_len = 0usize;
-            
+
             for token in doc {
                 let term = token.as_ref().to_lowercase();
                 if !term.is_empty() {
@@ -160,24 +161,28 @@ impl BM25Scorer {
                     doc_len += 1;
                 }
             }
-            
+
             total_len += doc_len;
-            
+
             for term in seen_terms {
                 *doc_freqs.entry(term).or_insert(0) += 1;
             }
         }
-        
+
         scorer.num_docs = num_docs;
-        scorer.avg_doc_len = if num_docs > 0 { total_len as f32 / num_docs as f32 } else { 0.0 };
+        scorer.avg_doc_len = if num_docs > 0 {
+            total_len as f32 / num_docs as f32
+        } else {
+            0.0
+        };
         scorer.doc_freqs = doc_freqs;
-        
+
         // Precompute IDF scores
         scorer.precompute_idf();
-        
+
         scorer
     }
-    
+
     /// Precompute IDF scores for all terms
     fn precompute_idf(&mut self) {
         for (term, &df) in &self.doc_freqs {
@@ -187,7 +192,7 @@ impl BM25Scorer {
             }
         }
     }
-    
+
     /// Compute IDF for a term
     #[inline]
     fn compute_idf(&self, df: usize, n: usize) -> f32 {
@@ -196,7 +201,7 @@ impl BM25Scorer {
         let df = df as f32;
         ((n - df + 0.5) / (df + 0.5) + 1.0).ln()
     }
-    
+
     /// Get IDF for a term
     pub fn idf(&self, term: &str) -> f32 {
         self.idf_cache
@@ -207,7 +212,7 @@ impl BM25Scorer {
                 ((self.num_docs as f32 + 0.5) / 0.5 + 1.0).ln()
             })
     }
-    
+
     /// Score a document for a query
     pub fn score<I, T>(&self, query_terms: I, doc_terms: &[T], doc_len: usize) -> f32
     where
@@ -219,63 +224,68 @@ impl BM25Scorer {
         for term in doc_terms {
             *tf.entry(term.as_ref()).or_insert(0) += 1;
         }
-        
+
         let k1 = self.config.k1;
         let b = self.config.b;
         let dl = doc_len as f32;
         let avgdl = self.avg_doc_len;
-        
+
         let mut score = 0.0f32;
-        
+
         for query_term in query_terms {
             let term = query_term.as_ref().to_lowercase();
             let term_str = term.as_str();
-            
+
             // Get TF for this term in the document
             let term_tf = *tf.get(term_str).unwrap_or(&0) as f32;
             if term_tf == 0.0 {
                 continue;
             }
-            
+
             // Get IDF
             let idf = self.idf(&term);
-            
+
             // BM25 scoring formula
             let numerator = term_tf * (k1 + 1.0);
             let denominator = term_tf + k1 * (1.0 - b + b * dl / avgdl);
-            
+
             score += idf * numerator / denominator;
         }
-        
+
         score
     }
-    
+
     /// Score a document given precomputed term frequencies
     #[inline]
-    pub fn score_with_tf(&self, query_terms: &[String], doc_tf: &HashMap<String, usize>, doc_len: usize) -> f32 {
+    pub fn score_with_tf(
+        &self,
+        query_terms: &[String],
+        doc_tf: &HashMap<String, usize>,
+        doc_len: usize,
+    ) -> f32 {
         let k1 = self.config.k1;
         let b = self.config.b;
         let dl = doc_len as f32;
         let avgdl = self.avg_doc_len;
-        
+
         let mut score = 0.0f32;
-        
+
         for term in query_terms {
             let term_tf = *doc_tf.get(term).unwrap_or(&0) as f32;
             if term_tf == 0.0 {
                 continue;
             }
-            
+
             let idf = self.idf(term);
             let numerator = term_tf * (k1 + 1.0);
             let denominator = term_tf + k1 * (1.0 - b + b * dl / avgdl);
-            
+
             score += idf * numerator / denominator;
         }
-        
+
         score
     }
-    
+
     /// Update stats when adding a document
     pub fn add_document<I, T>(&mut self, tokens: I)
     where
@@ -284,7 +294,7 @@ impl BM25Scorer {
     {
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut doc_len = 0usize;
-        
+
         for token in tokens {
             let term = token.as_ref().to_lowercase();
             if !term.is_empty() {
@@ -292,21 +302,21 @@ impl BM25Scorer {
                 doc_len += 1;
             }
         }
-        
+
         // Update average document length
         let total_len = self.avg_doc_len * self.num_docs as f32;
         self.num_docs += 1;
         self.avg_doc_len = (total_len + doc_len as f32) / self.num_docs as f32;
-        
+
         // Update document frequencies
         let num_docs = self.num_docs;
         let min_idf = self.config.min_idf;
-        
+
         for term in seen {
             let df = self.doc_freqs.entry(term.clone()).or_insert(0);
             *df += 1;
             let df_val = *df;
-            
+
             // Update IDF cache (compute inline to avoid borrow issues)
             let idf = (((num_docs - df_val + 1) as f32) / (df_val as f32 + 0.5)).ln();
             if idf >= min_idf {
@@ -316,7 +326,7 @@ impl BM25Scorer {
             }
         }
     }
-    
+
     /// Get statistics
     pub fn stats(&self) -> BM25Stats {
         BM25Stats {
@@ -375,7 +385,7 @@ pub fn tokenize_query(text: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_bm25_basic() {
         let docs = vec![
@@ -383,16 +393,13 @@ mod tests {
             vec!["hello", "there"],
             vec!["goodbye", "world"],
         ];
-        
-        let scorer = BM25Scorer::build(
-            docs.iter().map(|d| d.iter()),
-            BM25Config::default(),
-        );
-        
+
+        let scorer = BM25Scorer::build(docs.iter().map(|d| d.iter()), BM25Config::default());
+
         assert_eq!(scorer.num_docs, 3);
         assert!((scorer.avg_doc_len - 2.0).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_bm25_idf() {
         let docs = vec![
@@ -400,20 +407,17 @@ mod tests {
             vec!["common", "other"],
             vec!["common", "another"],
         ];
-        
-        let scorer = BM25Scorer::build(
-            docs.iter().map(|d| d.iter()),
-            BM25Config::default(),
-        );
-        
+
+        let scorer = BM25Scorer::build(docs.iter().map(|d| d.iter()), BM25Config::default());
+
         // "common" appears in all 3 docs, "rare" in only 1
         let idf_common = scorer.idf("common");
         let idf_rare = scorer.idf("rare");
-        
+
         // Rare terms should have higher IDF
         assert!(idf_rare > idf_common);
     }
-    
+
     #[test]
     fn test_bm25_scoring() {
         let docs = vec![
@@ -421,61 +425,50 @@ mod tests {
             vec!["the", "lazy", "dog"],
             vec!["quick", "quick", "quick"], // High TF for "quick"
         ];
-        
-        let scorer = BM25Scorer::build(
-            docs.iter().map(|d| d.iter()),
-            BM25Config::default(),
-        );
-        
+
+        let scorer = BM25Scorer::build(docs.iter().map(|d| d.iter()), BM25Config::default());
+
         // Score doc 3 for "quick"
-        let score = scorer.score(
-            vec!["quick"],
-            &["quick", "quick", "quick"],
-            3,
-        );
-        
+        let score = scorer.score(vec!["quick"], &["quick", "quick", "quick"], 3);
+
         assert!(score > 0.0);
-        
+
         // Score doc 1 for "quick"
-        let score1 = scorer.score(
-            vec!["quick"],
-            &["the", "quick", "brown", "fox"],
-            4,
-        );
-        
+        let score1 = scorer.score(vec!["quick"], &["the", "quick", "brown", "fox"], 4);
+
         // Doc 3 should score higher (more occurrences of "quick")
         assert!(score > score1);
     }
-    
+
     #[test]
     fn test_tokenize() {
         let text = "Hello, World! This is a test.";
         let tokens = tokenize(text);
-        
+
         assert_eq!(tokens, vec!["hello,", "world!", "this", "is", "a", "test."]);
     }
-    
+
     #[test]
     fn test_tokenize_minimal() {
         let text = "Hello, World! This is a test.";
         let tokens = tokenize_minimal(text);
-        
+
         // Single chars and punctuation filtered
         assert!(tokens.contains(&"hello".to_string()));
         assert!(tokens.contains(&"world".to_string()));
         assert!(!tokens.contains(&"a".to_string())); // Single char
     }
-    
+
     #[test]
     fn test_add_document() {
         let mut scorer = BM25Scorer::new(BM25Config::default());
-        
+
         scorer.add_document(vec!["hello", "world"]);
         assert_eq!(scorer.num_docs, 1);
-        
+
         scorer.add_document(vec!["hello", "there", "friend"]);
         assert_eq!(scorer.num_docs, 2);
-        
+
         // Average should be (2 + 3) / 2 = 2.5
         assert!((scorer.avg_doc_len - 2.5).abs() < 0.001);
     }

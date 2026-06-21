@@ -36,6 +36,7 @@ thiserror = { workspace = true }
 clap = { version = "4.5", features = ["derive"] }
 crossbeam-channel = { workspace = true }
 num_cpus = { workspace = true }
+rayon = "1.10"
 
 # Additional dependencies for services
 serde = { workspace = true }

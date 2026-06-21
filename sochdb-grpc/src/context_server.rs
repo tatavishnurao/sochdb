@@ -8,10 +8,10 @@
 //! Provides LLM context assembly with token budgets via gRPC.
 
 use crate::proto::{
-    context_service_server::{ContextService, ContextServiceServer},
     ContextQueryRequest, ContextQueryResponse, ContextSectionType, EstimateTokensRequest,
     EstimateTokensResponse, FormatContextRequest, FormatContextResponse, OutputFormat,
     SectionResult,
+    context_service_server::{ContextService, ContextServiceServer},
 };
 use tonic::{Request, Response, Status};
 
@@ -68,10 +68,16 @@ impl ContextService for ContextServer {
                     format!("# {}\n[Data from: {}]\n", section.name, section.query)
                 }
                 x if x == ContextSectionType::ContextSectionLast as i32 => {
-                    format!("# {} (Recent)\n[Last entries from: {}]\n", section.name, section.query)
+                    format!(
+                        "# {} (Recent)\n[Last entries from: {}]\n",
+                        section.name, section.query
+                    )
                 }
                 x if x == ContextSectionType::ContextSectionSearch as i32 => {
-                    format!("# {} (Search Results)\n[Search: {}]\n", section.name, section.query)
+                    format!(
+                        "# {} (Search Results)\n[Search: {}]\n",
+                        section.name, section.query
+                    )
                 }
                 x if x == ContextSectionType::ContextSectionSelect as i32 => {
                     format!("# {} (Query)\n[SQL: {}]\n", section.name, section.query)
@@ -105,20 +111,14 @@ impl ContextService for ContextServer {
 
         // Format output
         let context = match req.format {
-            x if x == OutputFormat::Json as i32 => {
-                serde_json::json!({
-                    "session_id": req.session_id,
-                    "sections": context_parts,
-                    "total_tokens": total_tokens
-                })
-                .to_string()
-            }
-            x if x == OutputFormat::Markdown as i32 => {
-                context_parts.join("\n---\n")
-            }
-            x if x == OutputFormat::Text as i32 => {
-                context_parts.join("\n\n")
-            }
+            x if x == OutputFormat::Json as i32 => serde_json::json!({
+                "session_id": req.session_id,
+                "sections": context_parts,
+                "total_tokens": total_tokens
+            })
+            .to_string(),
+            x if x == OutputFormat::Markdown as i32 => context_parts.join("\n---\n"),
+            x if x == OutputFormat::Text as i32 => context_parts.join("\n\n"),
             _ => {
                 // TOON format (default)
                 format!(

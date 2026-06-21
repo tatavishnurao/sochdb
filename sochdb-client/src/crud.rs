@@ -102,7 +102,7 @@ impl<'a> RowBuilder<'a> {
             for row in &self.rows {
                 let id = tch.insert_row(&self.table, row);
                 last_id = Some(id);
-                
+
                 // Persist to storage backend for durability
                 // Key format: {table}:{row_id}
                 // Value: bincode serialized row data
@@ -169,15 +169,18 @@ impl<'a> UpdateBuilder<'a> {
     }
 
     /// Execute update
-    /// 
-    /// Note: Updates are persisted to TCH in-memory store. 
+    ///
+    /// Note: Updates are persisted to TCH in-memory store.
     /// The MutationResult contains affected row IDs for storage-level operations.
     pub fn execute(self) -> Result<UpdateResult> {
         let mut tch = self.conn.tch.write();
-        let mutation_result = tch.update_rows(&self.table, &self.updates, self.where_clause.as_ref());
+        let mutation_result =
+            tch.update_rows(&self.table, &self.updates, self.where_clause.as_ref());
 
         // TODO: Wire mutation_result.affected_row_ids to storage backend for WAL/index/CDC
-        Ok(UpdateResult { rows_updated: mutation_result.affected_count })
+        Ok(UpdateResult {
+            rows_updated: mutation_result.affected_count,
+        })
     }
 }
 
@@ -219,7 +222,7 @@ impl<'a> DeleteBuilder<'a> {
     }
 
     /// Execute delete
-    /// 
+    ///
     /// Note: Deletes are persisted to TCH in-memory store.
     /// The MutationResult contains affected row IDs for storage-level operations.
     pub fn execute(self) -> Result<DeleteResult> {
@@ -227,7 +230,9 @@ impl<'a> DeleteBuilder<'a> {
         let mutation_result = tch.delete_rows(&self.table, self.where_clause.as_ref());
 
         // TODO: Wire mutation_result.affected_row_ids to storage backend for WAL/index/CDC
-        Ok(DeleteResult { rows_deleted: mutation_result.affected_count })
+        Ok(DeleteResult {
+            rows_deleted: mutation_result.affected_count,
+        })
     }
 }
 

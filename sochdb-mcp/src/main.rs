@@ -67,7 +67,7 @@ use tracing_subscriber::FmtSubscriber;
 
 use sochdb::connection::EmbeddedConnection;
 
-use crate::framing::{read_message, write_message_format, WireFormat};
+use crate::framing::{WireFormat, read_message, write_message_format};
 use crate::jsonrpc::{RpcRequest, RpcResponse};
 use crate::mcp::McpServer;
 

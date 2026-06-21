@@ -32,8 +32,8 @@
 //! 4. **Circuit Breaker**: JWKS refresh doesn't add latency in hot path
 
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use parking_lot::RwLock;
@@ -139,7 +139,7 @@ pub struct RateLimiter {
 struct TokenBucket {
     tokens: f64,
     last_update: Instant,
-    rate: f64,    // tokens per second
+    rate: f64, // tokens per second
     capacity: f64,
 }
 

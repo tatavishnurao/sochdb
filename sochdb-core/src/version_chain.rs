@@ -49,7 +49,7 @@ pub type TxnId = u64;
 pub type Timestamp = u64;
 
 /// Version visibility context
-/// 
+///
 /// Provides the information needed to determine if a version is visible
 /// to a particular reader/transaction.
 #[derive(Debug, Clone)]
@@ -95,7 +95,7 @@ impl VisibilityContext {
 }
 
 /// Version metadata
-/// 
+///
 /// Common metadata for all version chain implementations.
 #[derive(Debug, Clone)]
 pub struct VersionMeta {
@@ -166,7 +166,7 @@ impl VersionMeta {
 }
 
 /// Trait for MVCC version chain implementations
-/// 
+///
 /// Implementors store multiple versions of a value and provide
 /// visibility-based access according to MVCC semantics.
 pub trait MvccVersionChain {
@@ -522,18 +522,18 @@ mod tests {
     #[test]
     fn test_version_meta_visibility() {
         let mut meta = VersionMeta::new_uncommitted(1, 100);
-        
+
         // Uncommitted - only visible to creator
         let ctx = VisibilityContext::new(1, 200);
         assert!(meta.is_visible(&ctx));
-        
+
         let ctx2 = VisibilityContext::new(2, 200);
         assert!(!meta.is_visible(&ctx2));
-        
+
         // After commit - visible to later snapshots
         meta.commit(150);
         assert!(meta.is_visible(&ctx2));
-        
+
         // Not visible to earlier snapshots
         let ctx3 = VisibilityContext::new(3, 100);
         assert!(!meta.is_visible(&ctx3));
@@ -544,11 +544,11 @@ mod tests {
         let mut meta = VersionMeta::new_uncommitted(1, 100);
         meta.commit(150);
         meta.delete(2, 200);
-        
+
         // Visible before deletion
         let ctx = VisibilityContext::new(3, 180);
         assert!(meta.is_visible(&ctx));
-        
+
         // Not visible after deletion
         let ctx2 = VisibilityContext::new(3, 250);
         assert!(!meta.is_visible(&ctx2));
@@ -558,18 +558,18 @@ mod tests {
     fn test_visibility_context_committed_before() {
         let mut active = std::collections::HashSet::new();
         active.insert(5);
-        
+
         let ctx = VisibilityContext::with_active_txns(1, 200, active);
-        
+
         // Committed before snapshot
         assert!(ctx.is_committed_before(2, Some(100)));
-        
+
         // Committed after snapshot
         assert!(!ctx.is_committed_before(3, Some(250)));
-        
+
         // Active transaction - not committed
         assert!(!ctx.is_committed_before(5, Some(100)));
-        
+
         // No commit timestamp
         assert!(!ctx.is_committed_before(6, None));
     }
@@ -592,9 +592,15 @@ mod tests {
     }
 
     impl ChainEntry for TestEntry {
-        fn commit_ts(&self) -> u64 { self.commit_ts }
-        fn txn_id(&self) -> u64 { self.txn_id }
-        fn set_commit_ts(&mut self, ts: u64) { self.commit_ts = ts; }
+        fn commit_ts(&self) -> u64 {
+            self.commit_ts
+        }
+        fn txn_id(&self) -> u64 {
+            self.txn_id
+        }
+        fn set_commit_ts(&mut self, ts: u64) {
+            self.commit_ts = ts;
+        }
     }
 
     #[test]
@@ -603,7 +609,11 @@ mod tests {
         assert!(chain.is_empty());
 
         // Add uncommitted, then commit
-        chain.set_uncommitted(TestEntry { commit_ts: 0, txn_id: 1, val: 10 });
+        chain.set_uncommitted(TestEntry {
+            commit_ts: 0,
+            txn_id: 1,
+            val: 10,
+        });
         assert_eq!(chain.version_count(), 1);
 
         // Read own writes
@@ -628,11 +638,19 @@ mod tests {
     #[test]
     fn test_binary_search_chain_abort() {
         let mut chain = BinarySearchChain::<TestEntry>::new();
-        chain.set_uncommitted(TestEntry { commit_ts: 0, txn_id: 1, val: 10 });
+        chain.set_uncommitted(TestEntry {
+            commit_ts: 0,
+            txn_id: 1,
+            val: 10,
+        });
         chain.abort(1);
         assert!(chain.is_empty());
         // Abort wrong txn is a no-op
-        chain.set_uncommitted(TestEntry { commit_ts: 0, txn_id: 2, val: 20 });
+        chain.set_uncommitted(TestEntry {
+            commit_ts: 0,
+            txn_id: 2,
+            val: 20,
+        });
         chain.abort(1);
         assert_eq!(chain.version_count(), 1);
     }
@@ -642,9 +660,13 @@ mod tests {
         let mut chain = BinarySearchChain::<TestEntry>::new();
         assert!(!chain.has_write_conflict(1));
 
-        chain.set_uncommitted(TestEntry { commit_ts: 0, txn_id: 1, val: 10 });
+        chain.set_uncommitted(TestEntry {
+            commit_ts: 0,
+            txn_id: 1,
+            val: 10,
+        });
         assert!(!chain.has_write_conflict(1)); // own txn
-        assert!(chain.has_write_conflict(2));  // other txn
+        assert!(chain.has_write_conflict(2)); // other txn
     }
 
     #[test]
@@ -653,7 +675,11 @@ mod tests {
 
         // Commit 5 versions at ts 10, 20, 30, 40, 50
         for i in 1..=5u64 {
-            chain.set_uncommitted(TestEntry { commit_ts: 0, txn_id: i, val: i as i32 });
+            chain.set_uncommitted(TestEntry {
+                commit_ts: 0,
+                txn_id: i,
+                val: i as i32,
+            });
             chain.commit(i, i * 10);
         }
         assert_eq!(chain.committed_count(), 5);
@@ -674,7 +700,11 @@ mod tests {
         // Commit in order: ts=100, ts=200, ts=300
         for (i, ts) in [100u64, 200, 300].iter().enumerate() {
             let txn = (i + 1) as u64;
-            chain.set_uncommitted(TestEntry { commit_ts: 0, txn_id: txn, val: *ts as i32 });
+            chain.set_uncommitted(TestEntry {
+                commit_ts: 0,
+                txn_id: txn,
+                val: *ts as i32,
+            });
             chain.commit(txn, *ts);
         }
 

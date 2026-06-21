@@ -51,20 +51,13 @@
 use clap::Parser;
 use tonic::transport::Server;
 use tonic_health::server::health_reporter;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use sochdb_grpc::{
-    VectorIndexServer,
-    graph_server::GraphServer,
-    policy_server::PolicyServer,
-    context_server::ContextServer,
-    collection_server::CollectionServer,
-    namespace_server::NamespaceServer,
-    semantic_cache_server::SemanticCacheServer,
-    trace_server::TraceServer,
-    checkpoint_server::CheckpointServer,
-    mcp_server::McpServer,
-    kv_server::KvServer,
+    VectorIndexServer, checkpoint_server::CheckpointServer, collection_server::CollectionServer,
+    context_server::ContextServer, graph_server::GraphServer, kv_server::KvServer,
+    mcp_server::McpServer, namespace_server::NamespaceServer, policy_server::PolicyServer,
+    semantic_cache_server::SemanticCacheServer, trace_server::TraceServer,
 };
 
 /// SochDB gRPC Server
@@ -76,11 +69,11 @@ struct Args {
     /// Host address to bind to
     #[arg(long, default_value = "127.0.0.1")]
     host: String,
-    
+
     /// Port to listen on
     #[arg(short, long, default_value = "50051")]
     port: u16,
-    
+
     /// Enable debug logging
     #[arg(short, long)]
     debug: bool,
@@ -89,21 +82,21 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    
+
     // Initialize tracing
     let filter = if args.debug {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"))
     } else {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"))
     };
-    
+
     tracing_subscriber::registry()
         .with(filter)
         .with(tracing_subscriber::fmt::layer())
         .init();
-    
+
     let addr = format!("{}:{}", args.host, args.port).parse()?;
-    
+
     // Create all service instances
     let vector_server = VectorIndexServer::new();
     let graph_server = GraphServer::new();
@@ -116,17 +109,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let checkpoint_server = CheckpointServer::new();
     let mcp_server = McpServer::new();
     let kv_server = KvServer::new();
-    
+
     // Create gRPC health service for Kubernetes probes
     let (mut health_reporter, health_service) = health_reporter();
-    
+
     // Mark the overall service as serving (empty service name = overall health)
     // The empty string "" represents overall server health
-    health_reporter.set_service_status("", tonic_health::ServingStatus::Serving).await;
-    
+    health_reporter
+        .set_service_status("", tonic_health::ServingStatus::Serving)
+        .await;
+
     tracing::info!("Starting SochDB gRPC server on {}", addr);
     tracing::info!("Server version: {}", env!("CARGO_PKG_VERSION"));
-    
+
     println!(
         r#"
 ╔══════════════════════════════════════════════════════════════╗
@@ -152,7 +147,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         addr,
         env!("CARGO_PKG_VERSION")
     );
-    
+
     Server::builder()
         .add_service(health_service)
         .add_service(vector_server.into_service())
@@ -168,6 +163,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(kv_server.into_service())
         .serve(addr)
         .await?;
-    
+
     Ok(())
 }

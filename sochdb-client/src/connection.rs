@@ -66,7 +66,7 @@ pub type Timestamp = u64;
 pub type RowId = u64;
 
 /// Result from a mutation operation (UPDATE/DELETE)
-/// 
+///
 /// Contains both the count and the affected row IDs for storage-level
 /// durability operations (WAL entries, secondary index updates, CDC).
 #[derive(Debug, Clone, Default)]
@@ -82,10 +82,13 @@ impl MutationResult {
     pub fn empty() -> Self {
         Self::default()
     }
-    
+
     /// Create from count and IDs
     pub fn new(affected_count: usize, affected_row_ids: Vec<RowId>) -> Self {
-        Self { affected_count, affected_row_ids }
+        Self {
+            affected_count,
+            affected_row_ids,
+        }
     }
 }
 
@@ -133,26 +136,26 @@ pub struct ArraySchema {
 }
 
 /// Simulated WAL storage manager for transactions
-/// 
+///
 /// # ⚠️ DEPRECATED - DO NOT USE IN PRODUCTION
-/// 
+///
 /// This is a **testing stub** that provides NO durability guarantees:
 /// - No disk I/O occurs
 /// - Data is lost on process exit
 /// - No crash recovery
-/// 
+///
 /// ## Migration
-/// 
+///
 /// Replace with `sochdb_storage::WalStorageManager` or use [`DurableConnection`]:
-/// 
+///
 /// ```rust,ignore
 /// // Before (WRONG - no durability):
 /// let conn = SochConnection::open("./data")?;
-/// 
+///
 /// // After (CORRECT - full WAL durability):
 /// let conn = DurableConnection::open("./data")?;
 /// ```
-/// 
+///
 /// See: <https://github.com/sochdb/sochdb/blob/main/docs/ARCHITECTURE.md#wal-integration>
 #[deprecated(
     since = "0.2.0",
@@ -445,13 +448,12 @@ impl Level {
         self.sstables
             .iter()
             .map(|sst| match sst {
-                SstHandle::InMemory(s) => s.entries
+                SstHandle::InMemory(s) => s
+                    .entries
                     .iter()
                     .map(|e| e.key.len() + e.value.len())
                     .sum::<usize>() as u64,
-                SstHandle::OnDisk { reader, .. } => {
-                    reader.metadata().file_size
-                }
+                SstHandle::OnDisk { reader, .. } => reader.metadata().file_size,
             })
             .sum()
     }
@@ -784,7 +786,12 @@ impl LscsStorage {
                                 }
                             }
                         }
-                        SstHandle::OnDisk { reader, min_key, max_key, .. } => {
+                        SstHandle::OnDisk {
+                            reader,
+                            min_key,
+                            max_key,
+                            ..
+                        } => {
                             if key >= min_key.as_slice() && key <= max_key.as_slice() {
                                 let opts = sochdb_storage::ReadOptions::default();
                                 match reader.get(key, &opts) {
@@ -793,7 +800,9 @@ impl LscsStorage {
                                             // Empty value = tombstone for disk SSTables
                                             return Ok(None);
                                         }
-                                        self.stats.bloom_filter_hits.fetch_add(1, Ordering::Relaxed);
+                                        self.stats
+                                            .bloom_filter_hits
+                                            .fetch_add(1, Ordering::Relaxed);
                                         return Ok(Some(value));
                                     }
                                     Ok(None) => {
@@ -860,12 +869,18 @@ impl LscsStorage {
             for entry in &entries {
                 // For tombstones, write empty value; actual tombstone handling
                 // is done at read time via the deleted flag in compaction
-                let val = if entry.deleted { &[][..] } else { &entry.value[..] };
-                builder.add(&entry.key, val)
+                let val = if entry.deleted {
+                    &[][..]
+                } else {
+                    &entry.value[..]
+                };
+                builder
+                    .add(&entry.key, val)
                     .map_err(|e| ClientError::Storage(format!("SSTable write failed: {}", e)))?;
             }
 
-            let result = builder.finish()
+            let result = builder
+                .finish()
                 .map_err(|e| ClientError::Storage(format!("SSTable finish failed: {}", e)))?;
 
             let min_key = result.smallest_key.clone().unwrap_or_default();
@@ -959,7 +974,9 @@ impl LscsStorage {
             SstHandle::InMemory(s) => {
                 out.extend(s.entries);
             }
-            SstHandle::OnDisk { reader, seq_num, .. } => {
+            SstHandle::OnDisk {
+                reader, seq_num, ..
+            } => {
                 // Iterate through all entries in the on-disk SSTable
                 let mut iter = reader.iter();
                 while iter.valid() {
@@ -1198,12 +1215,17 @@ impl LscsStorage {
                     match sst {
                         SstHandle::InMemory(s) => {
                             for entry in &s.entries {
-                                if entry.key >= start_key.to_vec() && entry.key <= end_key.to_vec() {
+                                if entry.key >= start_key.to_vec() && entry.key <= end_key.to_vec()
+                                {
                                     results
                                         .entry(entry.key.clone())
                                         .and_modify(|e| {
                                             if entry.timestamp > e.1 {
-                                                *e = (entry.value.clone(), entry.timestamp, entry.deleted);
+                                                *e = (
+                                                    entry.value.clone(),
+                                                    entry.timestamp,
+                                                    entry.deleted,
+                                                );
                                             }
                                         })
                                         .or_insert_with(|| {
@@ -1212,7 +1234,12 @@ impl LscsStorage {
                                 }
                             }
                         }
-                        SstHandle::OnDisk { reader, min_key, max_key, .. } => {
+                        SstHandle::OnDisk {
+                            reader,
+                            min_key,
+                            max_key,
+                            ..
+                        } => {
                             // Skip SSTables whose key range doesn't overlap [start_key, end_key]
                             if max_key.as_slice() < start_key || min_key.as_slice() > end_key {
                                 continue;
@@ -1276,39 +1303,37 @@ impl LscsStorage {
     }
 
     /// Force flush memtable to SST
-    /// 
+    ///
     /// Returns the number of bytes flushed.
     pub fn flush(&self) -> Result<usize> {
         use std::sync::atomic::Ordering;
-        
+
         let memtable_size = self.memtable_size.load(Ordering::SeqCst) as usize;
         self.maybe_flush_memtable()?;
         Ok(memtable_size)
     }
 
     /// Force compaction of all levels
-    /// 
+    ///
     /// Returns compaction metrics.
     pub fn compact(&self) -> Result<CompactionMetrics> {
-        
-        
         // First flush any pending memtable
         let flushed_bytes = self.flush()? as u64;
-        
+
         // Get pre-compaction stats
         let levels = self.levels.read();
         let pre_files: usize = levels.iter().map(|l| l.sstables.len()).sum();
         let pre_bytes: u64 = levels.iter().map(|l| l.total_size()).sum();
         drop(levels);
-        
+
         // Perform compaction
         self.maybe_compact()?;
-        
+
         // Get post-compaction stats
         let levels = self.levels.read();
         let post_files: usize = levels.iter().map(|l| l.sstables.len()).sum();
         let post_bytes: u64 = levels.iter().map(|l| l.total_size()).sum();
-        
+
         Ok(CompactionMetrics {
             bytes_compacted: Some(flushed_bytes + pre_bytes.saturating_sub(post_bytes)),
             files_merged: Some(pre_files.saturating_sub(post_files)),
@@ -1508,12 +1533,12 @@ impl ColumnStore {
     }
 
     /// Optimized batch scan with pre-allocation and vectorized column access
-    /// 
+    ///
     /// Performance optimizations:
     /// 1. Pre-allocates result vector based on non-deleted row count
     /// 2. Batches column reads to reduce HashMap lookups
     /// 3. Uses cache-friendly sequential iteration over column arrays
-    /// 
+    ///
     /// Target: ≤1.1× SQLite overhead for full table scans
     fn get_all_rows_optimized(
         &self,
@@ -1534,10 +1559,8 @@ impl ColumnStore {
         let mut results = Vec::with_capacity(visible_count);
 
         // Pre-fetch column references to avoid repeated HashMap lookups
-        let col_refs: Vec<(&String, Option<&Vec<ColumnValue>>)> = columns
-            .iter()
-            .map(|c| (c, table_cols.get(c)))
-            .collect();
+        let col_refs: Vec<(&String, Option<&Vec<ColumnValue>>)> =
+            columns.iter().map(|c| (c, table_cols.get(c))).collect();
 
         // Sequential scan with batched column access
         for (idx, meta) in row_meta.iter().enumerate() {
@@ -1561,7 +1584,7 @@ impl ColumnStore {
     }
 
     /// Streaming batch iterator for very large tables
-    /// 
+    ///
     /// Yields rows in batches to reduce peak memory usage.
     /// Each batch is cache-line aligned for optimal CPU prefetch.
     #[allow(dead_code)]
@@ -1781,7 +1804,7 @@ impl TrieColumnarHybrid {
     }
 
     /// Update rows in a table - NOW ACTUALLY UPDATES DATA
-    /// 
+    ///
     /// Returns [`MutationResult`] with affected row IDs for storage-level durability.
     pub fn update_rows(
         &mut self,
@@ -1820,9 +1843,13 @@ impl TrieColumnarHybrid {
     }
 
     /// Delete rows from a table - NOW ACTUALLY DELETES DATA
-    /// 
+    ///
     /// Returns [`MutationResult`] with affected row IDs for storage-level durability.
-    pub fn delete_rows(&mut self, table: &str, where_clause: Option<&WhereClause>) -> MutationResult {
+    pub fn delete_rows(
+        &mut self,
+        table: &str,
+        where_clause: Option<&WhereClause>,
+    ) -> MutationResult {
         if !self.tables.contains_key(table) {
             return MutationResult::empty();
         }
@@ -1883,7 +1910,7 @@ impl TrieColumnarHybrid {
     }
 
     /// Select rows from a table - OPTIMIZED with batch allocation
-    /// 
+    ///
     /// Performance optimizations applied:
     /// - Uses `get_all_rows_optimized()` with pre-allocation
     /// - Cache-friendly sequential column access
@@ -1918,8 +1945,9 @@ impl TrieColumnarHybrid {
         } else {
             all_rows.len()
         };
-        
-        let mut filtered: Vec<std::collections::HashMap<String, SochValue>> = Vec::with_capacity(estimated_size);
+
+        let mut filtered: Vec<std::collections::HashMap<String, SochValue>> =
+            Vec::with_capacity(estimated_size);
         for (_, row) in all_rows {
             let matches = match where_clause {
                 Some(wc) => self.matches_where(&row, wc),
@@ -2035,10 +2063,7 @@ pub enum WhereClause {
         negated: bool,
     },
     /// IS NULL / IS NOT NULL
-    IsNull {
-        field: String,
-        negated: bool,
-    },
+    IsNull { field: String, negated: bool },
     /// BETWEEN: field BETWEEN low AND high
     Between {
         field: String,
@@ -2110,21 +2135,30 @@ impl WhereClause {
                     false
                 }
             }
-            WhereClause::In { field, values, negated } => {
+            WhereClause::In {
+                field,
+                values,
+                negated,
+            } => {
                 if let Some(row_val) = row.get(field) {
-                    let found = values.iter().any(|v| compare_values(row_val, &CompareOp::Eq, v));
+                    let found = values
+                        .iter()
+                        .any(|v| compare_values(row_val, &CompareOp::Eq, v));
                     if *negated { !found } else { found }
                 } else {
                     *negated // NULL NOT IN (values) is true, NULL IN (values) is false
                 }
             }
             WhereClause::IsNull { field, negated } => {
-                let is_null = row.get(field).map(|v| matches!(v, SochValue::Null)).unwrap_or(true);
+                let is_null = row
+                    .get(field)
+                    .map(|v| matches!(v, SochValue::Null))
+                    .unwrap_or(true);
                 if *negated { !is_null } else { is_null }
             }
             WhereClause::Between { field, low, high } => {
                 if let Some(row_val) = row.get(field) {
-                    compare_values(row_val, &CompareOp::Ge, low) 
+                    compare_values(row_val, &CompareOp::Ge, low)
                         && compare_values(row_val, &CompareOp::Le, high)
                 } else {
                     false
@@ -2313,9 +2347,9 @@ pub struct SochConnection {
 
 impl SochConnection {
     /// Open a connection to the database at the given path
-    /// 
+    ///
     /// # ⚠️ Testing Only
-    /// 
+    ///
     /// This creates an in-memory connection with stub WAL/MVCC.
     /// For production, use [`DurableConnection::open`] instead.
     #[allow(deprecated)]
@@ -2479,35 +2513,35 @@ impl SochConnection {
     // ─────────────────────────────────────────────────────────────────────────
 
     /// Force flush memtable to SST files
-    /// 
+    ///
     /// Returns the number of bytes flushed.
     pub fn flush(&self) -> Result<usize> {
         self.storage.flush()
     }
 
     /// Force compaction of all LSM levels
-    /// 
+    ///
     /// Returns compaction metrics including bytes compacted and files merged.
     pub fn compact(&self) -> Result<CompactionMetrics> {
         self.storage.compact()
     }
 
     /// Get value by key from storage
-    /// 
+    ///
     /// Searches memtable → immutable memtables → SSTables (newest to oldest).
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.storage.get("", key)
     }
 
     /// Put key-value pair to storage
-    /// 
+    ///
     /// Writes to WAL first (durability), then memtable.
     pub fn put(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         self.storage.put(&key, &value)
     }
 
     /// Delete key from storage
-    /// 
+    ///
     /// Writes a tombstone to WAL and memtable.
     pub fn delete(&self, key: &[u8]) -> Result<()> {
         self.storage.delete(key)
@@ -2767,15 +2801,14 @@ impl EmbeddedConnection {
     pub fn scan_range(&self, start: &str, end: &str) -> Result<Vec<(String, Vec<u8>)>> {
         self.queries_executed.fetch_add(1, Ordering::Relaxed);
         let txn = self.ensure_txn()?;
-        let results = self.db
+        let results = self
+            .db
             .scan_range(txn, start.as_bytes(), end.as_bytes())
             .map_err(|e| ClientError::Storage(e.to_string()))?;
         // Convert byte keys to strings
         Ok(results
             .into_iter()
-            .filter_map(|(k, v)| {
-                String::from_utf8(k).ok().map(|s| (s, v))
-            })
+            .filter_map(|(k, v)| String::from_utf8(k).ok().map(|s| (s, v)))
             .collect())
     }
 
@@ -3547,8 +3580,8 @@ impl ReadOnlyConnection {
     /// Write operations are not available on this connection type.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         // Open storage (uses shared lock internally)
-        let storage = DurableStorage::open(path.as_ref())
-            .map_err(|e| ClientError::Storage(e.to_string()))?;
+        let storage =
+            DurableStorage::open(path.as_ref()).map_err(|e| ClientError::Storage(e.to_string()))?;
 
         Ok(Self {
             storage: Arc::new(storage),
@@ -3635,15 +3668,15 @@ impl ReadOnlyConnection {
 pub trait ReadableConnection {
     /// Get a value by key
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
-    
+
     /// Scan keys with a prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
-    
+
     /// Get a value by path
     fn get_path(&self, path: &str) -> Result<Option<Vec<u8>>> {
         self.get(path.as_bytes())
     }
-    
+
     /// Scan by path prefix
     fn scan_path(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>> {
         let results = self.scan(prefix.as_bytes())?;
@@ -3658,16 +3691,16 @@ pub trait ReadableConnection {
 pub trait WritableConnection: ReadableConnection {
     /// Put a key-value pair
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
-    
+
     /// Delete a key
     fn delete(&self, key: &[u8]) -> Result<()>;
-    
+
     /// Begin a transaction
     fn begin_txn(&self) -> Result<u64>;
-    
+
     /// Commit a transaction
     fn commit_txn(&self) -> Result<u64>;
-    
+
     /// Abort a transaction
     fn abort_txn(&self) -> Result<()>;
 }
@@ -3676,7 +3709,7 @@ impl ReadableConnection for ReadOnlyConnection {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         ReadOnlyConnection::get(self, key)
     }
-    
+
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         ReadOnlyConnection::scan(self, prefix)
     }
@@ -3686,7 +3719,7 @@ impl ReadableConnection for DurableConnection {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         DurableConnection::get(self, key)
     }
-    
+
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         DurableConnection::scan(self, prefix)
     }
@@ -3696,19 +3729,19 @@ impl WritableConnection for DurableConnection {
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
         DurableConnection::put(self, key, value)
     }
-    
+
     fn delete(&self, key: &[u8]) -> Result<()> {
         DurableConnection::delete(self, key)
     }
-    
+
     fn begin_txn(&self) -> Result<u64> {
         DurableConnection::begin_txn(self)
     }
-    
+
     fn commit_txn(&self) -> Result<u64> {
         DurableConnection::commit_txn(self)
     }
-    
+
     fn abort_txn(&self) -> Result<()> {
         DurableConnection::abort_txn(self)
     }
@@ -4395,9 +4428,7 @@ mod tests {
         }
 
         // Scan full range
-        let results = storage
-            .scan(b"ts_key0000", b"ts_key0099", 200)
-            .unwrap();
+        let results = storage.scan(b"ts_key0000", b"ts_key0099", 200).unwrap();
 
         // Should have 90 entries (100 - 10 deleted)
         assert_eq!(

@@ -61,7 +61,7 @@ impl QuantLevel {
             QuantLevel::F16 => 2.0,
             QuantLevel::BF16 => 2.0,
             QuantLevel::I8 => 1.0,
-            QuantLevel::PQ => 0.125, // ~1 byte per 8 dims (typical)
+            QuantLevel::PQ => 0.125,   // ~1 byte per 8 dims (typical)
             QuantLevel::BPS => 0.0625, // ~1 byte per 16 dims
         }
     }
@@ -166,7 +166,7 @@ impl UnifiedQuantizedVector {
             UnifiedQuantizedVector::BF16(v) => v.len(),
             UnifiedQuantizedVector::I8 { data, .. } => data.len(),
             UnifiedQuantizedVector::PQ { num_subspaces, .. } => *num_subspaces * 8, // Approximate
-            UnifiedQuantizedVector::BPS { num_blocks, .. } => *num_blocks * 16, // Approximate
+            UnifiedQuantizedVector::BPS { num_blocks, .. } => *num_blocks * 16,     // Approximate
         }
     }
 
@@ -211,8 +211,12 @@ impl UnifiedQuantizedVector {
     pub fn from_f32(data: &[f32], level: QuantLevel) -> Self {
         match level {
             QuantLevel::F32 => UnifiedQuantizedVector::F32(data.to_vec()),
-            QuantLevel::F16 => UnifiedQuantizedVector::F16(data.iter().map(|&x| f32_to_f16(x)).collect()),
-            QuantLevel::BF16 => UnifiedQuantizedVector::BF16(data.iter().map(|&x| f32_to_bf16(x)).collect()),
+            QuantLevel::F16 => {
+                UnifiedQuantizedVector::F16(data.iter().map(|&x| f32_to_f16(x)).collect())
+            }
+            QuantLevel::BF16 => {
+                UnifiedQuantizedVector::BF16(data.iter().map(|&x| f32_to_bf16(x)).collect())
+            }
             QuantLevel::I8 => {
                 // Simple symmetric quantization
                 let max_abs = data.iter().map(|x| x.abs()).fold(0.0f32, f32::max);
@@ -363,12 +367,7 @@ impl UnifiedScorer {
 
     /// Compute I8 dot product with dequantization.
     #[inline]
-    pub fn dot_i8_dequant(
-        query: &[i8],
-        query_scale: f32,
-        vector: &[i8],
-        vector_scale: f32,
-    ) -> f32 {
+    pub fn dot_i8_dequant(query: &[i8], query_scale: f32, vector: &[i8], vector_scale: f32) -> f32 {
         let int_dot = Self::dot_i8(query, vector);
         int_dot as f32 * query_scale * vector_scale
     }
@@ -424,7 +423,12 @@ impl UnifiedScorer {
     }
 
     /// Estimate recall at given candidate count for a level.
-    pub fn estimate_recall(&self, level: QuantLevel, candidates: usize, total_vectors: usize) -> f32 {
+    pub fn estimate_recall(
+        &self,
+        level: QuantLevel,
+        candidates: usize,
+        total_vectors: usize,
+    ) -> f32 {
         let base_recall = level.expected_recall();
         let coverage = (candidates as f32 / total_vectors as f32).min(1.0);
         base_recall * coverage.sqrt() // Rough model
@@ -558,7 +562,7 @@ mod tests {
     fn test_unified_vector_f32() {
         let data = vec![1.0, 2.0, 3.0, 4.0];
         let vec = UnifiedQuantizedVector::from_f32(&data, QuantLevel::F32);
-        
+
         assert_eq!(vec.level(), QuantLevel::F32);
         assert_eq!(vec.dimension(), 4);
         assert_eq!(vec.to_f32(), data);
@@ -568,14 +572,17 @@ mod tests {
     fn test_unified_vector_i8() {
         let data = vec![0.5, -0.3, 0.8, -0.1];
         let vec = UnifiedQuantizedVector::from_f32(&data, QuantLevel::I8);
-        
+
         assert_eq!(vec.level(), QuantLevel::I8);
         assert_eq!(vec.dimension(), 4);
-        
+
         // Check reconstruction accuracy
         let reconstructed = vec.to_f32();
         for (orig, recon) in data.iter().zip(reconstructed.iter()) {
-            assert!((orig - recon).abs() < 0.1, "I8 reconstruction error too large");
+            assert!(
+                (orig - recon).abs() < 0.1,
+                "I8 reconstruction error too large"
+            );
         }
     }
 
@@ -583,13 +590,15 @@ mod tests {
     fn test_unified_vector_f16() {
         let data = vec![1.5, -2.25, 0.0, 100.0];
         let vec = UnifiedQuantizedVector::from_f32(&data, QuantLevel::F16);
-        
+
         assert_eq!(vec.level(), QuantLevel::F16);
-        
+
         let reconstructed = vec.to_f32();
         for (orig, recon) in data.iter().zip(reconstructed.iter()) {
-            assert!((orig - recon).abs() < 0.01 * orig.abs().max(1.0), 
-                "F16 reconstruction error too large");
+            assert!(
+                (orig - recon).abs() < 0.01 * orig.abs().max(1.0),
+                "F16 reconstruction error too large"
+            );
         }
     }
 
@@ -597,14 +606,16 @@ mod tests {
     fn test_unified_vector_bf16() {
         let data = vec![1.5, -2.25, 0.0, 100.0];
         let vec = UnifiedQuantizedVector::from_f32(&data, QuantLevel::BF16);
-        
+
         assert_eq!(vec.level(), QuantLevel::BF16);
-        
+
         let reconstructed = vec.to_f32();
         for (orig, recon) in data.iter().zip(reconstructed.iter()) {
             // BF16 has lower precision than F16
-            assert!((orig - recon).abs() < 0.1 * orig.abs().max(1.0), 
-                "BF16 reconstruction error too large");
+            assert!(
+                (orig - recon).abs() < 0.1 * orig.abs().max(1.0),
+                "BF16 reconstruction error too large"
+            );
         }
     }
 
@@ -612,29 +623,36 @@ mod tests {
     fn test_dot_i8() {
         let a: Vec<i8> = vec![1, 2, 3, 4, 5, 6, 7, 8];
         let b: Vec<i8> = vec![8, 7, 6, 5, 4, 3, 2, 1];
-        
+
         let result = UnifiedScorer::dot_i8(&a, &b);
-        let expected: i32 = a.iter().zip(b.iter())
+        let expected: i32 = a
+            .iter()
+            .zip(b.iter())
             .map(|(&x, &y)| (x as i32) * (y as i32))
             .sum();
-        
+
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_pipeline_planning() {
         let config = QuantPipelineConfig {
-            available_levels: vec![QuantLevel::F32, QuantLevel::I8, QuantLevel::BPS, QuantLevel::PQ],
+            available_levels: vec![
+                QuantLevel::F32,
+                QuantLevel::I8,
+                QuantLevel::BPS,
+                QuantLevel::PQ,
+            ],
             ..Default::default()
         };
-        
+
         let scorer = UnifiedScorer::new(config);
-        
+
         // Small dataset: should skip coarse and refine
         let stages_small = scorer.plan_pipeline(500);
         assert_eq!(stages_small.len(), 1);
         assert_eq!(stages_small[0].0, PipelineStage::Rerank);
-        
+
         // Large dataset: should use all stages
         let stages_large = scorer.plan_pipeline(100_000);
         assert!(stages_large.len() >= 2);
@@ -643,17 +661,21 @@ mod tests {
     #[test]
     fn test_f16_roundtrip() {
         let values = [0.0, 1.0, -1.0, 0.5, 100.0, -0.001, 65504.0]; // Max F16 value
-        
+
         for &v in &values {
             let f16_bits = f32_to_f16(v);
             let back = f16_to_f32(f16_bits);
-            
+
             if v == 0.0 {
                 assert_eq!(back, 0.0);
             } else {
                 let rel_error = ((v - back) / v).abs();
-                assert!(rel_error < 0.001 || (v - back).abs() < 0.001, 
-                    "F16 roundtrip failed for {}: got {}", v, back);
+                assert!(
+                    rel_error < 0.001 || (v - back).abs() < 0.001,
+                    "F16 roundtrip failed for {}: got {}",
+                    v,
+                    back
+                );
             }
         }
     }
@@ -661,17 +683,22 @@ mod tests {
     #[test]
     fn test_bf16_roundtrip() {
         let values = [0.0, 1.0, -1.0, 100.0, 1e10, -1e-10];
-        
+
         for &v in &values {
             let bf16_bits = f32_to_bf16(v);
             let back = bf16_to_f32(bf16_bits);
-            
+
             if v == 0.0 {
                 assert!(back.abs() < 1e-10);
             } else {
                 let rel_error = ((v - back) / v).abs();
-                assert!(rel_error < 0.01, 
-                    "BF16 roundtrip failed for {}: got {} (error {})", v, back, rel_error);
+                assert!(
+                    rel_error < 0.01,
+                    "BF16 roundtrip failed for {}: got {} (error {})",
+                    v,
+                    back,
+                    rel_error
+                );
             }
         }
     }
@@ -680,15 +707,15 @@ mod tests {
     fn test_memory_usage() {
         let dim = 768;
         let data: Vec<f32> = (0..dim).map(|i| i as f32 / 1000.0).collect();
-        
+
         let f32_vec = UnifiedQuantizedVector::from_f32(&data, QuantLevel::F32);
         let i8_vec = UnifiedQuantizedVector::from_f32(&data, QuantLevel::I8);
         let f16_vec = UnifiedQuantizedVector::from_f32(&data, QuantLevel::F16);
-        
+
         assert_eq!(f32_vec.memory_bytes(), dim * 4);
         assert_eq!(i8_vec.memory_bytes(), dim + 5); // data + scale + zero
         assert_eq!(f16_vec.memory_bytes(), dim * 2);
-        
+
         // Verify compression ratios
         assert!(i8_vec.memory_bytes() < f32_vec.memory_bytes() / 3);
         assert!(f16_vec.memory_bytes() < f32_vec.memory_bytes());

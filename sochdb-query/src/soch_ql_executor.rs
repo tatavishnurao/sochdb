@@ -36,15 +36,15 @@
 //! ```
 
 use crate::soch_ql::{
-    ComparisonOp, LogicalOp, SelectQuery, SortDirection, SochQlParser, SochQuery, SochResult,
-    SochValue, WhereClause,
+    ComparisonOp, LogicalOp, SelectQuery, SochQlParser, SochQuery, SochResult, SochValue,
+    SortDirection, WhereClause,
 };
 #[cfg(test)]
 use crate::soch_ql::{Condition, OrderBy};
-use std::collections::HashMap;
 use sochdb_core::{Catalog, Result, SochDBError, SochRow, SochValue as CoreSochValue};
 #[cfg(test)]
 use sochdb_core::{SochSchema, SochType};
+use std::collections::HashMap;
 
 /// Query plan operators
 #[derive(Debug, Clone)]

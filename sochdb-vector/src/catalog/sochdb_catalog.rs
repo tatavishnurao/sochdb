@@ -25,8 +25,8 @@ impl Catalog {
             group_commit: true,
             ..Default::default()
         };
-        let db = Database::open_with_config(path, config)
-            .map_err(|e| Error::Storage(e.to_string()))?;
+        let db =
+            Database::open_with_config(path, config).map_err(|e| Error::Storage(e.to_string()))?;
 
         Ok(Self { db })
     }
@@ -56,7 +56,8 @@ impl Catalog {
             Metric::Cosine => "cosine",
         };
 
-        let txn = self.db
+        let txn = self
+            .db
             .begin_transaction()
             .map_err(|e| Error::Storage(e.to_string()))?;
 
@@ -73,10 +74,12 @@ impl Catalog {
             "created_at": Self::now_secs()
         });
 
-        self.db.put(txn, key.as_bytes(), value.to_string().as_bytes())
+        self.db
+            .put(txn, key.as_bytes(), value.to_string().as_bytes())
             .map_err(|e| Error::Storage(e.to_string()))?;
 
-        self.db.commit(txn)
+        self.db
+            .commit(txn)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         Ok(id)
@@ -86,14 +89,17 @@ impl Catalog {
     pub fn get_collection(&self, name: &str) -> Result<CollectionInfo> {
         let key = format!("collections/{}", name);
 
-        let txn = self.db
+        let txn = self
+            .db
             .begin_transaction()
             .map_err(|e| Error::Storage(e.to_string()))?;
-        let value = self.db
+        let value = self
+            .db
             .get(txn, key.as_bytes())
             .map_err(|e| Error::Storage(e.to_string()))?
             .ok_or_else(|| Error::CollectionNotFound(name.to_string()))?;
-        self.db.commit(txn)
+        self.db
+            .commit(txn)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         let json: serde_json::Value =
@@ -110,16 +116,19 @@ impl Catalog {
 
     /// List all collections
     pub fn list_collections(&self) -> Result<Vec<CollectionInfo>> {
-        let txn = self.db
+        let txn = self
+            .db
             .begin_transaction()
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         let prefix = b"collections/";
-        let entries = self.db
+        let entries = self
+            .db
             .scan(txn, prefix)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
-        self.db.commit(txn)
+        self.db
+            .commit(txn)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         let mut collections = Vec::new();
@@ -140,7 +149,8 @@ impl Catalog {
 
     /// Register a new segment
     pub fn add_segment(&self, collection_id: i64, segment: &SegmentInfo) -> Result<()> {
-        let txn = self.db
+        let txn = self
+            .db
             .begin_transaction()
             .map_err(|e| Error::Storage(e.to_string()))?;
 
@@ -156,10 +166,12 @@ impl Catalog {
             "created_at": Self::now_secs()
         });
 
-        self.db.put(txn, key.as_bytes(), value.to_string().as_bytes())
+        self.db
+            .put(txn, key.as_bytes(), value.to_string().as_bytes())
             .map_err(|e| Error::Storage(e.to_string()))?;
 
-        self.db.commit(txn)
+        self.db
+            .commit(txn)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         Ok(())
@@ -167,16 +179,19 @@ impl Catalog {
 
     /// Get all active segments for a collection
     pub fn get_segments(&self, collection_id: i64) -> Result<Vec<SegmentInfo>> {
-        let txn = self.db
+        let txn = self
+            .db
             .begin_transaction()
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         let prefix = format!("segments/{}/", collection_id);
-        let entries = self.db
+        let entries = self
+            .db
             .scan(txn, prefix.as_bytes())
             .map_err(|e| Error::Storage(e.to_string()))?;
 
-        self.db.commit(txn)
+        self.db
+            .commit(txn)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         let mut segments = Vec::new();
@@ -209,7 +224,8 @@ impl Catalog {
 
     /// Add a tombstone
     pub fn add_tombstone(&self, collection_id: i64, segment_id: u64, vec_id: u32) -> Result<()> {
-        let txn = self.db
+        let txn = self
+            .db
             .begin_transaction()
             .map_err(|e| Error::Storage(e.to_string()))?;
 
@@ -221,10 +237,12 @@ impl Catalog {
             "created_at": Self::now_secs()
         });
 
-        self.db.put(txn, key.as_bytes(), value.to_string().as_bytes())
+        self.db
+            .put(txn, key.as_bytes(), value.to_string().as_bytes())
             .map_err(|e| Error::Storage(e.to_string()))?;
 
-        self.db.commit(txn)
+        self.db
+            .commit(txn)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         Ok(())
@@ -232,17 +250,20 @@ impl Catalog {
 
     /// Get tombstones for a segment
     pub fn get_tombstones(&self, segment_id: u64) -> Result<Vec<u32>> {
-        let txn = self.db
+        let txn = self
+            .db
             .begin_transaction()
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         // Scan all tombstones and filter by segment_id
         let prefix = b"tombstones/";
-        let entries = self.db
+        let entries = self
+            .db
             .scan(txn, prefix)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
-        self.db.commit(txn)
+        self.db
+            .commit(txn)
             .map_err(|e| Error::Storage(e.to_string()))?;
 
         let mut tombstones = Vec::new();

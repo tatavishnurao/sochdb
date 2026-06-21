@@ -96,11 +96,11 @@ pub struct DatabaseConfig {
     pub sync_mode: SyncMode,
     /// Read-only mode
     pub read_only: bool,
-    
+
     /// Enable ordered index for O(log N) prefix scans
     ///
     /// # Deprecation Notice
-    /// 
+    ///
     /// **DEPRECATED since 0.2.0**: Use `default_index_policy` instead for per-table control.
     /// This field will be removed in v0.3.0.
     ///
@@ -122,7 +122,7 @@ pub struct DatabaseConfig {
     ///
     /// When false, saves ~134 ns/op on writes (20% speedup)
     /// but scan_prefix becomes O(N) instead of O(log N + K).
-    /// 
+    ///
     /// Set to false for write-heavy workloads without range scans.
     #[deprecated(
         since = "0.2.0",
@@ -295,7 +295,7 @@ impl DatabaseConfig {
     }
 
     /// Get effective ordered index setting, derived from `default_index_policy`.
-    /// 
+    ///
     /// This is the shim method for the deprecated `enable_ordered_index` field.
     /// It returns `true` if the policy requires an ordered index (ScanOptimized),
     /// and `false` otherwise (WriteOptimized, Balanced, AppendOnly).
@@ -1104,7 +1104,10 @@ impl Database {
 
         // Open storage WITHOUT exclusive lock (concurrent MVCC handles coordination)
         // We use a special internal method that skips the file lock
-        let storage = Arc::new(DurableStorage::open_for_concurrent(&path, config.default_index_policy)?);
+        let storage = Arc::new(DurableStorage::open_for_concurrent(
+            &path,
+            config.default_index_policy,
+        )?);
 
         // Propagate sync_mode from config to storage engine
         storage.set_sync_mode(config.sync_mode as u64);
@@ -1332,9 +1335,8 @@ impl Database {
     /// db.set_table_index_policy("users", IndexPolicy::Balanced);
     /// ```
     pub fn set_table_index_policy(&self, table: &str, policy: IndexPolicy) {
-        self.index_registry.configure_table(
-            TableIndexConfig::new(table, policy)
-        );
+        self.index_registry
+            .configure_table(TableIndexConfig::new(table, policy));
     }
 
     /// Get the index policy for a table
@@ -1391,10 +1393,7 @@ impl Database {
     /// db.put_batch(txn, &writes)?;
     /// ```
     pub fn put_batch(&self, txn: TxnHandle, writes: &[(&[u8], &[u8])]) -> Result<()> {
-        let bytes: u64 = writes
-            .iter()
-            .map(|(k, v)| (k.len() + v.len()) as u64)
-            .sum();
+        let bytes: u64 = writes.iter().map(|(k, v)| (k.len() + v.len()) as u64).sum();
         self.stats.bytes_written.fetch_add(bytes, Ordering::Relaxed);
 
         // In concurrent mode, acquire cross-process writer lock
@@ -1430,7 +1429,7 @@ impl Database {
     /// Scan keys with a prefix (enforces minimum prefix length for safety).
     ///
     /// # Prefix Safety
-    /// 
+    ///
     /// To prevent accidental full-table scans, this method requires a minimum
     /// prefix length of 2 bytes. Use `scan_unchecked` for internal operations
     /// that need empty/short prefixes.
@@ -1484,19 +1483,19 @@ impl Database {
     }
 
     /// Streaming scan for very large result sets
-    /// 
+    ///
     /// Returns an iterator that yields (key, value) pairs without
     /// materializing the entire result set. Use this for large scans
     /// where memory efficiency is important.
-    /// 
+    ///
     /// ## Performance
-    /// 
+    ///
     /// - Memory: O(1) per iteration vs O(N) for scan_range
     /// - Latency: First result available immediately vs waiting for all results
     /// - Throughput: Slightly lower due to per-item overhead
-    /// 
+    ///
     /// ## Usage
-    /// 
+    ///
     /// ```ignore
     /// for result in db.scan_range_iter(txn, b"start", b"end") {
     ///     let (key, value) = result?;
@@ -1513,10 +1512,9 @@ impl Database {
         self.storage
             .scan_range_iter(txn.txn_id, start, end)
             .map(move |item| {
-                stats.bytes_read.fetch_add(
-                    (item.0.len() + item.1.len()) as u64,
-                    Ordering::Relaxed,
-                );
+                stats
+                    .bytes_read
+                    .fetch_add((item.0.len() + item.1.len()) as u64, Ordering::Relaxed);
                 Ok(item)
             })
     }

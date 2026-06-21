@@ -61,12 +61,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use dashmap::DashMap;
 use parking_lot::RwLock;
-use sochdb_core::{Result, SochDBError};
 use sochdb_core::version_chain::{
-    BinarySearchChain, ChainEntry,
-    MvccVersionChain, MvccVersionChainMut, WriteConflictDetection,
-    VisibilityContext, TxnId, Timestamp,
+    BinarySearchChain, ChainEntry, MvccVersionChain, MvccVersionChainMut, Timestamp, TxnId,
+    VisibilityContext, WriteConflictDetection,
 };
+use sochdb_core::{Result, SochDBError};
 
 // Type aliases to avoid conflicts with other modules
 pub type ConcurrentVersionChain = VersionChain;
@@ -254,7 +253,7 @@ impl ReaderSlot {
     #[inline]
     pub fn try_claim(&self, my_pid: u32, snapshot_ts: u64, epoch: u32) -> bool {
         let current_pid = self.pid.load(Ordering::Acquire);
-        
+
         // Only claim if free or already ours
         if current_pid != 0 && current_pid != my_pid {
             return false;
@@ -349,13 +348,16 @@ impl MvccHeader {
             page_size: 4096,
             num_readers: MAX_READERS as u32,
             current_epoch: AtomicU64::new(1),
-            current_ts: AtomicU64::new(HlcTimestamp::new(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
-                0,
-            ).raw()),
+            current_ts: AtomicU64::new(
+                HlcTimestamp::new(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                    0,
+                )
+                .raw(),
+            ),
             writer_lock: AtomicU32::new(0),
             commits_since_gc: AtomicU64::new(0),
             _reserved: [0u8; 4],
@@ -422,9 +424,18 @@ impl VersionEntry {
 
 // Rec 11: Implement ChainEntry so BinarySearchChain<VersionEntry> works
 impl ChainEntry for VersionEntry {
-    #[inline] fn commit_ts(&self) -> u64 { self.commit_ts }
-    #[inline] fn txn_id(&self) -> u64 { self.txn_id }
-    #[inline] fn set_commit_ts(&mut self, ts: u64) { self.commit_ts = ts; }
+    #[inline]
+    fn commit_ts(&self) -> u64 {
+        self.commit_ts
+    }
+    #[inline]
+    fn txn_id(&self) -> u64 {
+        self.txn_id
+    }
+    #[inline]
+    fn set_commit_ts(&mut self, ts: u64) {
+        self.commit_ts = ts;
+    }
 }
 
 // =============================================================================
@@ -451,7 +462,9 @@ pub struct VersionChain {
 impl VersionChain {
     /// Create empty version chain
     pub fn new() -> Self {
-        Self { inner: BinarySearchChain::new() }
+        Self {
+            inner: BinarySearchChain::new(),
+        }
     }
 
     /// Add uncommitted version
@@ -536,7 +549,8 @@ impl MvccVersionChain for VersionChain {
     type Value = Option<Vec<u8>>;
 
     fn get_visible(&self, ctx: &VisibilityContext) -> Option<&Self::Value> {
-        self.inner.read_at(ctx.snapshot_ts, Some(ctx.reader_txn_id))
+        self.inner
+            .read_at(ctx.snapshot_ts, Some(ctx.reader_txn_id))
             .map(|v| &v.value)
     }
 
@@ -653,7 +667,12 @@ impl VersionStore {
     }
 
     /// Read value at snapshot timestamp
-    pub fn get(&self, key: &[u8], snapshot_ts: u64, current_txn_id: Option<u64>) -> Option<Vec<u8>> {
+    pub fn get(
+        &self,
+        key: &[u8],
+        snapshot_ts: u64,
+        current_txn_id: Option<u64>,
+    ) -> Option<Vec<u8>> {
         self.data.get(key).and_then(|chain| {
             chain
                 .read_at(snapshot_ts, current_txn_id)
@@ -680,9 +699,7 @@ impl VersionStore {
             total_reclaimed += reclaimed;
         }
 
-        self.stats
-            .gc_passes
-            .fetch_add(1, Ordering::Relaxed);
+        self.stats.gc_passes.fetch_add(1, Ordering::Relaxed);
         self.stats
             .versions_reclaimed
             .fetch_add(total_reclaimed as u64, Ordering::Relaxed);
@@ -762,7 +779,9 @@ impl sochdb_core::version_chain::MvccStore for VersionStore {
             stats.versions_removed += removed;
         }
         self.stats.gc_passes.fetch_add(1, Ordering::Relaxed);
-        self.stats.versions_reclaimed.fetch_add(stats.versions_removed as u64, Ordering::Relaxed);
+        self.stats
+            .versions_reclaimed
+            .fetch_add(stats.versions_removed as u64, Ordering::Relaxed);
         stats
     }
 
@@ -882,9 +901,7 @@ impl ConcurrentMvcc {
 
         // Get pointers into the mmap'd region
         let header = mmap.as_ptr() as *const MvccHeader;
-        let reader_slots_ptr = unsafe {
-            mmap.as_ptr().add(HEADER_SIZE) as *const ReaderSlot
-        };
+        let reader_slots_ptr = unsafe { mmap.as_ptr().add(HEADER_SIZE) as *const ReaderSlot };
 
         Ok(Self {
             path,
@@ -1071,10 +1088,7 @@ impl ConcurrentMvcc {
 
     /// Check if GC should run (based on commit count)
     pub fn should_run_gc(&self) -> bool {
-        self.header()
-            .commits_since_gc
-            .load(Ordering::Relaxed)
-            >= GC_COMMIT_INTERVAL
+        self.header().commits_since_gc.load(Ordering::Relaxed) >= GC_COMMIT_INTERVAL
     }
 
     /// Increment commit count and maybe run GC
@@ -1206,12 +1220,20 @@ mod tests {
         eprintln!("READER_SLOT_SIZE constant: {}", READER_SLOT_SIZE);
         eprintln!("METADATA_SIZE constant: {}", METADATA_SIZE);
 
-        assert_eq!(std::mem::size_of::<MvccHeader>(), HEADER_SIZE,
+        assert_eq!(
+            std::mem::size_of::<MvccHeader>(),
+            HEADER_SIZE,
             "MvccHeader size mismatch! Actual: {}, Expected: {}",
-            std::mem::size_of::<MvccHeader>(), HEADER_SIZE);
-        assert_eq!(std::mem::size_of::<ReaderSlot>(), READER_SLOT_SIZE,
+            std::mem::size_of::<MvccHeader>(),
+            HEADER_SIZE
+        );
+        assert_eq!(
+            std::mem::size_of::<ReaderSlot>(),
+            READER_SLOT_SIZE,
             "ReaderSlot size mismatch! Actual: {}, Expected: {}",
-            std::mem::size_of::<ReaderSlot>(), READER_SLOT_SIZE);
+            std::mem::size_of::<ReaderSlot>(),
+            READER_SLOT_SIZE
+        );
     }
 
     #[test]
@@ -1306,7 +1328,11 @@ mod tests {
         // Versions that should be reclaimed:
         // ts=70 (epoch=4), ts=65 (epoch=3), ts=60 (epoch=2), ts=55 (epoch=1)
         // That's 4 versions reclaimed
-        assert!(reclaimed > 0, "Should have reclaimed some versions, got {}", reclaimed);
+        assert!(
+            reclaimed > 0,
+            "Should have reclaimed some versions, got {}",
+            reclaimed
+        );
         assert!(chain.len() >= 1, "Should keep at least one version");
     }
 

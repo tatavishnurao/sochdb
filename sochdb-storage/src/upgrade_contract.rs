@@ -295,10 +295,7 @@ pub enum CompatibilityResult {
 #[derive(Debug, Clone)]
 pub enum VersionError {
     /// Invalid magic bytes
-    InvalidMagic {
-        expected: [u8; 8],
-        found: [u8; 8],
-    },
+    InvalidMagic { expected: [u8; 8], found: [u8; 8] },
     /// Unknown format type
     UnknownFormatType(u8),
     /// Format type mismatch
@@ -429,11 +426,7 @@ impl MigrationRegistry {
             current = next.to_version();
         }
 
-        if current == to {
-            Some(path)
-        } else {
-            None
-        }
+        if current == to { Some(path) } else { None }
     }
 
     /// Execute migration path
@@ -554,7 +547,10 @@ mod tests {
         let result = header
             .check_compatibility(FormatType::Manifest, FormatVersion::new(1, 1))
             .unwrap();
-        assert!(matches!(result, CompatibilityResult::BackwardCompatible { .. }));
+        assert!(matches!(
+            result,
+            CompatibilityResult::BackwardCompatible { .. }
+        ));
 
         // Needs migration
         let result = header

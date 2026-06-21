@@ -102,8 +102,8 @@
 use dashmap::DashMap;
 use smallvec::SmallVec;
 use std::cell::RefCell;
-use std::collections::BinaryHeap;
 use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicPtr, AtomicU64, AtomicUsize, Ordering};
 
@@ -631,17 +631,14 @@ impl LockFreeHnsw {
                 });
 
                 if candidates.len() > max_conn {
-                    let (_left, _nth, _right) = candidates.select_nth_unstable_by(
-                        max_conn,
-                        |a, b| a.distance.partial_cmp(&b.distance).unwrap(),
-                    );
+                    let (_left, _nth, _right) = candidates
+                        .select_nth_unstable_by(max_conn, |a, b| {
+                            a.distance.partial_cmp(&b.distance).unwrap()
+                        });
                     candidates.truncate(max_conn);
                 }
 
-                candidates
-                    .into_iter()
-                    .map(|c| c.id)
-                    .collect()
+                candidates.into_iter().map(|c| c.id).collect()
             },
             self.config.max_cas_retries,
         );
@@ -717,7 +714,12 @@ impl LockFreeHnsw {
                     let dist = self.distance(query, &neighbor_node.vector);
 
                     if scratch.results.len() < ef
-                        || dist < scratch.results.peek().map(|r| r.0.distance).unwrap_or(f32::MAX)
+                        || dist
+                            < scratch
+                                .results
+                                .peek()
+                                .map(|r| r.0.distance)
+                                .unwrap_or(f32::MAX)
                     {
                         scratch.candidates.push(SearchCandidate {
                             distance: dist,
@@ -735,11 +737,7 @@ impl LockFreeHnsw {
                 }
             }
 
-            let mut result: Vec<_> = scratch
-                .results
-                .drain()
-                .map(|r| r.0)
-                .collect();
+            let mut result: Vec<_> = scratch.results.drain().map(|r| r.0).collect();
             result.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
             scratch.candidates.clear();
             result

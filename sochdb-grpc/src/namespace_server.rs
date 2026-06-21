@@ -8,11 +8,11 @@
 //! Provides namespace management for multi-tenant isolation via gRPC.
 
 use crate::proto::{
-    namespace_service_server::{NamespaceService, NamespaceServiceServer},
     CreateNamespaceRequest, CreateNamespaceResponse, DeleteNamespaceRequest,
     DeleteNamespaceResponse, GetNamespaceRequest, GetNamespaceResponse, ListNamespacesRequest,
     ListNamespacesResponse, Namespace, NamespaceQuota, NamespaceStats, SetQuotaRequest,
     SetQuotaResponse,
+    namespace_service_server::{NamespaceService, NamespaceServiceServer},
 };
 use dashmap::DashMap;
 use std::time::SystemTime;

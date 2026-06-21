@@ -39,11 +39,23 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Transaction operation for model checking
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TxnOp {
-    Begin { txn_id: u64 },
-    Read { key: Vec<u8>, expected: Option<Vec<u8>> },
-    Write { key: Vec<u8>, value: Vec<u8> },
-    Commit { txn_id: u64 },
-    Abort { txn_id: u64 },
+    Begin {
+        txn_id: u64,
+    },
+    Read {
+        key: Vec<u8>,
+        expected: Option<Vec<u8>>,
+    },
+    Write {
+        key: Vec<u8>,
+        value: Vec<u8>,
+    },
+    Commit {
+        txn_id: u64,
+    },
+    Abort {
+        txn_id: u64,
+    },
 }
 
 /// Transaction history for serializability checking
@@ -73,14 +85,14 @@ impl TxnHistory {
     }
 
     /// Check if history is serializable
-    /// 
+    ///
     /// Uses a simplified dependency graph analysis:
     /// - WW conflicts: two txns write same key
     /// - WR conflicts: txn reads value written by another
     /// - RW conflicts: txn writes key read by another (anti-dependency)
     pub fn is_serializable(&self) -> Result<bool, SerializabilityError> {
         let graph = self.build_dependency_graph()?;
-        
+
         // Check for cycles using DFS
         Ok(!graph.has_cycle())
     }
@@ -88,7 +100,7 @@ impl TxnHistory {
     /// Build a dependency graph from the history
     fn build_dependency_graph(&self) -> Result<DependencyGraph, SerializabilityError> {
         let mut graph = DependencyGraph::new();
-        
+
         // Track writes per transaction
         let mut txn_writes: HashMap<u64, HashSet<Vec<u8>>> = HashMap::new();
         let mut txn_reads: HashMap<u64, HashSet<Vec<u8>>> = HashMap::new();
@@ -120,7 +132,7 @@ impl TxnHistory {
         let committed: Vec<_> = self.commit_order.iter().copied().collect();
         let empty_set: HashSet<Vec<u8>> = HashSet::new();
         for (i, &t1) in committed.iter().enumerate() {
-            for &t2 in &committed[i+1..] {
+            for &t2 in &committed[i + 1..] {
                 let t1_writes = txn_writes.get(&t1).unwrap_or(&empty_set);
                 let t2_writes = txn_writes.get(&t2).unwrap_or(&empty_set);
                 let t1_reads = txn_reads.get(&t1).unwrap_or(&empty_set);
@@ -180,11 +192,14 @@ impl DependencyGraph {
     /// Check if graph has a cycle using DFS
     fn has_cycle(&self) -> bool {
         #[derive(Clone, Copy, PartialEq)]
-        enum Color { White, Gray, Black }
-        
-        let mut colors: HashMap<u64, Color> = self.nodes.iter()
-            .map(|&n| (n, Color::White))
-            .collect();
+        enum Color {
+            White,
+            Gray,
+            Black,
+        }
+
+        let mut colors: HashMap<u64, Color> =
+            self.nodes.iter().map(|&n| (n, Color::White)).collect();
 
         fn dfs(
             node: u64,
@@ -192,7 +207,7 @@ impl DependencyGraph {
             colors: &mut HashMap<u64, Color>,
         ) -> bool {
             colors.insert(node, Color::Gray);
-            
+
             if let Some(neighbors) = edges.get(&node) {
                 for &neighbor in neighbors {
                     match colors.get(&neighbor) {
@@ -206,7 +221,7 @@ impl DependencyGraph {
                     }
                 }
             }
-            
+
             colors.insert(node, Color::Black);
             false
         }
@@ -443,7 +458,9 @@ pub enum LinearOpType {
 impl LinearizabilityChecker {
     /// Create a new checker
     pub fn new() -> Self {
-        Self { history: Vec::new() }
+        Self {
+            history: Vec::new(),
+        }
     }
 
     /// Add an operation
@@ -452,7 +469,7 @@ impl LinearizabilityChecker {
     }
 
     /// Check if history is linearizable (simplified algorithm)
-    /// 
+    ///
     /// For a full implementation, use Wing & Gong's algorithm or similar.
     /// This simplified version checks basic consistency.
     pub fn is_linearizable(&self) -> bool {
@@ -477,8 +494,7 @@ impl LinearizabilityChecker {
                     // Read should see either current value or a pending write
                     if op.value != current_value {
                         // Check if it matches any pending write
-                        let matches_pending = pending_writes.iter()
-                            .any(|w| w.value == op.value);
+                        let matches_pending = pending_writes.iter().any(|w| w.value == op.value);
                         if !matches_pending && op.value != current_value {
                             return false;
                         }
@@ -504,15 +520,21 @@ mod tests {
     #[test]
     fn test_serializable_history_no_conflict() {
         let mut history = TxnHistory::default();
-        
+
         // T1: write(x, 1)
         history.push(TxnOp::Begin { txn_id: 1 });
-        history.push(TxnOp::Write { key: b"x".to_vec(), value: b"1".to_vec() });
+        history.push(TxnOp::Write {
+            key: b"x".to_vec(),
+            value: b"1".to_vec(),
+        });
         history.push(TxnOp::Commit { txn_id: 1 });
 
         // T2: write(y, 2)
         history.push(TxnOp::Begin { txn_id: 2 });
-        history.push(TxnOp::Write { key: b"y".to_vec(), value: b"2".to_vec() });
+        history.push(TxnOp::Write {
+            key: b"y".to_vec(),
+            value: b"2".to_vec(),
+        });
         history.push(TxnOp::Commit { txn_id: 2 });
 
         assert!(history.is_serializable().unwrap());
@@ -521,16 +543,16 @@ mod tests {
     #[test]
     fn test_kv_model_basic() {
         let mut model = KvModel::new();
-        
+
         let txn = model.begin();
         model.write(txn, b"key1".to_vec(), b"value1".to_vec());
-        
+
         // Read own write
         assert_eq!(model.read(txn, b"key1"), Some(b"value1".to_vec()));
-        
+
         // Commit
         assert!(model.commit(txn));
-        
+
         // Read after commit from new txn
         let txn2 = model.begin();
         assert_eq!(model.read(txn2, b"key1"), Some(b"value1".to_vec()));
@@ -544,10 +566,10 @@ mod tests {
         // Should not crash yet
         assert!(!sim.maybe_crash(CrashPoint::AfterWalWriteBeforeFsync));
         assert!(!sim.maybe_crash(CrashPoint::AfterWalWriteBeforeFsync));
-        
+
         // Should crash now
         assert!(sim.maybe_crash(CrashPoint::AfterWalWriteBeforeFsync));
-        
+
         // Should not crash again (already triggered)
         assert!(!sim.maybe_crash(CrashPoint::AfterWalWriteBeforeFsync));
 

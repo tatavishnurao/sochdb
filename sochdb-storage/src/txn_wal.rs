@@ -50,6 +50,7 @@
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use parking_lot::Mutex;
+use sochdb_core::{Result, SochDBError, WalRecordType};
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
@@ -57,7 +58,6 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use sochdb_core::{Result, SochDBError, WalRecordType};
 
 // =============================================================================
 // Coarse-Grained Timestamp Caching (Recommendation 5)
@@ -93,7 +93,7 @@ pub fn cached_timestamp_us() -> u64 {
     TS_CACHE.with(|cache| {
         let (instant, ts) = cache.get();
         let elapsed_ns = instant.elapsed().as_nanos() as u64;
-        
+
         if elapsed_ns < CACHE_VALIDITY_NS {
             // Fast path: return cached + monotonic offset
             // This is pure arithmetic, no syscall
@@ -911,9 +911,7 @@ impl TxnWal {
                     WalRecordType::TxnBegin => {
                         // Use entry() to avoid overwriting existing data if a
                         // duplicate TxnBegin appears (e.g., from PID recycling).
-                        pending_writes
-                            .entry(entry.txn_id)
-                            .or_insert_with(Vec::new);
+                        pending_writes.entry(entry.txn_id).or_insert_with(Vec::new);
                     }
                     WalRecordType::Data => {
                         // Accept data for any txn_id we've seen a Begin for,

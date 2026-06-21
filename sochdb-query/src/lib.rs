@@ -73,12 +73,12 @@ pub mod plugin_table;
 pub mod query_optimizer;
 pub mod semantic_triggers; // Task 7: Vector percolator triggers
 pub mod simd_filter; // SIMD vectorized query filters (mm.md Task 5.3)
+pub mod soch_ql;
+pub mod soch_ql_executor;
 pub mod sql; // SQL-92 compatible query engine with SochDB extensions
 pub mod streaming_context; // Task 1: Streaming context generation
 pub mod temporal_decay; // Task 4: Recency-biased scoring
 pub mod token_budget;
-pub mod soch_ql;
-pub mod soch_ql_executor;
 pub mod topk_executor; // Streaming Top-K for ORDER BY + LIMIT (Task: Fix ORDER BY Semantics)
 pub mod unified_fusion; // Task 7: Hybrid fusion that never post-filters
 
@@ -104,6 +104,15 @@ pub use plugin_table::{
     PluginVirtualTable, VirtualColumnDef, VirtualColumnType, VirtualFilter, VirtualRow,
     VirtualTable, VirtualTableError, VirtualTableRegistry, VirtualTableSchema, VirtualTableStats,
 };
+pub use soch_ql::{
+    ColumnDef, ColumnType, ComparisonOp, Condition, CreateTableQuery, InsertQuery, LogicalOp,
+    OrderBy, ParseError, SelectQuery, SochQlParser, SochQuery, SochResult, SochValue,
+    SortDirection, WhereClause,
+};
+pub use soch_ql_executor::{
+    KeyRange, Predicate, PredicateCondition, QueryPlan, SochQlExecutor, TokenReductionStats,
+    estimate_token_reduction, execute_sochql,
+};
 pub use sql::{
     BinaryOperator, ColumnDef as SqlColumnDef, CreateTableStmt, DeleteStmt, DropTableStmt,
     Expr as SqlExpr, InsertStmt, JoinType, Lexer, OrderByItem as SqlOrderBy, Parser as SqlParser,
@@ -113,20 +122,12 @@ pub use token_budget::{
     BudgetAllocation, BudgetSection, TokenBudgetConfig, TokenBudgetEnforcer, TokenEstimator,
     TokenEstimatorConfig, truncate_rows, truncate_to_tokens,
 };
-pub use soch_ql::{
-    ColumnDef, ColumnType, ComparisonOp, Condition, CreateTableQuery, InsertQuery, LogicalOp,
-    OrderBy, ParseError, SelectQuery, SortDirection, SochQlParser, SochQuery, SochResult,
-    SochValue, WhereClause,
-};
-pub use soch_ql_executor::{
-    KeyRange, Predicate, PredicateCondition, QueryPlan, TokenReductionStats, SochQlExecutor,
-    estimate_token_reduction, execute_sochql,
-};
 
 // Streaming Top-K for ORDER BY + LIMIT (Task: Fix ORDER BY Semantics)
 pub use topk_executor::{
-    ColumnRef, ExecutionStrategy as TopKExecutionStrategy, IndexAwareTopK, OrderByColumn, OrderByLimitExecutor,
-    OrderByLimitStats, OrderBySpec, SingleColumnTopK, SortDirection as TopKSortDirection, TopKHeap,
+    ColumnRef, ExecutionStrategy as TopKExecutionStrategy, IndexAwareTopK, OrderByColumn,
+    OrderByLimitExecutor, OrderByLimitStats, OrderBySpec, SingleColumnTopK,
+    SortDirection as TopKSortDirection, TopKHeap,
 };
 
 // Task 1: Streaming context generation
@@ -152,8 +153,8 @@ pub use temporal_decay::{
 
 // Task 5: Memory compaction
 pub use memory_compaction::{
-    Abstraction, CompactionStats, Episode, ExtractiveSummarizer, HierarchicalMemory, Summary,
-    Summarizer,
+    Abstraction, CompactionStats, Episode, ExtractiveSummarizer, HierarchicalMemory, Summarizer,
+    Summary,
 };
 
 // Task 6: Exact token counting
@@ -178,9 +179,7 @@ pub use filter_ir::{
 };
 
 // Task 2: Namespace-Scoped Query API (mandatory namespace)
-pub use namespace::{
-    Namespace, NamespaceError, NamespaceScope, QueryRequest, ScopedQuery,
-};
+pub use namespace::{Namespace, NamespaceError, NamespaceScope, QueryRequest, ScopedQuery};
 
 // Task 3: Metadata Index Primitives (bitmap + range accessors)
 pub use metadata_index::{
@@ -188,9 +187,7 @@ pub use metadata_index::{
 };
 
 // Task 4: Unified Candidate Gate Interface
-pub use candidate_gate::{
-    AllowedBitmap, AllowedSet, CandidateGate, ExecutionStrategy,
-};
+pub use candidate_gate::{AllowedBitmap, AllowedSet, CandidateGate, ExecutionStrategy};
 
 // Task 5: Filter-Aware Vector Search with selectivity-driven fallback
 pub use filtered_vector_search::{

@@ -8,13 +8,12 @@
 //! Provides collection management for vectors/documents via gRPC.
 
 use crate::proto::{
-    collection_service_server::{CollectionService, CollectionServiceServer},
     AddDocumentsRequest, AddDocumentsResponse, Collection, CreateCollectionRequest,
     CreateCollectionResponse, DeleteCollectionRequest, DeleteCollectionResponse,
-    DeleteDocumentRequest, DeleteDocumentResponse, Document, DocumentResult,
-    GetCollectionRequest, GetCollectionResponse, GetDocumentRequest, GetDocumentResponse,
-    ListCollectionsRequest, ListCollectionsResponse, SearchCollectionRequest,
-    SearchCollectionResponse,
+    DeleteDocumentRequest, DeleteDocumentResponse, Document, DocumentResult, GetCollectionRequest,
+    GetCollectionResponse, GetDocumentRequest, GetDocumentResponse, ListCollectionsRequest,
+    ListCollectionsResponse, SearchCollectionRequest, SearchCollectionResponse,
+    collection_service_server::{CollectionService, CollectionServiceServer},
 };
 use dashmap::DashMap;
 use std::sync::Arc;

@@ -56,7 +56,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
@@ -148,7 +148,8 @@ impl Default for Tool {
 }
 
 /// Tool handler function type.
-pub type ToolHandler = Arc<dyn Fn(&str, &Value) -> std::result::Result<Value, String> + Send + Sync>;
+pub type ToolHandler =
+    Arc<dyn Fn(&str, &Value) -> std::result::Result<Value, String> + Send + Sync>;
 
 /// Agent definition.
 pub struct Agent {
@@ -313,10 +314,9 @@ impl<C: ConnectionTrait> AgentRegistry<C> {
         if let Ok(results) = self.conn.scan(AGENT_PREFIX.as_bytes()) {
             for (_, value) in results {
                 if let Ok(data) = serde_json::from_slice::<Value>(&value) {
-                    if let (Some(agent_id), Some(caps)) = (
-                        data["agent_id"].as_str(),
-                        data["capabilities"].as_array(),
-                    ) {
+                    if let (Some(agent_id), Some(caps)) =
+                        (data["agent_id"].as_str(), data["capabilities"].as_array())
+                    {
                         let capabilities: Vec<ToolCategory> = caps
                             .iter()
                             .filter_map(|c| serde_json::from_value(c.clone()).ok())
@@ -569,7 +569,9 @@ impl<C: ConnectionTrait> ToolRouter<C> {
         };
 
         // Find capable agents
-        let mut capable = self.registry.find_capable_agents(&required, &ctx.excluded_agents);
+        let mut capable = self
+            .registry
+            .find_capable_agents(&required, &ctx.excluded_agents);
         if capable.is_empty() {
             return RouteResult {
                 agent_id: String::new(),
@@ -683,41 +685,43 @@ impl<C: ConnectionTrait> ToolRouter<C> {
                 let idx = hasher.finish() as usize % capable.len();
                 Arc::clone(&capable[idx])
             }
-            RoutingStrategy::LeastLoaded => {
-                capable
-                    .iter()
-                    .min_by_key(|a| *a.current_load.lock().unwrap())
-                    .map(Arc::clone)
-                    .unwrap()
-            }
-            RoutingStrategy::Priority => {
-                capable
-                    .iter()
-                    .max_by(|a, b| {
-                        let pa = a.priority;
-                        let pb = b.priority;
-                        let la = *a.current_load.lock().unwrap();
-                        let lb = *b.current_load.lock().unwrap();
-                        pa.cmp(&pb).then(lb.cmp(&la))
-                    })
-                    .map(Arc::clone)
-                    .unwrap()
-            }
-            RoutingStrategy::Fastest => {
-                capable
-                    .iter()
-                    .min_by(|a, b| {
-                        let ca = *a.total_calls.lock().unwrap();
-                        let cb = *b.total_calls.lock().unwrap();
-                        let la = *a.total_latency.lock().unwrap();
-                        let lb = *b.total_latency.lock().unwrap();
-                        let avg_a = if ca > 0 { la / ca as u32 } else { Duration::MAX };
-                        let avg_b = if cb > 0 { lb / cb as u32 } else { Duration::MAX };
-                        avg_a.cmp(&avg_b)
-                    })
-                    .map(Arc::clone)
-                    .unwrap()
-            }
+            RoutingStrategy::LeastLoaded => capable
+                .iter()
+                .min_by_key(|a| *a.current_load.lock().unwrap())
+                .map(Arc::clone)
+                .unwrap(),
+            RoutingStrategy::Priority => capable
+                .iter()
+                .max_by(|a, b| {
+                    let pa = a.priority;
+                    let pb = b.priority;
+                    let la = *a.current_load.lock().unwrap();
+                    let lb = *b.current_load.lock().unwrap();
+                    pa.cmp(&pb).then(lb.cmp(&la))
+                })
+                .map(Arc::clone)
+                .unwrap(),
+            RoutingStrategy::Fastest => capable
+                .iter()
+                .min_by(|a, b| {
+                    let ca = *a.total_calls.lock().unwrap();
+                    let cb = *b.total_calls.lock().unwrap();
+                    let la = *a.total_latency.lock().unwrap();
+                    let lb = *b.total_latency.lock().unwrap();
+                    let avg_a = if ca > 0 {
+                        la / ca as u32
+                    } else {
+                        Duration::MAX
+                    };
+                    let avg_b = if cb > 0 {
+                        lb / cb as u32
+                    } else {
+                        Duration::MAX
+                    };
+                    avg_a.cmp(&avg_b)
+                })
+                .map(Arc::clone)
+                .unwrap(),
             RoutingStrategy::Sticky => Arc::clone(&capable[0]),
         }
     }

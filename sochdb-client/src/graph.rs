@@ -52,8 +52,8 @@
 //! let path = graph.shortest_path("user_1", "msg_1", 10, None)?;
 //! ```
 
-use std::collections::{HashMap, HashSet, VecDeque};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ConnectionTrait;
 use crate::error::{ClientError, Result};
@@ -189,8 +189,8 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
             properties: properties.unwrap_or_default(),
         };
 
-        let data = serde_json::to_vec(&node)
-            .map_err(|e| ClientError::Serialization(e.to_string()))?;
+        let data =
+            serde_json::to_vec(&node).map_err(|e| ClientError::Serialization(e.to_string()))?;
 
         self.conn.put(&self.node_key(node_id), &data)?;
         Ok(node)
@@ -247,8 +247,8 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
             node.node_type = nt.to_string();
         }
 
-        let data = serde_json::to_vec(&node)
-            .map_err(|e| ClientError::Serialization(e.to_string()))?;
+        let data =
+            serde_json::to_vec(&node).map_err(|e| ClientError::Serialization(e.to_string()))?;
 
         self.conn.put(&self.node_key(node_id), &data)?;
         Ok(Some(node))
@@ -320,11 +320,12 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
             properties: properties.unwrap_or_default(),
         };
 
-        let data = serde_json::to_vec(&edge)
-            .map_err(|e| ClientError::Serialization(e.to_string()))?;
+        let data =
+            serde_json::to_vec(&edge).map_err(|e| ClientError::Serialization(e.to_string()))?;
 
         // Store edge
-        self.conn.put(&self.edge_key(from_id, edge_type, to_id), &data)?;
+        self.conn
+            .put(&self.edge_key(from_id, edge_type, to_id), &data)?;
 
         // Store reverse index
         self.conn.put(
@@ -353,11 +354,7 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
     }
 
     /// Get all outgoing edges from a node.
-    pub fn get_edges(
-        &self,
-        from_id: &str,
-        edge_type: Option<&str>,
-    ) -> Result<Vec<GraphEdge>> {
+    pub fn get_edges(&self, from_id: &str, edge_type: Option<&str>) -> Result<Vec<GraphEdge>> {
         let prefix = self.edge_prefix(from_id, edge_type);
         let results = self.conn.scan(&prefix)?;
 
@@ -412,21 +409,18 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
     }
 
     /// Delete an edge.
-    pub fn delete_edge(
-        &self,
-        from_id: &str,
-        edge_type: &str,
-        to_id: &str,
-    ) -> Result<bool> {
+    pub fn delete_edge(&self, from_id: &str, edge_type: &str, to_id: &str) -> Result<bool> {
         if self.get_edge(from_id, edge_type, to_id)?.is_none() {
             return Ok(false);
         }
 
         // Delete edge
-        self.conn.delete(&self.edge_key(from_id, edge_type, to_id))?;
+        self.conn
+            .delete(&self.edge_key(from_id, edge_type, to_id))?;
 
         // Delete reverse index
-        self.conn.delete(&self.reverse_index_key(edge_type, to_id, from_id))?;
+        self.conn
+            .delete(&self.reverse_index_key(edge_type, to_id, from_id))?;
 
         Ok(true)
     }
@@ -443,7 +437,13 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
         edge_types: Option<&[&str]>,
         node_types: Option<&[&str]>,
     ) -> Result<Vec<String>> {
-        self.traverse(start_id, max_depth, edge_types, node_types, TraversalOrder::BFS)
+        self.traverse(
+            start_id,
+            max_depth,
+            edge_types,
+            node_types,
+            TraversalOrder::BFS,
+        )
     }
 
     /// Depth-first search from a starting node.
@@ -454,7 +454,13 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
         edge_types: Option<&[&str]>,
         node_types: Option<&[&str]>,
     ) -> Result<Vec<String>> {
-        self.traverse(start_id, max_depth, edge_types, node_types, TraversalOrder::DFS)
+        self.traverse(
+            start_id,
+            max_depth,
+            edge_types,
+            node_types,
+            TraversalOrder::DFS,
+        )
     }
 
     fn traverse(
@@ -468,8 +474,12 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
         let mut visited = HashSet::new();
         let mut result = Vec::new();
 
-        let edge_type_set: HashSet<&str> = edge_types.map(|e| e.iter().copied().collect()).unwrap_or_default();
-        let node_type_set: HashSet<&str> = node_types.map(|n| n.iter().copied().collect()).unwrap_or_default();
+        let edge_type_set: HashSet<&str> = edge_types
+            .map(|e| e.iter().copied().collect())
+            .unwrap_or_default();
+        let node_type_set: HashSet<&str> = node_types
+            .map(|n| n.iter().copied().collect())
+            .unwrap_or_default();
 
         let mut frontier: VecDeque<(String, usize)> = VecDeque::new();
         frontier.push_back((start_id.to_string(), 0));
@@ -532,7 +542,9 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
         visited.insert(from_id.to_string());
         let mut parent: HashMap<String, String> = HashMap::new();
 
-        let edge_type_set: HashSet<&str> = edge_types.map(|e| e.iter().copied().collect()).unwrap_or_default();
+        let edge_type_set: HashSet<&str> = edge_types
+            .map(|e| e.iter().copied().collect())
+            .unwrap_or_default();
 
         let mut frontier: VecDeque<(String, usize)> = VecDeque::new();
         frontier.push_back((from_id.to_string(), 0));
@@ -588,7 +600,9 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
         direction: EdgeDirection,
     ) -> Result<Vec<Neighbor>> {
         let mut neighbors = Vec::new();
-        let edge_type_set: HashSet<&str> = edge_types.map(|e| e.iter().copied().collect()).unwrap_or_default();
+        let edge_type_set: HashSet<&str> = edge_types
+            .map(|e| e.iter().copied().collect())
+            .unwrap_or_default();
 
         if matches!(direction, EdgeDirection::Outgoing | EdgeDirection::Both) {
             for edge in self.get_edges(node_id, None)? {
@@ -624,11 +638,7 @@ impl<C: ConnectionTrait> GraphOverlay<C> {
     /// Get all nodes of a specific type.
     ///
     /// Note: This scans all nodes, use sparingly for large graphs.
-    pub fn get_nodes_by_type(
-        &self,
-        node_type: &str,
-        limit: usize,
-    ) -> Result<Vec<GraphNode>> {
+    pub fn get_nodes_by_type(&self, node_type: &str, limit: usize) -> Result<Vec<GraphNode>> {
         let prefix = format!("{}/nodes/", self.prefix).into_bytes();
         let results = self.conn.scan(&prefix)?;
 

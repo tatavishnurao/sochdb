@@ -957,9 +957,8 @@ impl WriteAheadLog {
                     Ok(WalRecordType::Clr) => {
                         // Get undo_next_lsn from after_image
                         if record.after_image.len() >= 8 {
-                            let bytes: [u8; 8] = record.after_image[0..8]
-                                .try_into()
-                                .unwrap_or([0; 8]);
+                            let bytes: [u8; 8] =
+                                record.after_image[0..8].try_into().unwrap_or([0; 8]);
                             let undo_next = u64::from_le_bytes(bytes);
                             if undo_next > 0 {
                                 undo_list.push_back((undo_next, txn_id));
@@ -1121,9 +1120,9 @@ impl Iterator for WalIterator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sochdb_core::ValidityBitmap;
     use std::sync::atomic::AtomicU64;
     use tempfile::TempDir;
-    use sochdb_core::ValidityBitmap;
 
     #[test]
     fn test_wal_record_serialization() {

@@ -790,7 +790,7 @@ impl Parser {
         let mut columns = Vec::new();
         loop {
             let col_name = self.expect_identifier("Expected column name")?;
-            
+
             // Optional ASC/DESC
             let asc = if self.match_token(&TokenKind::Desc) {
                 false
@@ -1947,7 +1947,10 @@ mod tests {
         if let Statement::Insert(insert) = stmt {
             assert!(insert.on_conflict.is_some());
             let on_conflict = insert.on_conflict.unwrap();
-            assert!(matches!(on_conflict.target, Some(ConflictTarget::Columns(_))));
+            assert!(matches!(
+                on_conflict.target,
+                Some(ConflictTarget::Columns(_))
+            ));
             assert!(matches!(on_conflict.action, ConflictAction::DoUpdate(_)));
         } else {
             panic!("Expected INSERT statement");
@@ -1956,7 +1959,8 @@ mod tests {
 
     #[test]
     fn test_insert_ignore_mysql() {
-        let stmt = Parser::parse("INSERT IGNORE INTO users (id, name) VALUES (1, 'Alice')").unwrap();
+        let stmt =
+            Parser::parse("INSERT IGNORE INTO users (id, name) VALUES (1, 'Alice')").unwrap();
         if let Statement::Insert(insert) = stmt {
             assert!(insert.on_conflict.is_some());
             let on_conflict = insert.on_conflict.unwrap();
@@ -2088,10 +2092,9 @@ mod tests {
 
     #[test]
     fn test_insert_returning() {
-        let stmt = Parser::parse(
-            "INSERT INTO users (id, name) VALUES (1, 'Alice') RETURNING id, name",
-        )
-        .unwrap();
+        let stmt =
+            Parser::parse("INSERT INTO users (id, name) VALUES (1, 'Alice') RETURNING id, name")
+                .unwrap();
         if let Statement::Insert(insert) = stmt {
             assert!(insert.returning.is_some());
             let returning = insert.returning.unwrap();

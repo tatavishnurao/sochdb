@@ -8,10 +8,10 @@
 //! Provides basic key-value operations via gRPC.
 
 use crate::proto::{
+    KvBatchGetRequest, KvBatchGetResponse, KvBatchPutRequest, KvBatchPutResponse, KvDeleteRequest,
+    KvDeleteResponse, KvEntry, KvGetRequest, KvGetResponse, KvPutRequest, KvPutResponse,
+    KvScanRequest, KvScanResponse,
     kv_service_server::{KvService, KvServiceServer},
-    KvBatchGetRequest, KvBatchGetResponse, KvBatchPutRequest, KvBatchPutResponse,
-    KvDeleteRequest, KvDeleteResponse, KvEntry, KvGetRequest, KvGetResponse, KvPutRequest,
-    KvPutResponse, KvScanRequest, KvScanResponse,
 };
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -71,10 +71,7 @@ impl Default for KvServer {
 
 #[tonic::async_trait]
 impl KvService for KvServer {
-    async fn get(
-        &self,
-        request: Request<KvGetRequest>,
-    ) -> Result<Response<KvGetResponse>, Status> {
+    async fn get(&self, request: Request<KvGetRequest>) -> Result<Response<KvGetResponse>, Status> {
         let req = request.into_inner();
         let ns = self.get_or_create_namespace(&req.namespace);
         let now = Instant::now();
@@ -107,10 +104,7 @@ impl KvService for KvServer {
         }
     }
 
-    async fn put(
-        &self,
-        request: Request<KvPutRequest>,
-    ) -> Result<Response<KvPutResponse>, Status> {
+    async fn put(&self, request: Request<KvPutRequest>) -> Result<Response<KvPutResponse>, Status> {
         let req = request.into_inner();
         let ns = self.get_or_create_namespace(&req.namespace);
 
@@ -161,7 +155,11 @@ impl KvService for KvServer {
 
         let (tx, rx) = mpsc::channel(100);
 
-        let limit = if req.limit > 0 { req.limit as usize } else { usize::MAX };
+        let limit = if req.limit > 0 {
+            req.limit as usize
+        } else {
+            usize::MAX
+        };
 
         // Collect matching entries
         let mut entries: Vec<(Vec<u8>, Vec<u8>)> = ns

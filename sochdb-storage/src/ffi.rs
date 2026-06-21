@@ -16,16 +16,16 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::database::{Database, TxnHandle};
+use serde_json::Value;
+use sochdb_index::hnsw::{DistanceMetric, HnswConfig, HnswIndex};
+use std::collections::HashMap;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
-use serde_json::Value;
-use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use sochdb_index::hnsw::{DistanceMetric, HnswConfig, HnswIndex};
 
 /// Opaque pointer to Database
 pub struct DatabasePtr(Arc<Database>);
@@ -47,19 +47,25 @@ fn collection_key(namespace: &str, collection: &str) -> String {
 }
 
 fn vector_bin_key(namespace: &str, collection: &str, id_hash: u128) -> String {
-    format!("{}/collections/{}/vectors_bin/{:032x}", namespace, collection, id_hash)
+    format!(
+        "{}/collections/{}/vectors_bin/{:032x}",
+        namespace, collection, id_hash
+    )
 }
 
 fn metadata_key(namespace: &str, collection: &str, id_hash: u128) -> String {
-    format!("{}/collections/{}/meta/{:032x}", namespace, collection, id_hash)
+    format!(
+        "{}/collections/{}/meta/{:032x}",
+        namespace, collection, id_hash
+    )
 }
 
 fn hash_id_to_u128(id: &str) -> u128 {
     let hash = blake3::hash(id.as_bytes());
     let bytes = hash.as_bytes();
     u128::from_le_bytes([
-        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-        bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8],
+        bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
     ])
 }
 
@@ -150,7 +156,7 @@ pub struct C_CommitResult {
 }
 
 /// C-compatible Database Configuration
-/// 
+///
 /// All fields have sensible defaults when set to 0/false.
 /// This allows clients to only set the fields they care about.
 #[repr(C)]
@@ -181,8 +187,8 @@ pub struct C_DatabaseConfig {
 /// The path must be a valid C string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_open_with_config(
-    path: *const c_char, 
-    config: C_DatabaseConfig
+    path: *const c_char,
+    config: C_DatabaseConfig,
 ) -> *mut DatabasePtr {
     if path.is_null() {
         return ptr::null_mut();
@@ -196,11 +202,11 @@ pub unsafe extern "C" fn sochdb_open_with_config(
 
     // Build config from C struct, using defaults for unset fields
     let mut db_config = crate::database::DatabaseConfig::default();
-    
+
     if config.wal_enabled_set {
         db_config.wal_enabled = config.wal_enabled;
     }
-    
+
     if config.sync_mode_set {
         db_config.sync_mode = match config.sync_mode {
             0 => crate::database::SyncMode::Off,
@@ -208,15 +214,15 @@ pub unsafe extern "C" fn sochdb_open_with_config(
             _ => crate::database::SyncMode::Full,
         };
     }
-    
+
     if config.memtable_size_bytes > 0 {
         db_config.memtable_size_limit = config.memtable_size_bytes as usize;
     }
-    
+
     if config.group_commit_set {
         db_config.group_commit = config.group_commit;
     }
-    
+
     if config.default_index_policy_set {
         db_config.default_index_policy = match config.default_index_policy {
             0 => crate::index_policy::IndexPolicy::WriteOptimized,
@@ -265,7 +271,7 @@ pub unsafe extern "C" fn sochdb_open(path: *const c_char) -> *mut DatabasePtr {
 }
 
 /// Open the database in concurrent mode (multi-reader, single-writer).
-/// 
+///
 /// This mode allows multiple processes to access the database simultaneously:
 /// - Readers: Lock-free, concurrent access via MVCC snapshots
 /// - Writers: Single-writer coordination through atomic locks
@@ -349,12 +355,15 @@ pub unsafe extern "C" fn sochdb_begin_txn(ptr: *mut DatabasePtr) -> C_TxnHandle 
 
 /// Commit a transaction.
 /// Returns C_CommitResult with commit_ts on success.
-/// The commit_ts is HLC-backed and monotonically increasing, suitable for 
+/// The commit_ts is HLC-backed and monotonically increasing, suitable for
 /// MVCC observability, replication, and audit trails.
 /// # Safety
 /// The ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sochdb_commit(ptr: *mut DatabasePtr, handle: C_TxnHandle) -> C_CommitResult {
+pub unsafe extern "C" fn sochdb_commit(
+    ptr: *mut DatabasePtr,
+    handle: C_TxnHandle,
+) -> C_CommitResult {
     if ptr.is_null() {
         return C_CommitResult {
             commit_ts: 0,
@@ -681,7 +690,7 @@ pub unsafe extern "C" fn sochdb_scan_prefix(
                 .into_iter()
                 .filter(|(k, _)| k.starts_with(&prefix_owned))
                 .collect();
-            
+
             let iter = Box::new(filtered.into_iter().map(Ok));
             let ptr = Box::new(ScanIteratorPtr(iter));
             Box::into_raw(ptr)
@@ -872,13 +881,13 @@ pub unsafe extern "C" fn sochdb_put_many(
 
     // Parse batch
     let data = unsafe { slice::from_raw_parts(batch.data, batch.len) };
-    
+
     // Read number of entries
     if data.len() < 4 {
         return -1;
     }
     let num_entries = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
-    
+
     let mut offset = 4;
     let mut success_count = 0;
 
@@ -888,10 +897,16 @@ pub unsafe extern "C" fn sochdb_put_many(
             return success_count;
         }
         let key_len = u32::from_le_bytes([
-            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
         ]) as usize;
         let val_len = u32::from_le_bytes([
-            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
         ]) as usize;
         offset += 8;
 
@@ -951,9 +966,9 @@ pub unsafe extern "C" fn sochdb_delete_many(
     };
 
     let data = unsafe { slice::from_raw_parts(keys_data, keys_len) };
-    
+
     let num_entries = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
-    
+
     let mut offset = 4;
     let mut success_count = 0;
 
@@ -962,7 +977,10 @@ pub unsafe extern "C" fn sochdb_delete_many(
             return success_count;
         }
         let key_len = u32::from_le_bytes([
-            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
         ]) as usize;
         offset += 4;
 
@@ -1017,8 +1035,12 @@ pub unsafe extern "C" fn sochdb_get_many(
     result_out: *mut *mut u8,
     result_len_out: *mut usize,
 ) -> c_int {
-    if ptr.is_null() || keys_data.is_null() || keys_len < 4 
-        || result_out.is_null() || result_len_out.is_null() {
+    if ptr.is_null()
+        || keys_data.is_null()
+        || keys_len < 4
+        || result_out.is_null()
+        || result_len_out.is_null()
+    {
         return -1;
     }
 
@@ -1029,13 +1051,13 @@ pub unsafe extern "C" fn sochdb_get_many(
     };
 
     let data = unsafe { slice::from_raw_parts(keys_data, keys_len) };
-    
+
     let num_entries = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
-    
+
     // Build result buffer
     let mut result = Vec::with_capacity(4 + num_entries * 10); // Estimate
     result.extend_from_slice(&(num_entries as u32).to_le_bytes());
-    
+
     let mut offset = 4;
 
     for _ in 0..num_entries {
@@ -1044,7 +1066,10 @@ pub unsafe extern "C" fn sochdb_get_many(
             continue;
         }
         let key_len = u32::from_le_bytes([
-            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
         ]) as usize;
         offset += 4;
 
@@ -1077,7 +1102,7 @@ pub unsafe extern "C" fn sochdb_get_many(
         *result_len_out = boxed.len();
     }
     let _ = Box::into_raw(boxed); // Leak for caller to free
-    
+
     0
 }
 
@@ -1149,18 +1174,18 @@ pub unsafe extern "C" fn sochdb_scan_batch(
     }
 
     let iter = unsafe { &mut (*iter_ptr).0 };
-    
+
     // Pre-allocate result buffer
     // Estimate: header (5 bytes) + batch_size * (8 bytes header + ~100 bytes avg data)
     let estimated_size = 5 + batch_size * 108;
     let mut result = Vec::with_capacity(estimated_size);
-    
+
     // Reserve space for header (will fill in at end)
     result.extend_from_slice(&[0u8; 5]); // 4 bytes count + 1 byte is_done
-    
+
     let mut count = 0u32;
     let mut is_done = false;
-    
+
     for _ in 0..batch_size {
         match iter.next() {
             Some(Ok((key, val))) => {
@@ -1175,7 +1200,7 @@ pub unsafe extern "C" fn sochdb_scan_batch(
                 // Write header with current count and return error
                 result[0..4].copy_from_slice(&count.to_le_bytes());
                 result[4] = 0; // Not done (error case)
-                
+
                 let mut boxed = result.into_boxed_slice();
                 unsafe {
                     *result_out = boxed.as_mut_ptr();
@@ -1190,11 +1215,11 @@ pub unsafe extern "C" fn sochdb_scan_batch(
             }
         }
     }
-    
+
     // Fill in header
     result[0..4].copy_from_slice(&count.to_le_bytes());
     result[4] = if is_done { 1 } else { 0 };
-    
+
     // If no results and done, signal completion
     if count == 0 && is_done {
         // Still allocate minimal buffer so caller can free consistently
@@ -1206,7 +1231,7 @@ pub unsafe extern "C" fn sochdb_scan_batch(
         let _ = Box::into_raw(boxed);
         return 1; // Done
     }
-    
+
     // Return buffer
     let mut boxed = result.into_boxed_slice();
     unsafe {
@@ -1214,7 +1239,7 @@ pub unsafe extern "C" fn sochdb_scan_batch(
         *result_len_out = boxed.len();
     }
     let _ = Box::into_raw(boxed);
-    
+
     0 // Success, check is_done flag for completion
 }
 
@@ -1246,13 +1271,13 @@ pub unsafe extern "C" fn sochdb_set_table_index_policy(
     if ptr.is_null() || table_name.is_null() {
         return -1;
     }
-    
+
     let c_str = unsafe { CStr::from_ptr(table_name) };
     let table = match c_str.to_str() {
         Ok(s) => s,
         Err(_) => return -1,
     };
-    
+
     let index_policy = match policy {
         0 => crate::index_policy::IndexPolicy::WriteOptimized,
         1 => crate::index_policy::IndexPolicy::Balanced,
@@ -1260,13 +1285,13 @@ pub unsafe extern "C" fn sochdb_set_table_index_policy(
         3 => crate::index_policy::IndexPolicy::AppendOnly,
         _ => return -2,
     };
-    
+
     let db = unsafe { &(*ptr).0 };
-    
+
     // Configure the table's index policy through the database registry
     let config = crate::index_policy::TableIndexConfig::new(table, index_policy);
     db.index_registry().configure_table(config);
-    
+
     0
 }
 
@@ -1289,16 +1314,16 @@ pub unsafe extern "C" fn sochdb_get_table_index_policy(
     if ptr.is_null() || table_name.is_null() {
         return 255;
     }
-    
+
     let c_str = unsafe { CStr::from_ptr(table_name) };
     let table = match c_str.to_str() {
         Ok(s) => s,
         Err(_) => return 255,
     };
-    
+
     let db = unsafe { &(*ptr).0 };
     let config = db.index_registry().get_config(table);
-    
+
     match config.policy {
         crate::index_policy::IndexPolicy::WriteOptimized => 0,
         crate::index_policy::IndexPolicy::Balanced => 1,
@@ -1315,7 +1340,7 @@ pub struct C_TemporalEdge {
     pub to_id: *const c_char,
     pub valid_from: u64,
     pub valid_until: u64,
-    pub properties_json: *const c_char,  // JSON string of properties
+    pub properties_json: *const c_char, // JSON string of properties
 }
 
 /// Add a temporal edge with validity interval.
@@ -1327,8 +1352,12 @@ pub unsafe extern "C" fn sochdb_add_temporal_edge(
     namespace: *const c_char,
     edge: C_TemporalEdge,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || edge.from_id.is_null() 
-        || edge.edge_type.is_null() || edge.to_id.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || edge.from_id.is_null()
+        || edge.edge_type.is_null()
+        || edge.to_id.is_null()
+    {
         return -1;
     }
 
@@ -1350,19 +1379,19 @@ pub unsafe extern "C" fn sochdb_add_temporal_edge(
     };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     // Begin transaction for atomic write
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     // Store temporal edge: _graph/{ns}/temporal/{from}/{type}/{to}/{valid_from}
     let key = format!(
         "_graph/{}/temporal/{}/{}/{}/{:016x}",
         ns, from, etype, to, edge.valid_from
     );
-    
+
     let props_str = if edge.properties_json.is_null() {
         "{}".to_string()
     } else {
@@ -1371,17 +1400,17 @@ pub unsafe extern "C" fn sochdb_add_temporal_edge(
             Err(_) => return -1,
         }
     };
-    
+
     let value = format!(
         r#"{{"from_id":"{}","edge_type":"{}","to_id":"{}","valid_from":{},"valid_until":{},"properties":{}}}"#,
         from, etype, to, edge.valid_from, edge.valid_until, props_str
     );
-    
+
     if let Err(_) = db.put(txn, key.as_bytes(), value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     match db.commit(txn) {
         Ok(_) => 0,
         Err(_) => -1,
@@ -1390,7 +1419,7 @@ pub unsafe extern "C" fn sochdb_add_temporal_edge(
 
 /// Query temporal graph edges. Returns a JSON array of matching edges.
 /// Caller must free the returned string with sochdb_free_string.
-/// 
+///
 /// query_mode: 0=POINT_IN_TIME, 1=RANGE, 2=CURRENT
 /// # Safety
 /// All pointers must be valid C strings. edge_type can be null for no filter.
@@ -1400,10 +1429,10 @@ pub unsafe extern "C" fn sochdb_query_temporal_graph(
     namespace: *const c_char,
     node_id: *const c_char,
     query_mode: u8,
-    timestamp: u64,      // For POINT_IN_TIME
-    start_time: u64,     // For RANGE
-    end_time: u64,       // For RANGE
-    edge_type: *const c_char,  // Optional filter (null = all types)
+    timestamp: u64,           // For POINT_IN_TIME
+    start_time: u64,          // For RANGE
+    end_time: u64,            // For RANGE
+    edge_type: *const c_char, // Optional filter (null = all types)
     out_len: *mut usize,
 ) -> *mut c_char {
     if ptr.is_null() || namespace.is_null() || node_id.is_null() || out_len.is_null() {
@@ -1418,7 +1447,7 @@ pub unsafe extern "C" fn sochdb_query_temporal_graph(
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
-    
+
     let edge_filter = if edge_type.is_null() {
         None
     } else {
@@ -1429,13 +1458,13 @@ pub unsafe extern "C" fn sochdb_query_temporal_graph(
     };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     // Begin transaction for scan
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return ptr::null_mut(),
     };
-    
+
     // Scan prefix: _graph/{ns}/temporal/{node}/
     let prefix = format!("_graph/{}/temporal/{}/", ns, node);
     let pairs = match db.scan(txn, prefix.as_bytes()) {
@@ -1445,25 +1474,25 @@ pub unsafe extern "C" fn sochdb_query_temporal_graph(
             return ptr::null_mut();
         }
     };
-    
+
     // Commit read transaction
     if let Err(_) = db.commit(txn) {
         return ptr::null_mut();
     }
-    
+
     let mut results = Vec::new();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64;
-    
+
     for (_key, value) in pairs {
         // Parse the JSON value
         let value_str = match std::str::from_utf8(&value) {
             Ok(s) => s,
             Err(_) => continue,
         };
-        
+
         // Simple JSON parsing (in production, use serde_json)
         if let Some(valid_from_pos) = value_str.find(r#""valid_from":"#) {
             if let Some(valid_until_pos) = value_str.find(r#""valid_until":"#) {
@@ -1471,42 +1500,46 @@ pub unsafe extern "C" fn sochdb_query_temporal_graph(
                 let vf_end = value_str[vf_start..].find(',').unwrap_or(0) + vf_start;
                 let vu_start = valid_until_pos + r#""valid_until":"#.len();
                 let vu_end = value_str[vu_start..].find(',').unwrap_or(0) + vu_start;
-                
+
                 let valid_from: u64 = value_str[vf_start..vf_end].parse().unwrap_or(0);
                 let valid_until: u64 = value_str[vu_start..vu_end].parse().unwrap_or(0);
-                
+
                 // Filter by edge_type if specified
                 if let Some(filter) = edge_filter {
                     if !value_str.contains(&format!(r#""edge_type":"{}""#, filter)) {
                         continue;
                     }
                 }
-                
+
                 // Filter by query mode
                 let matches = match query_mode {
                     0 => timestamp >= valid_from && (valid_until == 0 || timestamp < valid_until),
                     1 => {
-                        let edge_end = if valid_until == 0 { u64::MAX } else { valid_until };
+                        let edge_end = if valid_until == 0 {
+                            u64::MAX
+                        } else {
+                            valid_until
+                        };
                         valid_from < end_time && edge_end > start_time
                     }
                     2 => now >= valid_from && (valid_until == 0 || now < valid_until),
                     _ => false,
                 };
-                
+
                 if matches {
                     results.push(value_str.to_string());
                 }
             }
         }
     }
-    
+
     // Build JSON array
     let json = format!("[{}]", results.join(","));
     let c_string = match std::ffi::CString::new(json) {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
-    
+
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
 }
@@ -1528,13 +1561,13 @@ pub unsafe extern "C" fn sochdb_free_string(ptr: *mut c_char) {
 // ============================================================================
 
 /// Add a node to the graph overlay.
-/// 
+///
 /// Stores node as: _graph/{namespace}/nodes/{node_id}
-/// 
+///
 /// # Returns
 /// - 0: Success
 /// - -1: Error
-/// 
+///
 /// # Safety
 /// All pointers must be valid C strings. properties_json can be null.
 #[unsafe(no_mangle)]
@@ -1571,23 +1604,23 @@ pub unsafe extern "C" fn sochdb_graph_add_node(
     };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     let key = format!("_graph/{}/nodes/{}", ns, id);
     let value = format!(
         r#"{{"id":"{}","node_type":"{}","properties":{}}}"#,
         id, ntype, props
     );
-    
+
     if let Err(_) = db.put(txn, key.as_bytes(), value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     match db.commit(txn) {
         Ok(_) => 0,
         Err(_) => -1,
@@ -1595,13 +1628,13 @@ pub unsafe extern "C" fn sochdb_graph_add_node(
 }
 
 /// Add an edge between nodes in the graph overlay.
-/// 
+///
 /// Stores edge as: _graph/{namespace}/edges/{from_id}/{edge_type}/{to_id}
-/// 
+///
 /// # Returns
 /// - 0: Success
 /// - -1: Error
-/// 
+///
 /// # Safety
 /// All pointers must be valid C strings. properties_json can be null.
 #[unsafe(no_mangle)]
@@ -1613,8 +1646,12 @@ pub unsafe extern "C" fn sochdb_graph_add_edge(
     to_id: *const c_char,
     properties_json: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || from_id.is_null() 
-        || edge_type.is_null() || to_id.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || from_id.is_null()
+        || edge_type.is_null()
+        || to_id.is_null()
+    {
         return -1;
     }
 
@@ -1644,23 +1681,23 @@ pub unsafe extern "C" fn sochdb_graph_add_edge(
     };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     let key = format!("_graph/{}/edges/{}/{}/{}", ns, from, etype, to);
     let value = format!(
         r#"{{"from_id":"{}","edge_type":"{}","to_id":"{}","properties":{}}}"#,
         from, etype, to, props
     );
-    
+
     if let Err(_) = db.put(txn, key.as_bytes(), value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     match db.commit(txn) {
         Ok(_) => 0,
         Err(_) => -1,
@@ -1668,12 +1705,12 @@ pub unsafe extern "C" fn sochdb_graph_add_edge(
 }
 
 /// Traverse the graph from a starting node.
-/// 
+///
 /// Returns JSON: {"nodes": [...], "edges": [...]}
 /// Caller must free the returned string with sochdb_free_string.
-/// 
+///
 /// order: 0=BFS, 1=DFS
-/// 
+///
 /// # Safety
 /// All pointers must be valid.
 #[unsafe(no_mangle)]
@@ -1682,7 +1719,7 @@ pub unsafe extern "C" fn sochdb_graph_traverse(
     namespace: *const c_char,
     start_node: *const c_char,
     max_depth: usize,
-    order: u8,  // 0=BFS, 1=DFS
+    order: u8, // 0=BFS, 1=DFS
     out_len: *mut usize,
 ) -> *mut c_char {
     if ptr.is_null() || namespace.is_null() || start_node.is_null() || out_len.is_null() {
@@ -1699,23 +1736,27 @@ pub unsafe extern "C" fn sochdb_graph_traverse(
     };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return ptr::null_mut(),
     };
-    
+
     // Collect nodes and edges through traversal
     let mut visited_nodes = std::collections::HashSet::new();
     let mut nodes_json = Vec::new();
     let mut edges_json = Vec::new();
-    
+
     // Use queue for BFS, stack for DFS
     let mut frontier: Vec<(String, usize)> = vec![(start.to_string(), 0)];
-    
+
     while let Some((current_node, depth)) = if order == 0 {
         // BFS: remove from front
-        if frontier.is_empty() { None } else { Some(frontier.remove(0)) }
+        if frontier.is_empty() {
+            None
+        } else {
+            Some(frontier.remove(0))
+        }
     } else {
         // DFS: remove from back
         frontier.pop()
@@ -1724,7 +1765,7 @@ pub unsafe extern "C" fn sochdb_graph_traverse(
             continue;
         }
         visited_nodes.insert(current_node.clone());
-        
+
         // Get node data
         let node_key = format!("_graph/{}/nodes/{}", ns, current_node);
         if let Ok(Some(node_data)) = db.get(txn, node_key.as_bytes()) {
@@ -1732,14 +1773,14 @@ pub unsafe extern "C" fn sochdb_graph_traverse(
                 nodes_json.push(s.to_string());
             }
         }
-        
+
         // Get outgoing edges
         let edge_prefix = format!("_graph/{}/edges/{}/", ns, current_node);
         if let Ok(edges) = db.scan(txn, edge_prefix.as_bytes()) {
             for (_key, value) in edges {
                 if let Ok(edge_str) = std::str::from_utf8(&value) {
                     edges_json.push(edge_str.to_string());
-                    
+
                     // Extract to_id for traversal
                     if let Some(to_pos) = edge_str.find(r#""to_id":""#) {
                         let start_idx = to_pos + r#""to_id":""#.len();
@@ -1754,22 +1795,22 @@ pub unsafe extern "C" fn sochdb_graph_traverse(
             }
         }
     }
-    
+
     if let Err(_) = db.commit(txn) {
         return ptr::null_mut();
     }
-    
+
     let result = format!(
         r#"{{"nodes":[{}],"edges":[{}]}}"#,
         nodes_json.join(","),
         edges_json.join(",")
     );
-    
+
     let c_string = match std::ffi::CString::new(result) {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
-    
+
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
 }
@@ -1779,11 +1820,11 @@ pub unsafe extern "C" fn sochdb_graph_traverse(
 // ============================================================================
 
 /// Store a value in the semantic cache with its embedding.
-/// 
+///
 /// # Returns
 /// - 0: Success
 /// - -1: Error
-/// 
+///
 /// # Safety
 /// All pointers must be valid.
 #[unsafe(no_mangle)]
@@ -1796,8 +1837,12 @@ pub unsafe extern "C" fn sochdb_cache_put(
     embedding_len: usize,
     ttl_seconds: u64,
 ) -> c_int {
-    if ptr.is_null() || cache_name.is_null() || key.is_null() 
-        || value.is_null() || embedding_ptr.is_null() {
+    if ptr.is_null()
+        || cache_name.is_null()
+        || key.is_null()
+        || value.is_null()
+        || embedding_ptr.is_null()
+    {
         return -1;
     }
 
@@ -1816,39 +1861,43 @@ pub unsafe extern "C" fn sochdb_cache_put(
     let embedding = unsafe { slice::from_raw_parts(embedding_ptr, embedding_len) };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     // Compute expiry timestamp
     let expires_at = if ttl_seconds > 0 {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs() + ttl_seconds
+            .as_secs()
+            + ttl_seconds
     } else {
         0 // No expiry
     };
-    
+
     // Store cache entry: _cache/{cache_name}/{key_hash}
     let key_hash = format!("{:016x}", twox_hash::xxh3::hash64(k.as_bytes()));
     let cache_key = format!("_cache/{}/{}", cache, key_hash);
-    
+
     // Serialize embedding as JSON array
     let embedding_json: Vec<String> = embedding.iter().map(|f| f.to_string()).collect();
-    
+
     let cache_value = format!(
         r#"{{"key":"{}","value":"{}","embedding":[{}],"expires_at":{}}}"#,
-        k, v, embedding_json.join(","), expires_at
+        k,
+        v,
+        embedding_json.join(","),
+        expires_at
     );
-    
+
     if let Err(_) = db.put(txn, cache_key.as_bytes(), cache_value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     match db.commit(txn) {
         Ok(_) => 0,
         Err(_) => -1,
@@ -1856,10 +1905,10 @@ pub unsafe extern "C" fn sochdb_cache_put(
 }
 
 /// Look up a value in the semantic cache by embedding similarity.
-/// 
+///
 /// Returns the cached value if similarity >= threshold, null otherwise.
 /// Caller must free the returned string with sochdb_free_string.
-/// 
+///
 /// # Safety
 /// All pointers must be valid.
 #[unsafe(no_mangle)]
@@ -1882,12 +1931,12 @@ pub unsafe extern "C" fn sochdb_cache_get(
     let query = unsafe { slice::from_raw_parts(query_embedding_ptr, embedding_len) };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return ptr::null_mut(),
     };
-    
+
     let prefix = format!("_cache/{}/", cache);
     let entries = match db.scan(txn, prefix.as_bytes()) {
         Ok(e) => e,
@@ -1896,22 +1945,22 @@ pub unsafe extern "C" fn sochdb_cache_get(
             return ptr::null_mut();
         }
     };
-    
+
     let _ = db.commit(txn);
-    
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    
+
     let mut best_match: Option<(f32, String)> = None;
-    
+
     for (_key, value) in entries {
         let value_str = match std::str::from_utf8(&value) {
             Ok(s) => s,
             Err(_) => continue,
         };
-        
+
         // Parse expires_at
         if let Some(exp_pos) = value_str.find(r#""expires_at":"#) {
             let exp_start = exp_pos + r#""expires_at":"#.len();
@@ -1924,7 +1973,7 @@ pub unsafe extern "C" fn sochdb_cache_get(
                 }
             }
         }
-        
+
         // Parse embedding and compute cosine similarity
         if let Some(emb_pos) = value_str.find(r#""embedding":["#) {
             let emb_start = emb_pos + r#""embedding":["#.len();
@@ -1934,7 +1983,7 @@ pub unsafe extern "C" fn sochdb_cache_get(
                     .split(',')
                     .filter_map(|s| s.trim().parse().ok())
                     .collect();
-                
+
                 if cached_embedding.len() == query.len() {
                     let similarity = cosine_similarity(query, &cached_embedding);
                     if similarity >= threshold {
@@ -1953,7 +2002,7 @@ pub unsafe extern "C" fn sochdb_cache_get(
             }
         }
     }
-    
+
     match best_match {
         Some((_, value)) => {
             let c_string = match std::ffi::CString::new(value) {
@@ -1988,13 +2037,13 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 // ============================================================================
 
 /// Start a new trace. Returns trace_id and root_span_id.
-/// 
+///
 /// Caller must free the returned strings with sochdb_free_string.
-/// 
+///
 /// # Returns
 /// - 0: Success
 /// - -1: Error
-/// 
+///
 /// # Safety
 /// All pointers must be valid.
 #[unsafe(no_mangle)]
@@ -2014,49 +2063,49 @@ pub unsafe extern "C" fn sochdb_trace_start(
     };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     // Generate unique IDs
     let trace_id = format!("trace_{:016x}", rand_u64());
     let span_id = format!("span_{:016x}", rand_u64());
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_micros() as u64;
-    
+
     // Store trace: _traces/{trace_id}
     let trace_key = format!("_traces/{}", trace_id);
     let trace_value = format!(
         r#"{{"trace_id":"{}","name":"{}","start_us":{},"root_span_id":"{}"}}"#,
         trace_id, trace_name, now, span_id
     );
-    
+
     if let Err(_) = db.put(txn, trace_key.as_bytes(), trace_value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     // Store root span: _traces/{trace_id}/spans/{span_id}
     let span_key = format!("_traces/{}/spans/{}", trace_id, span_id);
     let span_value = format!(
         r#"{{"span_id":"{}","name":"{}","start_us":{},"parent_span_id":null,"status":"active"}}"#,
         span_id, trace_name, now
     );
-    
+
     if let Err(_) = db.put(txn, span_key.as_bytes(), span_value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     if let Err(_) = db.commit(txn) {
         return -1;
     }
-    
+
     // Return trace_id and span_id
     let trace_c = match std::ffi::CString::new(trace_id) {
         Ok(s) => s,
@@ -2066,19 +2115,19 @@ pub unsafe extern "C" fn sochdb_trace_start(
         Ok(s) => s,
         Err(_) => return -1,
     };
-    
+
     unsafe {
         *trace_id_out = trace_c.into_raw();
         *span_id_out = span_c.into_raw();
     }
-    
+
     0
 }
 
 /// Start a child span within a trace.
-/// 
+///
 /// Caller must free the returned span_id with sochdb_free_string.
-/// 
+///
 /// # Safety
 /// All pointers must be valid.
 #[unsafe(no_mangle)]
@@ -2089,8 +2138,12 @@ pub unsafe extern "C" fn sochdb_trace_span_start(
     name: *const c_char,
     span_id_out: *mut *mut c_char,
 ) -> c_int {
-    if ptr.is_null() || trace_id.is_null() || parent_span_id.is_null() 
-        || name.is_null() || span_id_out.is_null() {
+    if ptr.is_null()
+        || trace_id.is_null()
+        || parent_span_id.is_null()
+        || name.is_null()
+        || span_id_out.is_null()
+    {
         return -1;
     }
 
@@ -2109,48 +2162,48 @@ pub unsafe extern "C" fn sochdb_trace_span_start(
 
     let db = unsafe { &(*ptr).0 };
     let span_id = format!("span_{:016x}", rand_u64());
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_micros() as u64;
-    
+
     let span_key = format!("_traces/{}/spans/{}", tid, span_id);
     let span_value = format!(
         r#"{{"span_id":"{}","name":"{}","start_us":{},"parent_span_id":"{}","status":"active"}}"#,
         span_id, span_name, now, pid
     );
-    
+
     if let Err(_) = db.put(txn, span_key.as_bytes(), span_value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     if let Err(_) = db.commit(txn) {
         return -1;
     }
-    
+
     let span_c = match std::ffi::CString::new(span_id) {
         Ok(s) => s,
         Err(_) => return -1,
     };
-    
+
     unsafe { *span_id_out = span_c.into_raw() };
     0
 }
 
 /// End a span and record its duration.
-/// 
+///
 /// status: 0=unset, 1=ok, 2=error
-/// 
+///
 /// # Returns
 /// Duration in microseconds on success, -1 on error.
-/// 
+///
 /// # Safety
 /// All pointers must be valid.
 #[unsafe(no_mangle)]
@@ -2174,14 +2227,14 @@ pub unsafe extern "C" fn sochdb_trace_span_end(
     };
 
     let db = unsafe { &(*ptr).0 };
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     let span_key = format!("_traces/{}/spans/{}", tid, sid);
-    
+
     // Read current span
     let span_data = match db.get(txn, span_key.as_bytes()) {
         Ok(Some(data)) => data,
@@ -2190,7 +2243,7 @@ pub unsafe extern "C" fn sochdb_trace_span_end(
             return -1;
         }
     };
-    
+
     let span_str = match std::str::from_utf8(&span_data) {
         Ok(s) => s,
         Err(_) => {
@@ -2198,7 +2251,7 @@ pub unsafe extern "C" fn sochdb_trace_span_end(
             return -1;
         }
     };
-    
+
     // Parse start_us
     let start_us = if let Some(pos) = span_str.find(r#""start_us":"#) {
         let start = pos + r#""start_us":"#.len();
@@ -2210,32 +2263,37 @@ pub unsafe extern "C" fn sochdb_trace_span_end(
     } else {
         0u64
     };
-    
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_micros() as u64;
-    
+
     let duration_us = now.saturating_sub(start_us);
     let status_str = match status {
         1 => "ok",
         2 => "error",
         _ => "unset",
     };
-    
+
     // Update span with end time and duration
-    let new_span = span_str
-        .replace(r#""status":"active""#, &format!(r#""status":"{}","end_us":{},"duration_us":{}"#, status_str, now, duration_us));
-    
+    let new_span = span_str.replace(
+        r#""status":"active""#,
+        &format!(
+            r#""status":"{}","end_us":{},"duration_us":{}"#,
+            status_str, now, duration_us
+        ),
+    );
+
     if let Err(_) = db.put(txn, span_key.as_bytes(), new_span.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     if let Err(_) = db.commit(txn) {
         return -1;
     }
-    
+
     duration_us as i64
 }
 
@@ -2243,7 +2301,7 @@ pub unsafe extern "C" fn sochdb_trace_span_end(
 fn rand_u64() -> u64 {
     use std::sync::atomic::{AtomicU64, Ordering};
     static STATE: AtomicU64 = AtomicU64::new(0x853c49e6748fea9b);
-    
+
     let mut s = STATE.load(Ordering::Relaxed);
     if s == 0 {
         s = std::time::SystemTime::now()
@@ -2263,7 +2321,7 @@ fn rand_u64() -> u64 {
 // =========================================================================
 
 /// Create a vector collection for storing embeddings
-/// 
+///
 /// # Returns
 /// - 0: Success (or already exists)
 /// - -1: Error
@@ -2278,7 +2336,7 @@ pub unsafe extern "C" fn sochdb_collection_create(
     if ptr.is_null() || namespace.is_null() || collection.is_null() {
         return -1;
     }
-    
+
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
         Ok(s) => s,
         Err(_) => return -1,
@@ -2287,25 +2345,22 @@ pub unsafe extern "C" fn sochdb_collection_create(
         Ok(s) => s,
         Err(_) => return -1,
     };
-    
+
     let db = unsafe { &(*ptr).0 };
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     // Store collection config
     let config_key = format!("{}/_collections/{}", ns, col);
-    let config_value = format!(
-        r#"{{"dimension":{},"metric":{}}}"#,
-        dimension, dist_type
-    );
-    
+    let config_value = format!(r#"{{"dimension":{},"metric":{}}}"#, dimension, dist_type);
+
     if let Err(_) = db.put(txn, config_key.as_bytes(), config_value.as_bytes()) {
         let _ = db.abort(txn);
         return -1;
     }
-    
+
     let result = match db.commit(txn) {
         Ok(_) => 0,
         Err(_) => -1,
@@ -2324,7 +2379,7 @@ pub unsafe extern "C" fn sochdb_collection_create(
 }
 
 /// Insert a vector into a collection
-/// 
+///
 /// # Returns
 /// - 0: Success
 /// - -1: Error
@@ -2338,11 +2393,15 @@ pub unsafe extern "C" fn sochdb_collection_insert(
     vector_len: usize,
     metadata_json: *const c_char, // Optional JSON metadata
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || collection.is_null() 
-        || id.is_null() || vector_ptr.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || collection.is_null()
+        || id.is_null()
+        || vector_ptr.is_null()
+    {
         return -1;
     }
-    
+
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
         Ok(s) => s,
         Err(_) => return -1,
@@ -2365,7 +2424,7 @@ pub unsafe extern "C" fn sochdb_collection_insert(
     if vector_len != dimension {
         return -1;
     }
-    
+
     let metadata = if !metadata_json.is_null() {
         match unsafe { CStr::from_ptr(metadata_json) }.to_str() {
             Ok(s) => s.to_string(),
@@ -2374,12 +2433,12 @@ pub unsafe extern "C" fn sochdb_collection_insert(
     } else {
         "{}".to_string()
     };
-    
+
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     let id_hash = hash_id_to_u128(doc_id);
     let vec_key = vector_bin_key(ns, col, id_hash);
     let vec_value = serialize_vector_binary(vector);
@@ -2400,7 +2459,7 @@ pub unsafe extern "C" fn sochdb_collection_insert(
             return -1;
         }
     }
-    
+
     if let Err(_) = db.commit(txn) {
         return -1;
     }
@@ -2424,14 +2483,18 @@ pub unsafe extern "C" fn sochdb_collection_insert_batch(
     ptr: *mut DatabasePtr,
     namespace: *const c_char,
     collection: *const c_char,
-    ids: *const *const c_char,        // Array of C strings
-    vectors: *const f32,               // Flat array: count * dimension floats
+    ids: *const *const c_char, // Array of C strings
+    vectors: *const f32,       // Flat array: count * dimension floats
     dimension: usize,
     metadata_jsons: *const *const c_char, // Array of C strings (nullable entries)
     count: usize,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || collection.is_null()
-        || ids.is_null() || vectors.is_null() || count == 0
+    if ptr.is_null()
+        || namespace.is_null()
+        || collection.is_null()
+        || ids.is_null()
+        || vectors.is_null()
+        || count == 0
     {
         return -1;
     }
@@ -2535,7 +2598,7 @@ pub struct CSearchResult {
 }
 
 /// Search a collection for nearest vectors
-/// 
+///
 /// # Returns
 /// - >= 0: Number of results
 /// - -1: Error
@@ -2549,8 +2612,12 @@ pub unsafe extern "C" fn sochdb_collection_search(
     k: usize,
     results_out: *mut CSearchResult,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || collection.is_null() 
-        || query_ptr.is_null() || results_out.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || collection.is_null()
+        || query_ptr.is_null()
+        || results_out.is_null()
+    {
         return -1;
     }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
@@ -2592,8 +2659,15 @@ pub unsafe extern "C" fn sochdb_collection_search(
         let mut metadata_json = serde_json::json!({});
         if let Some(bytes) = meta_value.as_deref() {
             if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(bytes) {
-                id_value = parsed.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                metadata_json = parsed.get("metadata").cloned().unwrap_or(serde_json::json!({}));
+                id_value = parsed
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                metadata_json = parsed
+                    .get("metadata")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
             }
         }
         let metadata = serde_json::to_string(&metadata_json).unwrap_or_else(|_| "{}".to_string());
@@ -2637,9 +2711,15 @@ pub unsafe extern "C" fn sochdb_collection_search_soa(
     scores_out: *mut *mut f32,
     len_out: *mut usize,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || collection.is_null()
-        || query_ptr.is_null() || ids_hi_out.is_null() || ids_lo_out.is_null()
-        || scores_out.is_null() || len_out.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || collection.is_null()
+        || query_ptr.is_null()
+        || ids_hi_out.is_null()
+        || ids_lo_out.is_null()
+        || scores_out.is_null()
+        || len_out.is_null()
+    {
         return -1;
     }
 
@@ -2747,8 +2827,12 @@ pub unsafe extern "C" fn sochdb_collection_fetch_metadata_json(
     ids_lo_ptr: *const u64,
     ids_len: usize,
 ) -> *mut c_char {
-    if ptr.is_null() || namespace.is_null() || collection.is_null()
-        || ids_hi_ptr.is_null() || ids_lo_ptr.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || collection.is_null()
+        || ids_hi_ptr.is_null()
+        || ids_lo_ptr.is_null()
+    {
         return ptr::null_mut();
     }
 
@@ -2834,7 +2918,7 @@ fn metadata_matches_filter(metadata: &Value, filter: &Value) -> bool {
 }
 
 /// Search a collection for keywords (simple term match)
-/// 
+///
 /// # Returns
 /// - >= 0: Number of results
 /// - -1: Error
@@ -2847,11 +2931,15 @@ pub unsafe extern "C" fn sochdb_collection_keyword_search(
     k: usize,
     results_out: *mut CSearchResult,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || collection.is_null() 
-        || query_ptr.is_null() || results_out.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || collection.is_null()
+        || query_ptr.is_null()
+        || results_out.is_null()
+    {
         return -1;
     }
-    
+
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
         Ok(s) => s,
         Err(_) => return -1,
@@ -2868,13 +2956,13 @@ pub unsafe extern "C" fn sochdb_collection_keyword_search(
     if terms.is_empty() {
         return 0;
     }
-    
+
     let db = unsafe { &(*ptr).0 };
     let txn = match db.begin_transaction() {
         Ok(t) => t,
         Err(_) => return -1,
     };
-    
+
     // Scan all vectors in collection (we assume vectors & metadata are stored together)
     let prefix = format!("{}/collections/{}/vectors/", ns, col);
     let entries = match db.scan(txn, prefix.as_bytes()) {
@@ -2885,43 +2973,51 @@ pub unsafe extern "C" fn sochdb_collection_keyword_search(
         }
     };
     let _ = db.commit(txn);
-    
+
     // Score documents based on term frequency
     let mut scored: Vec<(f32, String, String)> = Vec::new();
-    
+
     for (_key, value) in entries {
         // Parse whole JSON (robust)
         let doc: Value = match serde_json::from_slice(&value) {
             Ok(v) => v,
             Err(_) => continue,
         };
-        
+
         // Search in metadata string (includes values)
         let metadata_val = doc.get("metadata");
-        let metadata_str = metadata_val.map(|v| v.to_string()).unwrap_or("{}".to_string());
-        
+        let metadata_str = metadata_val
+            .map(|v| v.to_string())
+            .unwrap_or("{}".to_string());
+
         // Also check "content" field if present (fallback compat)
         let content_str = doc.get("content").and_then(|v| v.as_str()).unwrap_or("");
-        
+
         // Combine text to search
         let search_text = format!("{} {}", metadata_str, content_str).to_lowercase();
-         
+
         let mut score = 0.0;
         for term in &terms {
             score += search_text.matches(term).count() as f32;
         }
-        
+
         if score > 0.0 {
-            let id = doc.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            if id.is_empty() { continue; }
-            
+            let id = doc
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if id.is_empty() {
+                continue;
+            }
+
             scored.push((score, id, metadata_str));
         }
     }
-    
+
     // Sort by score descending
     scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-    
+
     // Return top k
     let result_count = scored.len().min(k);
     for (i, (score, id, metadata)) in scored.into_iter().take(k).enumerate() {
@@ -2933,14 +3029,14 @@ pub unsafe extern "C" fn sochdb_collection_keyword_search(
             Ok(s) => s.into_raw(),
             Err(_) => ptr::null_mut(),
         };
-        
+
         unsafe {
             (*results_out.add(i)).id_ptr = c_id;
             (*results_out.add(i)).score = score;
             (*results_out.add(i)).metadata_ptr = c_meta;
         }
     }
-    
+
     result_count as c_int
 }
 
@@ -2950,7 +3046,7 @@ pub unsafe extern "C" fn sochdb_search_result_free(result: *mut CSearchResult, c
     if result.is_null() {
         return;
     }
-    
+
     for i in 0..count {
         let r = unsafe { &mut *result.add(i) };
         if !r.id_ptr.is_null() {
@@ -3061,10 +3157,13 @@ pub unsafe extern "C" fn sochdb_scan_path(
 
     match db.scan_path(txn, prefix_str) {
         Ok(pairs) => {
-            let entries: Vec<String> = pairs.iter().map(|(path, value)| {
-                let val_str = String::from_utf8_lossy(value);
-                format!(r#"{{"path":"{}","value":"{}"}}"#, path, val_str)
-            }).collect();
+            let entries: Vec<String> = pairs
+                .iter()
+                .map(|(path, value)| {
+                    let val_str = String::from_utf8_lossy(value);
+                    format!(r#"{{"path":"{}","value":"{}"}}"#, path, val_str)
+                })
+                .collect();
             let json = format!("[{}]", entries.join(","));
             let c_string = match std::ffi::CString::new(json) {
                 Ok(s) => s,
@@ -3088,7 +3187,10 @@ pub unsafe extern "C" fn sochdb_scan_path(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_begin_read_only(ptr: *mut DatabasePtr) -> C_TxnHandle {
     if ptr.is_null() {
-        return C_TxnHandle { txn_id: 0, snapshot_ts: 0 };
+        return C_TxnHandle {
+            txn_id: 0,
+            snapshot_ts: 0,
+        };
     }
     let db = unsafe { &(*ptr).0 };
     match db.begin_read_only() {
@@ -3096,7 +3198,10 @@ pub unsafe extern "C" fn sochdb_begin_read_only(ptr: *mut DatabasePtr) -> C_TxnH
             txn_id: txn.txn_id,
             snapshot_ts: txn.snapshot_ts,
         },
-        Err(_) => C_TxnHandle { txn_id: 0, snapshot_ts: 0 },
+        Err(_) => C_TxnHandle {
+            txn_id: 0,
+            snapshot_ts: 0,
+        },
     }
 }
 
@@ -3107,7 +3212,10 @@ pub unsafe extern "C" fn sochdb_begin_read_only(ptr: *mut DatabasePtr) -> C_TxnH
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_begin_write_only(ptr: *mut DatabasePtr) -> C_TxnHandle {
     if ptr.is_null() {
-        return C_TxnHandle { txn_id: 0, snapshot_ts: 0 };
+        return C_TxnHandle {
+            txn_id: 0,
+            snapshot_ts: 0,
+        };
     }
     let db = unsafe { &(*ptr).0 };
     match db.begin_write_only() {
@@ -3115,7 +3223,10 @@ pub unsafe extern "C" fn sochdb_begin_write_only(ptr: *mut DatabasePtr) -> C_Txn
             txn_id: txn.txn_id,
             snapshot_ts: txn.snapshot_ts,
         },
-        Err(_) => C_TxnHandle { txn_id: 0, snapshot_ts: 0 },
+        Err(_) => C_TxnHandle {
+            txn_id: 0,
+            snapshot_ts: 0,
+        },
     }
 }
 
@@ -3130,7 +3241,9 @@ pub unsafe extern "C" fn sochdb_begin_write_only(ptr: *mut DatabasePtr) -> C_Txn
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_shutdown(ptr: *mut DatabasePtr) -> c_int {
-    if ptr.is_null() { return -1; }
+    if ptr.is_null() {
+        return -1;
+    }
     let db = unsafe { &(*ptr).0 };
     match db.shutdown() {
         Ok(_) => 0,
@@ -3144,7 +3257,9 @@ pub unsafe extern "C" fn sochdb_shutdown(ptr: *mut DatabasePtr) -> c_int {
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_fsync(ptr: *mut DatabasePtr) -> c_int {
-    if ptr.is_null() { return -1; }
+    if ptr.is_null() {
+        return -1;
+    }
     let db = unsafe { &(*ptr).0 };
     match db.fsync() {
         Ok(_) => 0,
@@ -3158,7 +3273,9 @@ pub unsafe extern "C" fn sochdb_fsync(ptr: *mut DatabasePtr) -> c_int {
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_truncate_wal(ptr: *mut DatabasePtr) -> c_int {
-    if ptr.is_null() { return -1; }
+    if ptr.is_null() {
+        return -1;
+    }
     let db = unsafe { &(*ptr).0 };
     match db.truncate_wal() {
         Ok(_) => 0,
@@ -3172,7 +3289,9 @@ pub unsafe extern "C" fn sochdb_truncate_wal(ptr: *mut DatabasePtr) -> c_int {
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_gc(ptr: *mut DatabasePtr) -> i64 {
-    if ptr.is_null() { return -1; }
+    if ptr.is_null() {
+        return -1;
+    }
     let db = unsafe { &(*ptr).0 };
     db.gc() as i64
 }
@@ -3183,7 +3302,9 @@ pub unsafe extern "C" fn sochdb_gc(ptr: *mut DatabasePtr) -> i64 {
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sochdb_checkpoint_full(ptr: *mut DatabasePtr) -> u64 {
-    if ptr.is_null() { return 0; }
+    if ptr.is_null() {
+        return 0;
+    }
     let db = unsafe { &(*ptr).0 };
     match db.checkpoint() {
         Ok(lsn) => lsn,
@@ -3200,7 +3321,9 @@ pub unsafe extern "C" fn sochdb_stats_json(
     ptr: *mut DatabasePtr,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if ptr.is_null() || out_len.is_null() { return ptr::null_mut(); }
+    if ptr.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let db = unsafe { &(*ptr).0 };
     let storage_stats = db.storage_stats();
     let db_stats = db.stats();
@@ -3232,11 +3355,10 @@ pub unsafe extern "C" fn sochdb_stats_json(
 /// # Safety
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sochdb_path(
-    ptr: *mut DatabasePtr,
-    out_len: *mut usize,
-) -> *mut c_char {
-    if ptr.is_null() || out_len.is_null() { return ptr::null_mut(); }
+pub unsafe extern "C" fn sochdb_path(ptr: *mut DatabasePtr, out_len: *mut usize) -> *mut c_char {
+    if ptr.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let db = unsafe { &(*ptr).0 };
     let path_str = db.path().to_string_lossy().to_string();
     let c_string = match std::ffi::CString::new(path_str) {
@@ -3260,7 +3382,9 @@ pub unsafe extern "C" fn sochdb_backup_create(
     ptr: *mut DatabasePtr,
     destination: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || destination.is_null() { return -1; }
+    if ptr.is_null() || destination.is_null() {
+        return -1;
+    }
     let db = unsafe { &(*ptr).0 };
     let dest = match unsafe { CStr::from_ptr(destination) }.to_str() {
         Ok(s) => s,
@@ -3286,7 +3410,9 @@ pub unsafe extern "C" fn sochdb_backup_restore(
     ptr: *mut DatabasePtr,
     backup_path: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || backup_path.is_null() { return -1; }
+    if ptr.is_null() || backup_path.is_null() {
+        return -1;
+    }
     let db = unsafe { &(*ptr).0 };
     let path = match unsafe { CStr::from_ptr(backup_path) }.to_str() {
         Ok(s) => s,
@@ -3309,7 +3435,9 @@ pub unsafe extern "C" fn sochdb_backup_list(
     backup_dir: *const c_char,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if backup_dir.is_null() || out_len.is_null() { return ptr::null_mut(); }
+    if backup_dir.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let dir = match unsafe { CStr::from_ptr(backup_dir) }.to_str() {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
@@ -3317,14 +3445,17 @@ pub unsafe extern "C" fn sochdb_backup_list(
 
     match crate::backup::BackupManager::list_backups(dir) {
         Ok(backups) => {
-            let entries: Vec<String> = backups.iter().map(|b| {
-                format!(
-                    r#"{{"name":"{}","timestamp":"{}","size_bytes":{}}}"#,
-                    b.generate_name(),
-                    b.generate_name(),
-                    0  // BackupMetadata may not expose size, use 0 placeholder
-                )
-            }).collect();
+            let entries: Vec<String> = backups
+                .iter()
+                .map(|b| {
+                    format!(
+                        r#"{{"name":"{}","timestamp":"{}","size_bytes":{}}}"#,
+                        b.generate_name(),
+                        b.generate_name(),
+                        0 // BackupMetadata may not expose size, use 0 placeholder
+                    )
+                })
+                .collect();
             let json = format!("[{}]", entries.join(","));
             let c_string = match std::ffi::CString::new(json) {
                 Ok(s) => s,
@@ -3342,10 +3473,10 @@ pub unsafe extern "C" fn sochdb_backup_list(
 /// # Safety
 /// backup_path must be a valid C string.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sochdb_backup_verify(
-    backup_path: *const c_char,
-) -> c_int {
-    if backup_path.is_null() { return -1; }
+pub unsafe extern "C" fn sochdb_backup_verify(backup_path: *const c_char) -> c_int {
+    if backup_path.is_null() {
+        return -1;
+    }
     let path = match unsafe { CStr::from_ptr(backup_path) }.to_str() {
         Ok(s) => s,
         Err(_) => return -1,
@@ -3373,17 +3504,22 @@ pub unsafe extern "C" fn sochdb_graph_delete_node(
     namespace: *const c_char,
     node_id: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || node_id.is_null() { return -1; }
+    if ptr.is_null() || namespace.is_null() || node_id.is_null() {
+        return -1;
+    }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let id = match unsafe { CStr::from_ptr(node_id) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     // Delete the node itself
@@ -3424,25 +3560,36 @@ pub unsafe extern "C" fn sochdb_graph_delete_edge(
     edge_type: *const c_char,
     to_id: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || from_id.is_null()
-        || edge_type.is_null() || to_id.is_null() { return -1; }
+    if ptr.is_null()
+        || namespace.is_null()
+        || from_id.is_null()
+        || edge_type.is_null()
+        || to_id.is_null()
+    {
+        return -1;
+    }
 
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let from = match unsafe { CStr::from_ptr(from_id) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let etype = match unsafe { CStr::from_ptr(edge_type) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let to = match unsafe { CStr::from_ptr(to_id) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     let key = format!("_graph/{}/edges/{}/{}/{}", ns, from, etype, to);
@@ -3477,22 +3624,26 @@ pub unsafe extern "C" fn sochdb_graph_get_neighbors(
         return ptr::null_mut();
     }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     let node = match unsafe { CStr::from_ptr(node_id) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     let et_filter = if edge_type_filter.is_null() {
         None
     } else {
         match unsafe { CStr::from_ptr(edge_type_filter) }.to_str() {
-            Ok(s) => Some(s), Err(_) => None,
+            Ok(s) => Some(s),
+            Err(_) => None,
         }
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return ptr::null_mut(),
+        Ok(t) => t,
+        Err(_) => return ptr::null_mut(),
     };
 
     let mut neighbors = Vec::new();
@@ -3531,7 +3682,9 @@ pub unsafe extern "C" fn sochdb_graph_get_neighbors(
             for (_key, value) in edges {
                 if let Ok(edge_str) = std::str::from_utf8(&value) {
                     let has_to = edge_str.contains(&format!(r#""to_id":"{}""#, node));
-                    if !has_to { continue; }
+                    if !has_to {
+                        continue;
+                    }
                     if let Some(filter) = et_filter {
                         if !edge_str.contains(&format!(r#""edge_type":"{}""#, filter)) {
                             continue;
@@ -3556,7 +3709,8 @@ pub unsafe extern "C" fn sochdb_graph_get_neighbors(
 
     let json = format!(r#"{{"neighbors":[{}]}}"#, neighbors.join(","));
     let c_string = match std::ffi::CString::new(json) {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
@@ -3577,27 +3731,36 @@ pub unsafe extern "C" fn sochdb_graph_find_path(
     max_depth: usize,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if ptr.is_null() || namespace.is_null() || from_node.is_null()
-        || to_node.is_null() || out_len.is_null() {
+    if ptr.is_null()
+        || namespace.is_null()
+        || from_node.is_null()
+        || to_node.is_null()
+        || out_len.is_null()
+    {
         return ptr::null_mut();
     }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     let from = match unsafe { CStr::from_ptr(from_node) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     let to = match unsafe { CStr::from_ptr(to_node) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return ptr::null_mut(),
+        Ok(t) => t,
+        Err(_) => return ptr::null_mut(),
     };
 
     // BFS with parent tracking
-    let mut visited: std::collections::HashMap<String, (String, String)> = std::collections::HashMap::new(); // node -> (parent, edge_json)
+    let mut visited: std::collections::HashMap<String, (String, String)> =
+        std::collections::HashMap::new(); // node -> (parent, edge_json)
     let mut queue: std::collections::VecDeque<(String, usize)> = std::collections::VecDeque::new();
     queue.push_back((from.to_string(), 0));
     visited.insert(from.to_string(), ("".to_string(), "".to_string()));
@@ -3608,7 +3771,9 @@ pub unsafe extern "C" fn sochdb_graph_find_path(
             found = true;
             break;
         }
-        if depth >= max_depth { continue; }
+        if depth >= max_depth {
+            continue;
+        }
 
         let prefix = format!("_graph/{}/edges/{}/", ns, current);
         if let Ok(edges) = db.scan(txn, prefix.as_bytes()) {
@@ -3619,7 +3784,10 @@ pub unsafe extern "C" fn sochdb_graph_find_path(
                         if let Some(end) = edge_str[start..].find('"') {
                             let next = &edge_str[start..start + end];
                             if !visited.contains_key(next) {
-                                visited.insert(next.to_string(), (current.clone(), edge_str.to_string()));
+                                visited.insert(
+                                    next.to_string(),
+                                    (current.clone(), edge_str.to_string()),
+                                );
                                 queue.push_back((next.to_string(), depth + 1));
                             }
                         }
@@ -3631,7 +3799,9 @@ pub unsafe extern "C" fn sochdb_graph_find_path(
 
     let _ = db.commit(txn);
 
-    if !found { return ptr::null_mut(); }
+    if !found {
+        return ptr::null_mut();
+    }
 
     // Reconstruct path
     let mut path = Vec::new();
@@ -3657,7 +3827,8 @@ pub unsafe extern "C" fn sochdb_graph_find_path(
         edges.join(",")
     );
     let c_string = match std::ffi::CString::new(json) {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
@@ -3679,31 +3850,45 @@ pub unsafe extern "C" fn sochdb_end_temporal_edge(
     edge_type: *const c_char,
     to_id: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || from_id.is_null()
-        || edge_type.is_null() || to_id.is_null() { return -1; }
+    if ptr.is_null()
+        || namespace.is_null()
+        || from_id.is_null()
+        || edge_type.is_null()
+        || to_id.is_null()
+    {
+        return -1;
+    }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let from = match unsafe { CStr::from_ptr(from_id) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let etype = match unsafe { CStr::from_ptr(edge_type) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let to = match unsafe { CStr::from_ptr(to_id) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     // Scan for temporal edges matching from/type/to
     let prefix = format!("_graph/{}/temporal/{}/{}/{}/", ns, from, etype, to);
     let edges = match db.scan(txn, prefix.as_bytes()) {
         Ok(e) => e,
-        Err(_) => { let _ = db.abort(txn); return -1; }
+        Err(_) => {
+            let _ = db.abort(txn);
+            return -1;
+        }
     };
 
     let now = std::time::SystemTime::now()
@@ -3716,7 +3901,8 @@ pub unsafe extern "C" fn sochdb_end_temporal_edge(
         if let Ok(val_str) = std::str::from_utf8(&value) {
             // Only end edges that are currently active (valid_until == 0)
             if val_str.contains(r#""valid_until":0"#) {
-                let new_val = val_str.replace(r#""valid_until":0"#, &format!(r#""valid_until":{}"#, now));
+                let new_val =
+                    val_str.replace(r#""valid_until":0"#, &format!(r#""valid_until":{}"#, now));
                 if db.put(txn, &key, new_val.as_bytes()).is_ok() {
                     found = true;
                 }
@@ -3725,7 +3911,13 @@ pub unsafe extern "C" fn sochdb_end_temporal_edge(
     }
 
     match db.commit(txn) {
-        Ok(_) => if found { 0 } else { 1 },
+        Ok(_) => {
+            if found {
+                0
+            } else {
+                1
+            }
+        }
         Err(_) => -1,
     }
 }
@@ -3744,34 +3936,46 @@ pub unsafe extern "C" fn sochdb_cache_delete(
     cache_name: *const c_char,
     key: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || cache_name.is_null() || key.is_null() { return -1; }
+    if ptr.is_null() || cache_name.is_null() || key.is_null() {
+        return -1;
+    }
     let cache = match unsafe { CStr::from_ptr(cache_name) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let k = match unsafe { CStr::from_ptr(key) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     let key_hash = format!("{:016x}", twox_hash::xxh3::hash64(k.as_bytes()));
     let cache_key = format!("_cache/{}/{}", cache, key_hash);
 
     match db.get(txn, cache_key.as_bytes()) {
-        Ok(Some(_)) => {
-            match db.delete(txn, cache_key.as_bytes()) {
-                Ok(_) => match db.commit(txn) {
-                    Ok(_) => 0,
-                    Err(_) => -1,
-                },
-                Err(_) => { let _ = db.abort(txn); -1 }
+        Ok(Some(_)) => match db.delete(txn, cache_key.as_bytes()) {
+            Ok(_) => match db.commit(txn) {
+                Ok(_) => 0,
+                Err(_) => -1,
+            },
+            Err(_) => {
+                let _ = db.abort(txn);
+                -1
             }
+        },
+        Ok(None) => {
+            let _ = db.commit(txn);
+            1
         }
-        Ok(None) => { let _ = db.commit(txn); 1 }
-        Err(_) => { let _ = db.abort(txn); -1 }
+        Err(_) => {
+            let _ = db.abort(txn);
+            -1
+        }
     }
 }
 
@@ -3784,20 +3988,27 @@ pub unsafe extern "C" fn sochdb_cache_clear(
     ptr: *mut DatabasePtr,
     cache_name: *const c_char,
 ) -> i64 {
-    if ptr.is_null() || cache_name.is_null() { return -1; }
+    if ptr.is_null() || cache_name.is_null() {
+        return -1;
+    }
     let cache = match unsafe { CStr::from_ptr(cache_name) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     let prefix = format!("_cache/{}/", cache);
     let entries = match db.scan(txn, prefix.as_bytes()) {
         Ok(e) => e,
-        Err(_) => { let _ = db.abort(txn); return -1; }
+        Err(_) => {
+            let _ = db.abort(txn);
+            return -1;
+        }
     };
 
     let mut count = 0i64;
@@ -3823,20 +4034,27 @@ pub unsafe extern "C" fn sochdb_cache_stats(
     cache_name: *const c_char,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if ptr.is_null() || cache_name.is_null() || out_len.is_null() { return ptr::null_mut(); }
+    if ptr.is_null() || cache_name.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let cache = match unsafe { CStr::from_ptr(cache_name) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return ptr::null_mut(),
+        Ok(t) => t,
+        Err(_) => return ptr::null_mut(),
     };
 
     let prefix = format!("_cache/{}/", cache);
     let entries = match db.scan(txn, prefix.as_bytes()) {
         Ok(e) => e,
-        Err(_) => { let _ = db.abort(txn); return ptr::null_mut(); }
+        Err(_) => {
+            let _ = db.abort(txn);
+            return ptr::null_mut();
+        }
     };
     let _ = db.commit(txn);
 
@@ -3855,8 +4073,8 @@ pub unsafe extern "C" fn sochdb_cache_stats(
             if let Some(exp_pos) = val_str.find(r#""expires_at":"#) {
                 let exp_start = exp_pos + r#""expires_at":"#.len();
                 if let Some(exp_end) = val_str[exp_start..].find('}') {
-                    let expires_at: u64 = val_str[exp_start..exp_start + exp_end]
-                        .parse().unwrap_or(0);
+                    let expires_at: u64 =
+                        val_str[exp_start..exp_start + exp_end].parse().unwrap_or(0);
                     if expires_at > 0 && now > expires_at {
                         expired += 1;
                     }
@@ -3867,10 +4085,15 @@ pub unsafe extern "C" fn sochdb_cache_stats(
 
     let json = format!(
         r#"{{"cache_name":"{}","total_entries":{},"expired_entries":{},"active_entries":{},"total_bytes":{}}}"#,
-        cache, total, expired, total - expired, total_bytes
+        cache,
+        total,
+        expired,
+        total - expired,
+        total_bytes
     );
     let c_string = match std::ffi::CString::new(json) {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
@@ -3890,17 +4113,22 @@ pub unsafe extern "C" fn sochdb_collection_delete(
     namespace: *const c_char,
     collection: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || namespace.is_null() || collection.is_null() { return -1; }
+    if ptr.is_null() || namespace.is_null() || collection.is_null() {
+        return -1;
+    }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let col = match unsafe { CStr::from_ptr(collection) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     // Delete config
@@ -3944,17 +4172,22 @@ pub unsafe extern "C" fn sochdb_collection_count(
     namespace: *const c_char,
     collection: *const c_char,
 ) -> i64 {
-    if ptr.is_null() || namespace.is_null() || collection.is_null() { return -1; }
+    if ptr.is_null() || namespace.is_null() || collection.is_null() {
+        return -1;
+    }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let col = match unsafe { CStr::from_ptr(collection) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     let meta_prefix = format!("{}/collections/{}/meta/", ns, col);
@@ -3981,32 +4214,43 @@ pub unsafe extern "C" fn sochdb_collection_list(
     namespace: *const c_char,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if ptr.is_null() || namespace.is_null() || out_len.is_null() { return ptr::null_mut(); }
+    if ptr.is_null() || namespace.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let ns = match unsafe { CStr::from_ptr(namespace) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return ptr::null_mut(),
+        Ok(t) => t,
+        Err(_) => return ptr::null_mut(),
     };
 
     let prefix = format!("{}/_collections/", ns);
     let entries = match db.scan(txn, prefix.as_bytes()) {
         Ok(e) => e,
-        Err(_) => { let _ = db.abort(txn); return ptr::null_mut(); }
+        Err(_) => {
+            let _ = db.abort(txn);
+            return ptr::null_mut();
+        }
     };
     let _ = db.commit(txn);
 
-    let names: Vec<String> = entries.iter().filter_map(|(key, _)| {
-        let key_str = std::str::from_utf8(key).ok()?;
-        let name = key_str.strip_prefix(&prefix)?;
-        Some(format!(r#""{}""#, name))
-    }).collect();
+    let names: Vec<String> = entries
+        .iter()
+        .filter_map(|(key, _)| {
+            let key_str = std::str::from_utf8(key).ok()?;
+            let name = key_str.strip_prefix(&prefix)?;
+            Some(format!(r#""{}""#, name))
+        })
+        .collect();
 
     let json = format!("[{}]", names.join(","));
     let c_string = match std::ffi::CString::new(json) {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
@@ -4025,14 +4269,17 @@ pub unsafe extern "C" fn sochdb_list_tables(
     ptr: *mut DatabasePtr,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if ptr.is_null() || out_len.is_null() { return ptr::null_mut(); }
+    if ptr.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let db = unsafe { &(*ptr).0 };
     let tables = db.list_tables();
 
     let names: Vec<String> = tables.iter().map(|t| format!(r#""{}""#, t)).collect();
     let json = format!("[{}]", names.join(","));
     let c_string = match std::ffi::CString::new(json) {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
@@ -4048,29 +4295,38 @@ pub unsafe extern "C" fn sochdb_get_table_schema(
     table_name: *const c_char,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if ptr.is_null() || table_name.is_null() || out_len.is_null() { return ptr::null_mut(); }
+    if ptr.is_null() || table_name.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let db = unsafe { &(*ptr).0 };
     let name = match unsafe { CStr::from_ptr(table_name) }.to_str() {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
 
     match db.get_table_schema(name) {
         Some(schema) => {
             // Serialize schema to JSON
-            let columns: Vec<String> = schema.columns.iter().map(|col| {
-                format!(r#"{{"name":"{}","type":"{}","nullable":{}}}"#,
-                    col.name,
-                    format!("{:?}", col.col_type),
-                    col.nullable
-                )
-            }).collect();
+            let columns: Vec<String> = schema
+                .columns
+                .iter()
+                .map(|col| {
+                    format!(
+                        r#"{{"name":"{}","type":"{}","nullable":{}}}"#,
+                        col.name,
+                        format!("{:?}", col.col_type),
+                        col.nullable
+                    )
+                })
+                .collect();
             let json = format!(
                 r#"{{"table":"{}","columns":[{}]}}"#,
                 schema.name,
                 columns.join(",")
             );
             let c_string = match std::ffi::CString::new(json) {
-                Ok(s) => s, Err(_) => return ptr::null_mut(),
+                Ok(s) => s,
+                Err(_) => return ptr::null_mut(),
             };
             unsafe { *out_len = c_string.as_bytes().len() };
             c_string.into_raw()
@@ -4089,17 +4345,17 @@ pub unsafe extern "C" fn sochdb_get_table_schema(
 /// # Safety
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sochdb_set_compression(
-    ptr: *mut DatabasePtr,
-    compression: u8,
-) -> c_int {
-    if ptr.is_null() { return -1; }
+pub unsafe extern "C" fn sochdb_set_compression(ptr: *mut DatabasePtr, compression: u8) -> c_int {
+    if ptr.is_null() {
+        return -1;
+    }
     let db = unsafe { &(*ptr).0 };
     let comp_type = crate::compression::CompressionType::from_u8(compression);
-    
+
     // Store compression preference via KV
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
     let key = b"_config/compression";
     let val = format!("{}", compression);
@@ -4118,24 +4374,29 @@ pub unsafe extern "C" fn sochdb_set_compression(
 /// # Safety
 /// ptr must be a valid pointer returned by sochdb_open.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sochdb_get_compression(
-    ptr: *mut DatabasePtr,
-) -> u8 {
-    if ptr.is_null() { return 255; }
+pub unsafe extern "C" fn sochdb_get_compression(ptr: *mut DatabasePtr) -> u8 {
+    if ptr.is_null() {
+        return 255;
+    }
     let db = unsafe { &(*ptr).0 };
-    
+
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return 255,
+        Ok(t) => t,
+        Err(_) => return 255,
     };
     let key = b"_config/compression";
     match db.get(txn, key) {
         Ok(Some(val)) => {
             let _ = db.commit(txn);
-            std::str::from_utf8(&val).ok()
+            std::str::from_utf8(&val)
+                .ok()
                 .and_then(|s| s.parse::<u8>().ok())
                 .unwrap_or(0)
         }
-        _ => { let _ = db.commit(txn); 0 }
+        _ => {
+            let _ = db.commit(txn);
+            0
+        }
     }
 }
 
@@ -4171,7 +4432,7 @@ pub unsafe extern "C" fn sochdb_execute_sql(
     // Use the query builder's path-based interface for SQL
     // The Database has an execute method or we can use the query builder
     let result = db.query(txn, "").execute();
-    
+
     // For now, return the scan results as JSON
     // This is a simplified SQL handler - the real implementation
     // should parse SQL and map to appropriate operations
@@ -4201,14 +4462,18 @@ pub unsafe extern "C" fn sochdb_namespace_create(
     ptr: *mut DatabasePtr,
     name: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || name.is_null() { return -1; }
+    if ptr.is_null() || name.is_null() {
+        return -1;
+    }
     let ns = match unsafe { CStr::from_ptr(name) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     let key = format!("_namespaces/{}", ns);
@@ -4236,14 +4501,18 @@ pub unsafe extern "C" fn sochdb_namespace_delete(
     ptr: *mut DatabasePtr,
     name: *const c_char,
 ) -> c_int {
-    if ptr.is_null() || name.is_null() { return -1; }
+    if ptr.is_null() || name.is_null() {
+        return -1;
+    }
     let ns = match unsafe { CStr::from_ptr(name) }.to_str() {
-        Ok(s) => s, Err(_) => return -1,
+        Ok(s) => s,
+        Err(_) => return -1,
     };
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return -1,
+        Ok(t) => t,
+        Err(_) => return -1,
     };
 
     // Delete namespace metadata
@@ -4273,31 +4542,40 @@ pub unsafe extern "C" fn sochdb_namespace_list(
     ptr: *mut DatabasePtr,
     out_len: *mut usize,
 ) -> *mut c_char {
-    if ptr.is_null() || out_len.is_null() { return ptr::null_mut(); }
+    if ptr.is_null() || out_len.is_null() {
+        return ptr::null_mut();
+    }
     let db = unsafe { &(*ptr).0 };
 
     let txn = match db.begin_transaction() {
-        Ok(t) => t, Err(_) => return ptr::null_mut(),
+        Ok(t) => t,
+        Err(_) => return ptr::null_mut(),
     };
 
     let prefix = b"_namespaces/";
     let entries = match db.scan(txn, prefix) {
         Ok(e) => e,
-        Err(_) => { let _ = db.abort(txn); return ptr::null_mut(); }
+        Err(_) => {
+            let _ = db.abort(txn);
+            return ptr::null_mut();
+        }
     };
     let _ = db.commit(txn);
 
-    let names: Vec<String> = entries.iter().filter_map(|(key, _)| {
-        let key_str = std::str::from_utf8(key).ok()?;
-        let name = key_str.strip_prefix("_namespaces/")?;
-        Some(format!(r#""{}""#, name))
-    }).collect();
+    let names: Vec<String> = entries
+        .iter()
+        .filter_map(|(key, _)| {
+            let key_str = std::str::from_utf8(key).ok()?;
+            let name = key_str.strip_prefix("_namespaces/")?;
+            Some(format!(r#""{}""#, name))
+        })
+        .collect();
 
     let json = format!("[{}]", names.join(","));
     let c_string = match std::ffi::CString::new(json) {
-        Ok(s) => s, Err(_) => return ptr::null_mut(),
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
     };
     unsafe { *out_len = c_string.as_bytes().len() };
     c_string.into_raw()
 }
-
