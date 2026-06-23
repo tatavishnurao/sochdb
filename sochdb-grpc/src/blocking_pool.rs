@@ -45,14 +45,12 @@
 //! Pool sizing: `blocking_threads ≈ 2×cores` for mixed I/O+CPU, capped to
 //! prevent memory blowups (each thread has stack + allocator footprint).
 
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
+use crossbeam_channel::{Receiver, Sender, TrySendError, bounded};
 use parking_lot::{Condvar, Mutex};
 
 /// Pool type for workload isolation
@@ -274,9 +272,7 @@ impl BlockingPool {
                 self.metrics.tasks_rejected.fetch_add(1, Ordering::Relaxed);
                 Err(BlockingPoolError::QueueFull)
             }
-            Err(TrySendError::Disconnected(_)) => {
-                Err(BlockingPoolError::PoolShutdown)
-            }
+            Err(TrySendError::Disconnected(_)) => Err(BlockingPoolError::PoolShutdown),
         }
     }
 
@@ -424,7 +420,7 @@ impl Default for BlockingPoolManager {
 }
 
 /// Async wrapper for blocking pool operations
-/// 
+///
 /// Bridges the async gRPC layer with the sync storage layer by spawning
 /// blocking work on dedicated pools and returning futures.
 #[cfg(feature = "async")]
@@ -489,17 +485,33 @@ mod tests {
         };
         let pool = BlockingPool::new(config);
 
-        // Submit tasks that will block
-        for _ in 0..2 {
-            pool.try_submit(move || {
-                thread::sleep(Duration::from_secs(1));
-            })
-            .unwrap();
-        }
+        // Occupy the single worker with a task that blocks until released, so
+        // it cannot dequeue anything else. This makes the queue state
+        // deterministic regardless of scheduler timing — the previous version
+        // raced the worker (it could dequeue task 1 before the 3rd submit) and
+        // was flaky under parallel test load.
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
+        pool.try_submit(move || {
+            started_tx.send(()).unwrap();
+            let _ = release_rx.recv(); // block until the test releases us
+        })
+        .unwrap();
+        started_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("worker did not start the blocking task");
 
-        // This should fail with QueueFull
+        // Worker is now busy; fill the queue to its depth (2).
+        pool.try_submit(|| {}).unwrap();
+        pool.try_submit(|| {}).unwrap();
+
+        // Queue is full and the worker is occupied → the next submit must be
+        // rejected with QueueFull.
         let result = pool.try_submit(|| {});
         assert!(matches!(result, Err(BlockingPoolError::QueueFull)));
+
+        // Release the worker so the pool can drain and shut down cleanly.
+        release_tx.send(()).unwrap();
     }
 
     #[test]

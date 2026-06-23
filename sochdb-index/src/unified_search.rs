@@ -50,7 +50,7 @@
 //! let results = view.search(&query, k, ef)?;
 //! ```
 
-use crate::aosoa_tiles::{TiledVectorStore, DEFAULT_TILE_SIZE};
+use crate::aosoa_tiles::{DEFAULT_TILE_SIZE, TiledVectorStore};
 use crate::csr_graph::{CsrGraph, CsrGraphBuilder, InternalSearchCandidate};
 use crate::internal_id::{IdMapper, InternalId, VisitedBitmap};
 use crate::simd_batch_distance::{BatchDistanceCalculator, BatchDistanceMetric};
@@ -179,7 +179,14 @@ impl UnifiedSearchView {
     /// * `ef` - Search expansion factor (higher = more accurate, slower)
     ///
     /// # Returns
-    /// Vec of (external_id, distance) pairs, sorted by distance ascending.
+    /// Vec of (external_id, distance) pairs, sorted by distance ascending
+    /// (lower = more similar). Distance semantics:
+    ///
+    /// | Metric     | Formula                         |
+    /// |------------|---------------------------------|
+    /// | Cosine     | `1 - cosine_similarity`         |
+    /// | Euclidean  | `sqrt(sum((a_i - b_i)²))`      |
+    /// | DotProduct | `-dot_product`                  |
     pub fn search(&self, query: &[f32], k: usize, ef: usize) -> Vec<(u128, f32)> {
         let entry_point = match self.graph.entry_point {
             Some(ep) => ep,
@@ -209,7 +216,9 @@ impl UnifiedSearchView {
             .into_iter()
             .take(k)
             .filter_map(|c| {
-                self.id_mapper.to_external(c.id).map(|ext| (ext, c.distance))
+                self.id_mapper
+                    .to_external(c.id)
+                    .map(|ext| (ext, c.distance))
             })
             .collect()
     }
@@ -387,9 +396,19 @@ impl UnifiedSearchView {
     }
 
     /// Calculate distance between query and node.
-    /// 
+    ///
     /// Uses SIMD-accelerated distance computation via `BatchDistanceCalculator`
     /// which provides the single control point for AVX2/NEON dispatch.
+    ///
+    /// # Contract
+    ///
+    /// All returned values satisfy **lower-is-better** semantics:
+    ///
+    /// | Metric     | Formula                         |
+    /// |------------|---------------------------------|
+    /// | Cosine     | `1 - cosine_similarity`         |
+    /// | Euclidean  | `sqrt(sum((a_i - b_i)²))`      |
+    /// | DotProduct | `-dot_product`                  |
     #[inline]
     fn calculate_distance(&self, query: &[f32], node: InternalId) -> f32 {
         // Get vector from tiled storage
@@ -398,11 +417,22 @@ impl UnifiedSearchView {
             // For single distances, the overhead is minimal and ensures consistent dispatch
             let distances = self.distance_calculator.compute(query, &[&vector]);
             let raw_distance = distances.first().copied().unwrap_or(f32::MAX);
-            
-            // For dot product, negate for min-heap (we want maximum similarity)
+
+            // Transform raw calculator output to lower-is-better distance.
+            //
+            // BatchDistanceCalculator returns:
+            //   Cosine     → cosine_similarity      (higher = more similar)
+            //   L2Squared  → sum(diff²)             (no sqrt)
+            //   DotProduct → raw dot product        (higher = more similar)
+            //
+            // We need:
+            //   Cosine     → 1 - similarity         (lower = more similar)
+            //   Euclidean  → sqrt(l2_squared)       (lower = more similar)
+            //   DotProduct → -dot_product           (lower = more similar)
             match self.metric {
                 DistanceMetric::DotProduct => -raw_distance,
-                _ => raw_distance,
+                DistanceMetric::Cosine => 1.0 - raw_distance,
+                DistanceMetric::Euclidean => raw_distance.sqrt(),
             }
         } else {
             f32::MAX // Node not found
@@ -421,21 +451,34 @@ impl UnifiedSearchView {
             .iter()
             .filter_map(|&node| self.vectors.get(node.get() as usize))
             .collect();
-        
+
         if vectors.is_empty() {
             return vec![f32::MAX; nodes.len()];
         }
 
         let refs: Vec<&[f32]> = vectors.iter().map(|v| v.as_slice()).collect();
         let mut distances = self.distance_calculator.compute(query, &refs);
-        
-        // For dot product, negate for min-heap
-        if matches!(self.metric, DistanceMetric::DotProduct) {
-            for d in &mut distances {
-                *d = -*d;
+
+        // Transform raw calculator output to lower-is-better distance (see
+        // calculate_distance contract above).
+        match self.metric {
+            DistanceMetric::DotProduct => {
+                for d in &mut distances {
+                    *d = -*d;
+                }
+            }
+            DistanceMetric::Cosine => {
+                for d in &mut distances {
+                    *d = 1.0 - *d;
+                }
+            }
+            DistanceMetric::Euclidean => {
+                for d in &mut distances {
+                    *d = d.sqrt();
+                }
             }
         }
-        
+
         distances
     }
 
@@ -459,7 +502,7 @@ impl UnifiedSearchView {
                 }
             }
         }
-        
+
         // On aarch64, hardware prefetch is generally sufficient
         // and explicit prefetch intrinsics are unstable
         #[cfg(not(target_arch = "x86_64"))]
@@ -485,9 +528,7 @@ impl UnifiedSearchView {
 
     /// Memory usage in bytes.
     pub fn memory_usage(&self) -> usize {
-        self.graph.memory_usage()
-            + self.id_mapper.memory_usage()
-            + self.vectors.memory_bytes()
+        self.graph.memory_usage() + self.id_mapper.memory_usage() + self.vectors.memory_bytes()
     }
 }
 
@@ -513,11 +554,11 @@ fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|&x| x * x).sum::<f32>().sqrt();
     let norm_b: f32 = b.iter().map(|&x| x * x).sum::<f32>().sqrt();
-    
+
     if norm_a == 0.0 || norm_b == 0.0 {
         return 1.0;
     }
-    
+
     1.0 - (dot / (norm_a * norm_b))
 }
 
@@ -585,29 +626,22 @@ impl UnifiedViewBuilder {
     /// # Arguments
     /// * `nodes` - Iterator of (external_id, vector, layer, neighbors_per_layer)
     /// * `entry_point` - External ID of the entry point
-    pub fn build<'a, I>(
-        self,
-        nodes: I,
-        entry_point: Option<u128>,
-    ) -> UnifiedSearchView
+    pub fn build<'a, I>(self, nodes: I, entry_point: Option<u128>) -> UnifiedSearchView
     where
         I: Iterator<Item = (u128, &'a [f32], usize, Vec<Vec<u128>>)>,
     {
         // First pass: collect all nodes to get count
         let node_list: Vec<_> = nodes.collect();
         let num_nodes = node_list.len();
-        
+
         let id_mapper = IdMapper::new();
         let mut vectors = TiledVectorStore::<DEFAULT_TILE_SIZE>::new(self.dimension, num_nodes);
-        let mut graph_builder = CsrGraphBuilder::new(
-            self.num_layers,
-            self.max_degree,
-            self.max_degree_layer0,
-        );
+        let mut graph_builder =
+            CsrGraphBuilder::new(self.num_layers, self.max_degree, self.max_degree_layer0);
 
         // Second pass: assign internal IDs and store vectors
         let mut node_data: Vec<(InternalId, usize, Vec<Vec<u128>>)> = Vec::with_capacity(num_nodes);
-        
+
         for (ext_id, vector, layer, neighbors_per_layer) in node_list {
             let internal_id = id_mapper.register(ext_id);
             vectors.push(vector);
@@ -655,7 +689,7 @@ mod tests {
         for i in 0..num_nodes {
             let ext_id = (i as u128) + 1000;
             let internal_id = id_mapper.register(ext_id);
-            
+
             let vector: Vec<f32> = (0..dimension).map(|d| (i + d) as f32).collect();
             vectors.push(&vector);
 
@@ -702,13 +736,13 @@ mod tests {
     fn test_search_returns_k() {
         let view = create_test_view(100, 64);
         let query = vec![0.0f32; 64];
-        
+
         let results = view.search(&query, 10, 50);
         assert_eq!(results.len(), 10);
 
         // Results should be sorted by distance
         for i in 1..results.len() {
-            assert!(results[i-1].1 <= results[i].1);
+            assert!(results[i - 1].1 <= results[i].1);
         }
     }
 
@@ -775,7 +809,7 @@ mod tests {
     fn test_memory_usage() {
         let view = create_test_view(1000, 128);
         let mem = view.memory_usage();
-        
+
         // Should be much smaller than 1000 * (128 * 4 + 600) ~= 1.1 MB
         // CSR + tiled should be around 0.5-0.6 MB
         assert!(mem > 0);
@@ -800,12 +834,14 @@ mod tests {
         let view = UnifiedViewBuilder::new(32)
             .metric(DistanceMetric::Euclidean)
             .build(
-                nodes.iter().map(|(id, v, l, n)| (*id, v.as_slice(), *l, n.clone())),
+                nodes
+                    .iter()
+                    .map(|(id, v, l, n)| (*id, v.as_slice(), *l, n.clone())),
                 Some(0),
             );
 
         assert_eq!(view.num_nodes(), 10);
-        
+
         let query = vec![5.0f32; 32];
         let results = view.search(&query, 5, 20);
         assert!(!results.is_empty());
@@ -826,5 +862,147 @@ mod tests {
             assert_eq!(a.0, b.0);
             assert!((a.1 - b.1).abs() < 0.0001);
         }
+    }
+
+    // ========================================================================
+    // Distance Contract Regression Tests
+    // ========================================================================
+
+    /// Build a small view with known vectors so we can verify exact distances.
+    fn create_known_view(metric: DistanceMetric, vectors: Vec<Vec<f32>>) -> UnifiedSearchView {
+        let dim = vectors[0].len();
+        let num_nodes = vectors.len();
+        let mut id_mapper = IdMapper::new();
+        let mut tiled = TiledVectorStore::<DEFAULT_TILE_SIZE>::new(dim, num_nodes.max(1));
+        let mut graph_builder = CsrGraphBuilder::new(2, 16, 32);
+
+        for (i, vec) in vectors.iter().enumerate() {
+            let ext_id = (i as u128) + 1;
+            let internal_id = id_mapper.register(ext_id);
+            tiled.push(vec);
+            if i > 0 {
+                let prev = InternalId::new((i - 1) as u32);
+                graph_builder.add_bidirectional_edge(internal_id, prev, 0);
+            }
+        }
+        if num_nodes > 0 {
+            graph_builder.set_entry_point(InternalId::new(0));
+        }
+        let graph = graph_builder.build();
+        UnifiedSearchView::new(graph, id_mapper, tiled, dim, metric)
+    }
+
+    /// Cosine distance must be `1 - cosine_similarity` (lower = more similar).
+    #[test]
+    fn test_cosine_distance_contract() {
+        let vectors = vec![
+            vec![1.0, 0.0, 0.0, 0.0], // identical to query
+            vec![0.0, 1.0, 0.0, 0.0], // orthogonal
+            vec![1.0, 0.0, 0.0, 0.0], // duplicate of 0
+        ];
+        let view = create_known_view(DistanceMetric::Cosine, vectors);
+        let query = vec![1.0, 0.0, 0.0, 0.0];
+
+        let results = view.search(&query, 3, 50);
+        assert_eq!(results.len(), 3, "should find all 3 nodes");
+
+        // Identical vectors → cosine_distance = 1 - 1 = 0
+        assert!(
+            (results[0].1 - 0.0).abs() < 1e-5,
+            "identical vectors should have distance ~0, got {}",
+            results[0].1
+        );
+
+        // Orthogonal vector → cosine_distance = 1 - 0 = 1
+        let orthogonal = results.iter().find(|(id, _)| *id == 2).unwrap();
+        assert!(
+            (orthogonal.1 - 1.0).abs() < 1e-5,
+            "orthogonal vectors should have distance ~1, got {}",
+            orthogonal.1
+        );
+
+        // Lower is better — identical must rank before orthogonal
+        assert!(results[0].1 < orthogonal.1);
+    }
+
+    /// L2 distance must be `sqrt(sum(diff²))` (not squared).
+    #[test]
+    fn test_euclidean_distance_contract() {
+        let vectors = vec![
+            vec![1.0, 0.0, 0.0, 0.0], // distance 0
+            vec![1.0, 1.0, 0.0, 0.0], // distance sqrt(1) = 1
+            vec![1.0, 2.0, 0.0, 0.0], // distance sqrt(4) = 2
+        ];
+        let view = create_known_view(DistanceMetric::Euclidean, vectors);
+        let query = vec![1.0, 0.0, 0.0, 0.0];
+
+        let results = view.search(&query, 3, 50);
+        assert_eq!(results.len(), 3);
+
+        // Distance to self must be 0
+        assert!(
+            (results[0].1 - 0.0).abs() < 1e-5,
+            "identical vectors should have distance 0, got {}",
+            results[0].1
+        );
+
+        // Distance to (1,1,0,0) must be sqrt(1) = 1, not 1.0² = 1.0
+        // (This catches the squared-L2 bug — for these vectors they coincide,
+        // so check the far vector where they differ.)
+        let near = results.iter().find(|(id, _)| *id == 2).unwrap();
+        assert!(
+            (near.1 - 1.0).abs() < 1e-5,
+            "distance to (1,1,0,0) should be sqrt(1) = 1, got {}",
+            near.1
+        );
+
+        // Distance to (1,2,0,0) must be sqrt(4) = 2, NOT 4 (squared)
+        let far = results.iter().find(|(id, _)| *id == 3).unwrap();
+        assert!(
+            (far.1 - 2.0).abs() < 1e-5,
+            "distance to (1,2,0,0) should be sqrt(4) = 2, got {} (squared would be 4)",
+            far.1
+        );
+
+        // Lower is better
+        assert!(results[0].1 < near.1);
+        assert!(near.1 < far.1);
+    }
+
+    /// Dot-product distance must be `-dot_product` (lower = more similar).
+    #[test]
+    fn test_dot_product_distance_contract() {
+        let vectors = vec![
+            vec![2.0, 0.0, 0.0, 0.0], // dot = 2 → distance = -2
+            vec![1.0, 0.0, 0.0, 0.0], // dot = 1 → distance = -1
+            vec![0.0, 1.0, 0.0, 0.0], // dot = 0 → distance = 0
+        ];
+        let view = create_known_view(DistanceMetric::DotProduct, vectors);
+        let query = vec![1.0, 0.0, 0.0, 0.0];
+
+        let results = view.search(&query, 3, 50);
+        assert_eq!(results.len(), 3);
+
+        // Highest dot product (2.0) must rank first with distance -2.0
+        assert_eq!(results[0].0, 1, "highest dot product must rank first");
+        assert!(
+            (results[0].1 - (-2.0)).abs() < 1e-5,
+            "distance should be -dot = -2.0, got {}",
+            results[0].1
+        );
+
+        // Lower is better — ascending order
+        assert!(
+            results[0].1 < results[1].1,
+            "lower distance (more negative dot) must rank first: {} vs {}",
+            results[0].1,
+            results[1].1
+        );
+        assert!(
+            results[1].1 < results[2].1,
+            "distances must be in ascending order: {} vs {}",
+            results[1].1,
+            results[2].1
+        );
     }
 }

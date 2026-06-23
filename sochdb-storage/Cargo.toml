@@ -26,10 +26,22 @@ async = ["tokio"]
 # Pure synchronous mode for embedded deployments (like SQLite)
 # Reduces binary size by ~500KB and removes async runtime dependency
 embedded-sync = []
+# Experimental / not-yet-wired subsystems. These modules are NOT part of the
+# live storage path and are unreferenced by the rest of the workspace. They are
+# quarantined behind this feature so the default build surface (and attack
+# surface) stays minimal. Enable explicitly to compile them: `--features experimental`.
+experimental = []
+# Data-at-rest encryption (AES-256-GCM-SIV envelope) and Point-in-Time Recovery.
+# The crypto/keyring/PITR *code* now compiles in the default build (so its tests
+# run in CI and it can be wired into DurableStorage); these features exist to
+# gate higher-level wiring/CLI surfaces and to document intent. Encryption is
+# inert at runtime unless a key is configured (fail-closed; see keyring).
+encryption = []
+pitr = ["encryption"]
 
 [dependencies]
-sochdb-core = { version = "0.5.0", path = "../sochdb-core" }
-sochdb-index = { version = "0.5.0", path = "../sochdb-index" }
+sochdb-core = { version = "2.0.11", path = "../sochdb-core" }
+sochdb-index = { version = "2.0.11", path = "../sochdb-index" }
 # Tokio is optional - only included when "async" feature is enabled
 tokio = { version = "1.35", features = ["sync", "time", "macros", "rt"], optional = true }
 serde = { workspace = true }
@@ -58,11 +70,22 @@ serde_json = "1.0"
 libc = "0.2"
 crc32fast = "1.3"
 arc-swap = "1.6"
+# Data-at-rest encryption (AES-256-GCM-SIV — nonce-misuse resistant)
+aes-gcm-siv = "0.11"
+rand = "0.8"
+zeroize = { version = "1.8", features = ["derive"] }
+# HKDF-SHA256 for deriving per-DB DEK/wrapping subkeys from the supplied KEK,
+# so the operator secret is never used verbatim as cipher key material.
+hkdf = "0.12"
+# HMAC-SHA256 to authenticate the keyring descriptor (so `encrypted=false`
+# cannot be silently forged to downgrade an encrypted DB to plaintext reads).
+hmac = "0.12"
 lz4_flex = "0.11"
 similar = "2.5"
 uuid = { version = "1.8", features = ["v4"] }
 smallvec = "1.13"
 thread_local = "1.1"
+tempfile = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.27", features = ["uio"] }
@@ -83,6 +106,13 @@ proptest = { workspace = true }
 criterion = { workspace = true }
 rand = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
+
+# Loom is only compiled when model-checking concurrency:
+#   RUSTFLAGS="--cfg loom" cargo test -p sochdb-storage --test loom_concurrency
+# It exhaustively explores thread interleavings for the lock-free MVCC
+# coordination protocols (reader-slot CAS allocation, HLC timestamp advance).
+[target.'cfg(loom)'.dev-dependencies]
+loom = "0.7"
 
 [[bench]]
 name = "sochdb_benchmarks"
@@ -131,3 +161,9 @@ harness = false
 [[bench]]
 name = "bench_comparison"
 harness = false
+
+# `loom` is a custom cfg enabled via RUSTFLAGS="--cfg loom" for the Loom
+# concurrency model checker (tests/loom_concurrency.rs). Declare it so the
+# unexpected_cfgs lint does not flag it (otherwise every build warns).
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }

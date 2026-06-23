@@ -105,11 +105,13 @@ pub enum ClaimResult {
 // ============================================================================
 
 /// A token proving ownership of a claimed task
-/// 
+///
 /// This token must be presented for subsequent operations (ack, nack, extend).
 /// It prevents workers from operating on tasks they don't own.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClaimToken {
+    /// Queue containing the task
+    pub queue_id: String,
     /// Task being claimed
     pub task_id: String,
     /// Owner identity
@@ -158,8 +160,9 @@ impl ClaimEntry {
         now_millis >= self.expires_at
     }
 
-    fn to_token(&self, task_id: &str) -> ClaimToken {
+    fn to_token(&self, queue_id: &str, task_id: &str) -> ClaimToken {
         ClaimToken {
+            queue_id: queue_id.to_string(),
             task_id: task_id.to_string(),
             owner: self.owner.clone(),
             instance: self.instance,
@@ -174,19 +177,19 @@ impl ClaimEntry {
 // ============================================================================
 
 /// Atomic claim manager for queue task ownership
-/// 
+///
 /// This provides the CAS-based claim protocol that ensures linearizable
 /// task ownership under concurrent access.
-/// 
+///
 /// ## Thread Safety
-/// 
+///
 /// All operations are thread-safe. The manager uses fine-grained locking
 /// to minimize contention:
 /// - Per-queue locks for claim operations
 /// - Read-write locks for statistics
-/// 
+///
 /// ## Durability
-/// 
+///
 /// In production, claims should be persisted to storage with WAL durability.
 /// This in-memory implementation is for reference and testing.
 pub struct AtomicClaimManager {
@@ -239,7 +242,7 @@ impl AtomicClaimManager {
     /// Get or create a lock for a specific claim key
     fn get_claim_lock(&self, queue_id: &str, task_id: &str) -> std::sync::Arc<Mutex<()>> {
         let key = format!("{}:{}", queue_id, task_id);
-        
+
         // Fast path: check if lock exists
         {
             let locks = self.claim_locks.read();
@@ -247,26 +250,27 @@ impl AtomicClaimManager {
                 return lock.clone();
             }
         }
-        
+
         // Slow path: create lock
         let mut locks = self.claim_locks.write();
-        locks.entry(key)
+        locks
+            .entry(key)
             .or_insert_with(|| std::sync::Arc::new(Mutex::new(())))
             .clone()
     }
 
     /// Attempt to claim a task
-    /// 
+    ///
     /// This is the atomic CAS operation that establishes ownership.
-    /// 
+    ///
     /// ## Semantics
-    /// 
+    ///
     /// - If task is unclaimed: creates claim, returns Success
     /// - If task is claimed by other worker with valid lease: returns AlreadyClaimed
     /// - If task is claimed but lease expired: creates new claim, returns TookOver
-    /// 
+    ///
     /// ## Complexity
-    /// 
+    ///
     /// O(1) hash lookups + lock acquisition
     pub fn claim(
         &self,
@@ -276,17 +280,19 @@ impl AtomicClaimManager {
         lease_duration_ms: u64,
     ) -> ClaimResult {
         let now = current_time_millis();
-        
+
         // Get per-claim lock to ensure CAS semantics
         let lock = self.get_claim_lock(queue_id, task_id);
         let _guard = lock.lock();
-        
+
         // Update stats
         self.stats.write().attempts += 1;
-        
+
         let mut claims = self.claims.write();
-        let queue_claims = claims.entry(queue_id.to_string()).or_insert_with(HashMap::new);
-        
+        let queue_claims = claims
+            .entry(queue_id.to_string())
+            .or_insert_with(HashMap::new);
+
         // Check existing claim
         if let Some(existing) = queue_claims.get(task_id) {
             if existing.owner == owner {
@@ -299,13 +305,13 @@ impl AtomicClaimManager {
                     expires_at: now + lease_duration_ms,
                     claim_count: existing.claim_count + 1,
                 };
-                let token = new_entry.to_token(task_id);
+                let token = new_entry.to_token(queue_id, task_id);
                 queue_claims.insert(task_id.to_string(), new_entry);
-                
+
                 self.stats.write().successes += 1;
                 return ClaimResult::Success { claim_token: token };
             }
-            
+
             if !existing.is_expired(now) {
                 // Valid claim by another worker
                 self.stats.write().contentions += 1;
@@ -314,7 +320,7 @@ impl AtomicClaimManager {
                     expires_at: existing.expires_at,
                 };
             }
-            
+
             // Expired claim - take over
             let previous_owner = existing.owner.clone();
             let instance = self.instance_counter.fetch_add(1, AtomicOrdering::SeqCst);
@@ -325,16 +331,16 @@ impl AtomicClaimManager {
                 expires_at: now + lease_duration_ms,
                 claim_count: existing.claim_count + 1,
             };
-            let token = new_entry.to_token(task_id);
+            let token = new_entry.to_token(queue_id, task_id);
             queue_claims.insert(task_id.to_string(), new_entry);
-            
+
             self.stats.write().takeovers += 1;
             return ClaimResult::TookOver {
                 previous_owner,
                 claim_token: token,
             };
         }
-        
+
         // No existing claim - create new
         let instance = self.instance_counter.fetch_add(1, AtomicOrdering::SeqCst);
         let entry = ClaimEntry {
@@ -344,25 +350,25 @@ impl AtomicClaimManager {
             expires_at: now + lease_duration_ms,
             claim_count: 1,
         };
-        let token = entry.to_token(task_id);
+        let token = entry.to_token(queue_id, task_id);
         queue_claims.insert(task_id.to_string(), entry);
-        
+
         self.stats.write().successes += 1;
         ClaimResult::Success { claim_token: token }
     }
 
     /// Release a claim (acknowledge successful processing)
-    /// 
+    ///
     /// The claim token must be valid and owned by the caller.
     pub fn release(&self, token: &ClaimToken) -> Result<(), String> {
         let _now = current_time_millis();
-        
-        let lock = self.get_claim_lock(&token.owner, &token.task_id);
+
+        let lock = self.get_claim_lock(&token.queue_id, &token.task_id);
         let _guard = lock.lock();
-        
+
         let mut claims = self.claims.write();
-        
-        if let Some(queue_claims) = claims.get_mut(&token.owner) {
+
+        if let Some(queue_claims) = claims.get_mut(&token.queue_id) {
             if let Some(existing) = queue_claims.get(&token.task_id) {
                 // Verify ownership
                 if existing.instance != token.instance {
@@ -371,18 +377,18 @@ impl AtomicClaimManager {
                 if existing.owner != token.owner {
                     return Err("Not claim owner".to_string());
                 }
-                
+
                 queue_claims.remove(&token.task_id);
                 self.stats.write().acks += 1;
                 return Ok(());
             }
         }
-        
+
         Err("Claim not found".to_string())
     }
 
     /// Extend a claim's lease duration
-    /// 
+    ///
     /// Useful when processing takes longer than expected.
     pub fn extend(
         &self,
@@ -391,12 +397,12 @@ impl AtomicClaimManager {
         additional_ms: u64,
     ) -> Result<ClaimToken, String> {
         let _now = current_time_millis();
-        
+
         let lock = self.get_claim_lock(queue_id, &token.task_id);
         let _guard = lock.lock();
-        
+
         let mut claims = self.claims.write();
-        
+
         if let Some(queue_claims) = claims.get_mut(queue_id) {
             if let Some(existing) = queue_claims.get_mut(&token.task_id) {
                 // Verify ownership
@@ -406,23 +412,23 @@ impl AtomicClaimManager {
                 if existing.owner != token.owner {
                     return Err("Not claim owner".to_string());
                 }
-                
+
                 // Extend the lease
                 existing.expires_at += additional_ms;
-                
-                return Ok(existing.to_token(&token.task_id));
+
+                return Ok(existing.to_token(queue_id, &token.task_id));
             }
         }
-        
+
         Err("Claim not found".to_string())
     }
 
     /// Check if a task is currently claimed
     pub fn is_claimed(&self, queue_id: &str, task_id: &str) -> Option<(String, u64)> {
         let now = current_time_millis();
-        
+
         let claims = self.claims.read();
-        
+
         if let Some(queue_claims) = claims.get(queue_id) {
             if let Some(entry) = queue_claims.get(task_id) {
                 if !entry.is_expired(now) {
@@ -430,37 +436,37 @@ impl AtomicClaimManager {
                 }
             }
         }
-        
+
         None
     }
 
     /// Get the current claim token for a task (if owned by the given worker)
     pub fn get_token(&self, queue_id: &str, task_id: &str, owner: &str) -> Option<ClaimToken> {
         let now = current_time_millis();
-        
+
         let claims = self.claims.read();
-        
+
         if let Some(queue_claims) = claims.get(queue_id) {
             if let Some(entry) = queue_claims.get(task_id) {
                 if !entry.is_expired(now) && entry.owner == owner {
-                    return Some(entry.to_token(task_id));
+                    return Some(entry.to_token(queue_id, task_id));
                 }
             }
         }
-        
+
         None
     }
 
     /// Clean up expired claims
-    /// 
+    ///
     /// This should be called periodically (e.g., every few seconds).
     /// Returns the number of claims cleaned up.
     pub fn cleanup_expired(&self) -> usize {
         let now = current_time_millis();
         let mut cleaned = 0;
-        
+
         let mut claims = self.claims.write();
-        
+
         for queue_claims in claims.values_mut() {
             queue_claims.retain(|_, entry| {
                 if entry.is_expired(now) {
@@ -471,11 +477,11 @@ impl AtomicClaimManager {
                 }
             });
         }
-        
+
         if cleaned > 0 {
             self.stats.write().expirations += cleaned as u64;
         }
-        
+
         cleaned
     }
 
@@ -487,8 +493,9 @@ impl AtomicClaimManager {
     /// Get number of active claims for a queue
     pub fn active_claims(&self, queue_id: &str) -> usize {
         let now = current_time_millis();
-        
-        self.claims.read()
+
+        self.claims
+            .read()
             .get(queue_id)
             .map(|q| q.values().filter(|e| !e.is_expired(now)).count())
             .unwrap_or(0)
@@ -497,13 +504,14 @@ impl AtomicClaimManager {
     /// Get all active claims for a queue (for monitoring)
     pub fn list_claims(&self, queue_id: &str) -> Vec<ClaimToken> {
         let now = current_time_millis();
-        
-        self.claims.read()
+
+        self.claims
+            .read()
             .get(queue_id)
             .map(|q| {
                 q.iter()
                     .filter(|(_, e)| !e.is_expired(now))
-                    .map(|(task_id, e)| e.to_token(task_id))
+                    .map(|(task_id, e)| e.to_token(queue_id, task_id))
                     .collect()
             })
             .unwrap_or_default()
@@ -515,7 +523,7 @@ impl AtomicClaimManager {
 // ============================================================================
 
 /// Compare-and-swap trait for storage backends
-/// 
+///
 /// This trait abstracts the CAS operation for different storage implementations.
 /// SochDB's storage layer should implement this for durable claims.
 pub trait CompareAndSwap {
@@ -523,12 +531,12 @@ pub trait CompareAndSwap {
     type Error: std::fmt::Debug;
 
     /// Insert a key-value pair only if the key doesn't exist
-    /// 
+    ///
     /// Returns Ok(true) if inserted, Ok(false) if key exists, Err on failure.
     fn insert_if_absent(&self, key: &[u8], value: &[u8]) -> Result<bool, Self::Error>;
 
     /// Update a value only if the current value matches expected
-    /// 
+    ///
     /// Returns Ok(true) if updated, Ok(false) if mismatch, Err on failure.
     fn compare_and_set(
         &self,
@@ -538,7 +546,7 @@ pub trait CompareAndSwap {
     ) -> Result<bool, Self::Error>;
 
     /// Delete a key only if the current value matches expected
-    /// 
+    ///
     /// Returns Ok(true) if deleted, Ok(false) if mismatch, Err on failure.
     fn delete_if_match(&self, key: &[u8], expected: &[u8]) -> Result<bool, Self::Error>;
 }
@@ -565,10 +573,10 @@ pub struct LeaseConfig {
 impl Default for LeaseConfig {
     fn default() -> Self {
         Self {
-            default_lease_ms: 30_000,      // 30 seconds
-            min_lease_ms: 1_000,           // 1 second
-            max_lease_ms: 3_600_000,       // 1 hour
-            cleanup_interval_ms: 5_000,    // 5 seconds
+            default_lease_ms: 30_000,   // 30 seconds
+            min_lease_ms: 1_000,        // 1 second
+            max_lease_ms: 3_600_000,    // 1 hour
+            cleanup_interval_ms: 5_000, // 5 seconds
             max_extensions: 10,
         }
     }
@@ -606,12 +614,13 @@ impl LeaseManager {
         lease_ms: Option<u64>,
     ) -> ClaimResult {
         self.maybe_cleanup();
-        
+
         let lease_duration = lease_ms
             .unwrap_or(self.config.default_lease_ms)
             .clamp(self.config.min_lease_ms, self.config.max_lease_ms);
-        
-        self.claim_manager.claim(queue_id, task_id, owner, lease_duration)
+
+        self.claim_manager
+            .claim(queue_id, task_id, owner, lease_duration)
     }
 
     /// Release a lease
@@ -621,26 +630,9 @@ impl LeaseManager {
             let key = format!("{}:{}", queue_id, token.task_id);
             self.extension_counts.write().remove(&key);
         }
-        
-        // Release in claim manager
-        // Note: The release method in AtomicClaimManager uses token.owner as queue_id,
-        // which is a bug. For now we work around it by calling the underlying claims.
-        let _now = current_time_millis();
-        
-        let mut claims = self.claim_manager.claims.write();
-        if let Some(queue_claims) = claims.get_mut(queue_id) {
-            if let Some(existing) = queue_claims.get(&token.task_id) {
-                if existing.instance == token.instance {
-                    queue_claims.remove(&token.task_id);
-                    self.claim_manager.stats.write().acks += 1;
-                    return Ok(());
-                } else {
-                    return Err("Stale claim token".to_string());
-                }
-            }
-        }
-        
-        Err("Claim not found".to_string())
+
+        // Delegate to claim manager (which now correctly uses token.queue_id)
+        self.claim_manager.release(token)
     }
 
     /// Extend a lease
@@ -651,7 +643,7 @@ impl LeaseManager {
         additional_ms: u64,
     ) -> Result<ClaimToken, String> {
         let key = format!("{}:{}", queue_id, token.task_id);
-        
+
         // Check extension limit
         {
             let counts = self.extension_counts.read();
@@ -664,21 +656,18 @@ impl LeaseManager {
                 }
             }
         }
-        
+
         // Clamp additional time
-        let additional = additional_ms.clamp(
-            self.config.min_lease_ms,
-            self.config.max_lease_ms,
-        );
-        
+        let additional = additional_ms.clamp(self.config.min_lease_ms, self.config.max_lease_ms);
+
         let result = self.claim_manager.extend(queue_id, token, additional)?;
-        
+
         // Increment extension count
         {
             let mut counts = self.extension_counts.write();
             *counts.entry(key).or_insert(0) += 1;
         }
-        
+
         Ok(result)
     }
 
@@ -699,7 +688,7 @@ impl LeaseManager {
             let last = self.last_cleanup.read();
             last.elapsed() > Duration::from_millis(self.config.cleanup_interval_ms)
         };
-        
+
         if should_cleanup {
             self.cleanup();
         }
@@ -725,13 +714,13 @@ fn current_time_millis() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
     use std::sync::Arc;
+    use std::thread;
 
     #[test]
     fn test_claim_success() {
         let manager = AtomicClaimManager::new();
-        
+
         match manager.claim("queue1", "task1", "worker1", 30_000) {
             ClaimResult::Success { claim_token } => {
                 assert_eq!(claim_token.task_id, "task1");
@@ -744,11 +733,11 @@ mod tests {
     #[test]
     fn test_claim_contention() {
         let manager = AtomicClaimManager::new();
-        
+
         // First claim succeeds
         let result1 = manager.claim("queue1", "task1", "worker1", 30_000);
         assert!(matches!(result1, ClaimResult::Success { .. }));
-        
+
         // Second claim fails
         let result2 = manager.claim("queue1", "task1", "worker2", 30_000);
         match result2 {
@@ -762,14 +751,14 @@ mod tests {
     #[test]
     fn test_claim_takeover() {
         let manager = AtomicClaimManager::new();
-        
+
         // Create claim with very short lease
         let result1 = manager.claim("queue1", "task1", "worker1", 1);
         assert!(matches!(result1, ClaimResult::Success { .. }));
-        
+
         // Wait for expiration
         thread::sleep(Duration::from_millis(10));
-        
+
         // New worker can take over
         let result2 = manager.claim("queue1", "task1", "worker2", 30_000);
         match result2 {
@@ -784,13 +773,13 @@ mod tests {
     fn test_concurrent_claims() {
         let manager = Arc::new(AtomicClaimManager::new());
         let successes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        
+
         let mut handles = vec![];
-        
+
         for i in 0..10 {
             let mgr = manager.clone();
             let succ = successes.clone();
-            
+
             handles.push(thread::spawn(move || {
                 match mgr.claim("queue1", "task1", &format!("worker{}", i), 30_000) {
                     ClaimResult::Success { .. } => {
@@ -800,34 +789,69 @@ mod tests {
                 }
             }));
         }
-        
+
         for h in handles {
             h.join().unwrap();
         }
-        
+
         // Only one worker should succeed
         assert_eq!(successes.load(AtomicOrdering::SeqCst), 1);
     }
 
     #[test]
-    fn test_claim_release() {
+    fn test_claim_release_wrong_queue() {
         let manager = AtomicClaimManager::new();
-        
-        // Claim
+
+        // Claim task in queue1
         let token = match manager.claim("queue1", "task1", "worker1", 30_000) {
             ClaimResult::Success { claim_token } => claim_token,
             _ => panic!("Expected success"),
         };
-        
+
+        // Token should have correct queue_id
+        assert_eq!(token.queue_id, "queue1");
+
         // Verify claimed
         assert!(manager.is_claimed("queue1", "task1").is_some());
-        
-        // Release
-        // Note: Due to the bug in release(), we use queue_id from token.owner
-        // which is wrong. We need to use cleanup_expired for now.
-        manager.cleanup_expired();
-        
-        // After cleanup (if expired) or direct removal, should not be claimed
+
+        // Release using the correct token should work
+        manager.release(&token).unwrap();
+
+        // After release, task should not be claimed
+        assert!(manager.is_claimed("queue1", "task1").is_none());
+    }
+
+    #[test]
+    fn test_multiple_queue_isolation() {
+        let manager = AtomicClaimManager::new();
+
+        // Claim same task_id in different queues
+        let token1 = match manager.claim("queue1", "task1", "worker1", 30_000) {
+            ClaimResult::Success { claim_token } => claim_token,
+            _ => panic!("Expected success"),
+        };
+
+        let token2 = match manager.claim("queue2", "task1", "worker1", 30_000) {
+            ClaimResult::Success { claim_token } => claim_token,
+            _ => panic!("Expected success"),
+        };
+
+        // Tokens should have distinct queue_ids
+        assert_eq!(token1.queue_id, "queue1");
+        assert_eq!(token2.queue_id, "queue2");
+
+        // Both tasks should be claimed
+        assert!(manager.is_claimed("queue1", "task1").is_some());
+        assert!(manager.is_claimed("queue2", "task1").is_some());
+
+        // Release from queue1 should not affect queue2
+        manager.release(&token1).unwrap();
+        assert!(manager.is_claimed("queue1", "task1").is_none());
+        assert!(manager.is_claimed("queue2", "task1").is_some());
+
+        // Release from queue2
+        manager.release(&token2).unwrap();
+        assert!(manager.is_claimed("queue2", "task1").is_none());
     }
 
     #[test]
@@ -839,20 +863,20 @@ mod tests {
             max_lease_ms: 1000,
             cleanup_interval_ms: 10000,
         };
-        
+
         let manager = LeaseManager::new(config);
-        
+
         let token = match manager.acquire("queue1", "task1", "worker1", None) {
             ClaimResult::Success { claim_token } => claim_token,
             _ => panic!("Expected success"),
         };
-        
+
         // First extension OK
         let token = manager.extend("queue1", &token, 100).unwrap();
-        
+
         // Second extension OK
         let token = manager.extend("queue1", &token, 100).unwrap();
-        
+
         // Third extension should fail
         let result = manager.extend("queue1", &token, 100);
         assert!(result.is_err());
@@ -861,17 +885,17 @@ mod tests {
     #[test]
     fn test_cleanup_expired() {
         let manager = AtomicClaimManager::new();
-        
+
         // Create claims with very short leases
         manager.claim("queue1", "task1", "worker1", 1);
         manager.claim("queue1", "task2", "worker1", 1);
         manager.claim("queue1", "task3", "worker1", 100_000); // Long lease
-        
+
         thread::sleep(Duration::from_millis(10));
-        
+
         let cleaned = manager.cleanup_expired();
         assert_eq!(cleaned, 2); // task1 and task2 expired
-        
+
         // task3 should still be claimed
         assert!(manager.is_claimed("queue1", "task3").is_some());
     }
@@ -879,13 +903,13 @@ mod tests {
     #[test]
     fn test_stats_tracking() {
         let manager = AtomicClaimManager::new();
-        
+
         // Success
         manager.claim("queue1", "task1", "worker1", 30_000);
-        
+
         // Contention
         manager.claim("queue1", "task1", "worker2", 30_000);
-        
+
         let stats = manager.stats();
         assert_eq!(stats.attempts, 2);
         assert_eq!(stats.successes, 1);

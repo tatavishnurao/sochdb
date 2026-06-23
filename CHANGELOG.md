@@ -7,6 +7,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.11] - 2026-06-21
+
+### Added
+
+- **`hnsw_optimize` C FFI export** (`sochdb-index`) — exposes
+  `HnswIndex::rebuild_layer0_exact` (exact layer-0 rebuild via NN-descent +
+  connectivity repair) through the C ABI so language bindings (Python, etc.) can
+  finalize an index for maximum recall after a bulk load. Returns the number of
+  nodes rebuilt, or -1 on a null handle. Mirrors the existing `hnsw_*` FFI
+  surface; serialized against concurrent inserts internally; no-op above the
+  exact-rebuild scale cap.
+
+## [2.0.10] - 2026-06-20
+
+### Fixed
+
+- **High-dimensional recall collapse from HNSW graph fragmentation**
+  (`sochdb-index`) — under L2 distance concentration in high dimensions the
+  layer-0 mutual-kNN graph fragments into components unreachable from the entry
+  point (~1000/20000 orphans at dim 3072), making recall a build-seed coin flip.
+  `optimize()` now runs a bounded connectivity-repair pass that reconnects every
+  orphan, driving orphans to zero and stabilizing recall@10 to 0.994–1.0 across
+  seeds. The repair is **append-only**, so it can never evict another node's sole
+  inbound edge (no net-new orphans).
+- **Vector search distance & ID semantics** (`sochdb-index`, `sochdb-grpc`) —
+  results now return correct lower-is-better distances for every metric: cosine
+  `1 - similarity`, euclidean true `sqrt(Σ diff²)` (previously squared), and
+  dot-product `-dot`. Fixes a cosine result-ordering bug and squared-L2 values in
+  the unified / hot-buffer search paths. Vector IDs are converted `u128 → u64`
+  with a checked conversion that errors on overflow instead of silently
+  truncating.
+
+### Added
+
+- **Typed `DistanceMetric` on search responses** (proto) — `SearchResponse` /
+  `SearchBatchResponse` now carry a typed `DistanceMetric`; the per-result string
+  label is retained for backward compatibility (additive, wire-compatible).
+- HNSW connectivity diagnostics and distance-contract regression tests.
+
+### Performance
+
+- **Sub-quadratic `optimize()` via NN-descent** (`sochdb-index`) — the exact
+  layer-0 rebuild replaced its O(N²) all-pairs k-NN with NN-descent + exact-f32
+  rerank. `optimize()` is **2.4–7.1× faster** at high dimension (dim 3072
+  euclidean 80.6s → 11.3s, cosine 92s → 20.4s) with recall preserved (18-seed
+  sweep: orphans 0, recall@10 0.9984–0.9996).
+- `optimize()` now serializes against concurrent insert (single-writer lock), and
+  its connectivity-repair loop halves redundant graph traversal per pass.
+
+## [2.0.6] - 2026-06-14
+
+### Fixed
+
+- **`HnswIndex::search_exact` / `search_exact_f64` SIGSEGV on batch-inserted
+  indexes** (`sochdb-index`) — both exact-search paths read each node's vector via
+  `entry.value().vector` directly. Nodes added through the batch-contiguous bulk
+  path (`insert_batch_contiguous_bulk`) store a zero-length dummy in
+  `HnswNode.vector` (the real vector lives in `vector_store`), so the empty slice
+  was fed to the fixed-dimension SIMD distance kernels, causing an out-of-bounds
+  read (`SIGSEGV`, `KERN_INVALID_ADDRESS`). Reproduced 100% via the Python SDK's
+  `vector_search_exact` after a `> scaffold-size` `insert_batch`. Both paths now
+  fetch the vector via `vector_store.get(node.vector_index).unwrap_or(&node.vector)`
+  like every other search path. Adds a release-mode regression test that builds via
+  the batch path and asserts both exact paths match brute-force ground truth.
+
+---
+
+## [2.0.4] - 2026-06-13
+
+Production-hardening release. (Crate version line; the `0.5.x` entries below are
+the earlier project-version line.)
+
+### Fixed
+
+- **boot_fsm reentrant `RwLock` self-deadlock** (`sochdb-kernel`) — `transition_to`
+  held `phase.write()` then called `remaining_budget()`, which re-acquired
+  `phase.read()`; parking_lot locks are not reentrant, so this deadlocked on the
+  first booting transition (could hang production boot). Now uses a non-locking
+  `remaining_budget_for(phase)`.
+- **stratified_skiplist lock-free lost-update** (`sochdb-storage`) — `find_position`
+  re-read `current.next` after its compare loop, so a concurrent insert could be
+  linked out of order and orphaned (counted in `len` but unreachable to `get`).
+  Now uses the successor the loop actually compared. Verified 140/140 hammer runs.
+- **HNSW default-drift** — the gRPC `create_index` and FFI `hnsw_new` hardcoded the
+  old cheap build params (m=16), bypassing `HnswConfig::default()`. They now inherit
+  the engine defaults (m=32 / m0=64 / ef_construction=256 / F32), reaching
+  **recall@10 = 0.972 on Cohere-1M (768-d, cosine)** out of the box. The Python,
+  Node, and Go SDKs were fixed to match (separate repos).
+- **`set_ef_search` data race (UB)** — replaced an unsynchronized `*mut HnswConfig`
+  write with an atomic; `search_fast`/`search_ultra`/`search_batch` now honor a
+  runtime ef override.
+- **crates.io publish order** — `sochdb-vector` and `sochdb-memory` were missing from
+  the publish sequence, so `sochdb-grpc` failed to publish; added in topo order.
+- Several stale/flaky unit tests corrected (product behavior unchanged).
+
+### Changed
+
+- **HNSW build-quality defaults raised** to m=32 / m0=64 / ef_construction=256 / F32
+  (was m=16 / m0=32 / ef_construction=200) for 95+ recall without tuning.
+- **CI** slimmed to fast single-platform Rust validation (fmt + build + test) on push;
+  cross-platform builds, crates.io publish, and deeper lint stay in the release flow.
+- Formatted the entire codebase with `cargo fmt`.
+
+---
+
 ## [0.5.0] - 2026-02-15
 
 ### Changed

@@ -54,7 +54,7 @@ If you prefer manual setup or `make setup` fails:
 
 | Requirement | Version | Check | Install |
 |-------------|---------|-------|---------|
-| **Rust** | ≥1.75.0 (2024 edition) | `rustc --version` | [rustup.rs](https://rustup.rs/) |
+| **Rust** | ≥1.85.0 (2024 edition) | `rustc --version` | [rustup.rs](https://rustup.rs/) |
 | **Git** | Any recent | `git --version` | OS package manager |
 | **Clang** | ≥14 (optional, for SIMD) | `clang --version` | OS package manager |
 | **Python** | ≥3.9 (for SDK) | `python --version` | OS package manager |
@@ -186,7 +186,7 @@ sochdb/
 ├── README.md               # Project overview
 ├── CONTRIBUTING.md         # This file
 ├── CHANGELOG.md            # Version history
-├── LICENSE                 # Apache 2.0
+├── LICENSE                 # AGPL-3.0-or-later
 │
 ├── docs/                   # 📚 Documentation
 │   ├── index.md            # Documentation home

@@ -32,16 +32,30 @@
 //! PyO3 eliminates all of this by directly calling the core insertion API
 //! with GIL release during the expensive HNSW work.
 
-use pyo3::prelude::*;
-use pyo3::exceptions::{PyValueError, PyRuntimeError, PyIOError};
-use pyo3::types::PyBytes;
-use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods, PyArrayMethods, ToPyArray, IntoPyArray};
 use numpy::ndarray::{Array1, Array2};
+use numpy::{
+    IntoPyArray, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2,
+    PyUntypedArrayMethods, ToPyArray,
+};
+use pyo3::exceptions::{PyIOError, PyRuntimeError, PyValueError};
+use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use std::sync::Arc;
 
-use sochdb_index::hnsw::{HnswConfig, HnswIndex, DistanceMetric};
+use sochdb::connection::{ConnectionConfig, DurableConnection};
+use sochdb_core::SochValue;
+use sochdb_index::hnsw::{DistanceMetric, HnswConfig, HnswIndex};
 use sochdb_index::vector_quantized::Precision;
-use ::sochdb::connection::{DurableConnection, ConnectionConfig};
+use sochdb_storage::database::{
+    ColumnDef, ColumnType, Database as StorageDatabase, DatabaseConfig, SyncMode, TableSchema,
+    TxnHandle,
+};
+use sochdb_vector::{
+    BM25Config as VectorBM25Config, InvertedIndex as VectorInvertedIndex,
+    RRFConfig as VectorRRFConfig, RRFFusion as VectorRRFFusion,
+};
+
+mod hybrid3; // Three-lane hybrid retrieval binding (grep + BM25 + HNSW → RRF)
 
 // =============================================================================
 // Performance Guardrails (Task 6)
@@ -50,11 +64,11 @@ use ::sochdb::connection::{DurableConnection, ConnectionConfig};
 /// Check if safe mode is enabled and emit warning.
 fn check_safe_mode() -> bool {
     static WARNED: std::sync::Once = std::sync::Once::new();
-    
+
     let enabled = std::env::var("SOCHDB_BATCH_SAFE_MODE")
         .map(|v| v == "1" || v.to_lowercase() == "true")
         .unwrap_or(false);
-    
+
     if enabled {
         WARNED.call_once(|| {
             eprintln!(
@@ -73,7 +87,7 @@ fn check_safe_mode() -> bool {
 /// Log insertion path for debugging
 fn log_insert_path(path: &str, contiguous: bool, n: usize) {
     static LOGGED: std::sync::Once = std::sync::Once::new();
-    
+
     LOGGED.call_once(|| {
         if std::env::var("SOCHDB_DEBUG_INSERT").is_ok() {
             eprintln!(
@@ -82,6 +96,89 @@ fn log_insert_path(path: &str, contiguous: bool, n: usize) {
             );
         }
     });
+}
+
+// =============================================================================
+// Native BM25 + RRF Wrappers
+// =============================================================================
+
+/// Native BM25 inverted index from sochdb-vector.
+#[pyclass(name = "BM25Index")]
+pub struct PyBM25Index {
+    inner: VectorInvertedIndex,
+}
+
+#[pymethods]
+impl PyBM25Index {
+    /// Create a native BM25 index.
+    #[new]
+    #[pyo3(signature = (k1=1.2, b=0.75, min_idf=0.0))]
+    fn new(k1: f32, b: f32, min_idf: f32) -> Self {
+        Self {
+            inner: VectorInvertedIndex::new(VectorBM25Config { k1, b, min_idf }),
+        }
+    }
+
+    /// Add a document with an explicit numeric ID.
+    fn add_document(&self, doc_id: u64, text: &str) {
+        self.inner.add_document_with_id(doc_id, text);
+    }
+
+    /// Add a document and return the generated numeric ID.
+    fn add_auto(&self, text: &str) -> u64 {
+        self.inner.add_document(text)
+    }
+
+    /// Search the BM25 index. Returns ``[(doc_id, score), ...]``.
+    #[pyo3(signature = (query, k=10))]
+    fn search(&self, query: &str, k: usize) -> Vec<(u64, f32)> {
+        self.inner.search(query, k)
+    }
+
+    fn num_documents(&self) -> usize {
+        self.inner.num_documents()
+    }
+
+    fn vocab_size(&self) -> usize {
+        self.inner.vocab_size()
+    }
+}
+
+/// Native reciprocal-rank fusion from sochdb-vector.
+#[pyclass(name = "RRFFusion")]
+pub struct PyRRFFusion {
+    inner: VectorRRFFusion,
+}
+
+#[pymethods]
+impl PyRRFFusion {
+    /// Create a native RRF combiner.
+    #[new]
+    #[pyo3(signature = (k=60.0, vector_weight=1.0, lexical_weight=1.0))]
+    fn new(k: f32, vector_weight: f32, lexical_weight: f32) -> Self {
+        Self {
+            inner: VectorRRFFusion::new(VectorRRFConfig {
+                k,
+                vector_weight,
+                lexical_weight,
+            }),
+        }
+    }
+
+    /// Fuse vector and lexical rankings. Returns ``[(doc_id, rrf_score), ...]``.
+    #[pyo3(signature = (vector_results, lexical_results, limit=10))]
+    fn fuse(
+        &self,
+        vector_results: Vec<(u64, f32)>,
+        lexical_results: Vec<(u64, f32)>,
+        limit: usize,
+    ) -> Vec<(u64, f32)> {
+        self.inner
+            .fuse(&vector_results, &lexical_results, limit, false)
+            .into_iter()
+            .map(|result| (result.doc_id, result.score))
+            .collect()
+    }
 }
 
 // =============================================================================
@@ -96,17 +193,45 @@ fn log_insert_path(path: &str, contiguous: bool, n: usize) {
 /// Example:
 ///     >>> import numpy as np
 ///     >>> from sochdb import HnswIndex
-///     >>> 
+///     >>>
 ///     >>> # Create index
-///     >>> index = HnswIndex(dimension=768, m=16, ef_construction=100)
-///     >>> 
+///     >>> index = HnswIndex(dimension=768, m=32, ef_construction=200)
+///     >>>
 ///     >>> # Insert vectors (zero-copy from numpy)
 ///     >>> embeddings = np.random.randn(10000, 768).astype(np.float32)
 ///     >>> index.insert_batch(embeddings)  # ~15,000 vec/s
-///     >>> 
+///     >>>
 ///     >>> # Search
 ///     >>> query = np.random.randn(768).astype(np.float32)
 ///     >>> ids, distances = index.search(query, k=10)
+/// A single search result with optional metadata.
+#[pyclass(name = "SearchResult")]
+#[derive(Clone, Debug)]
+pub struct PySearchResult {
+    /// Vector ID
+    #[pyo3(get)]
+    pub id: u64,
+    /// Distance to query
+    #[pyo3(get)]
+    pub distance: f32,
+    /// Optional parent/source ID
+    #[pyo3(get)]
+    pub parent_id: Option<u64>,
+    /// Optional view type
+    #[pyo3(get)]
+    pub view_type: Option<String>,
+}
+
+#[pymethods]
+impl PySearchResult {
+    fn __repr__(&self) -> String {
+        format!(
+            "SearchResult(id={}, distance={:.4}, parent_id={:?}, view_type={:?})",
+            self.id, self.distance, self.parent_id, self.view_type
+        )
+    }
+}
+
 #[pyclass(name = "HnswIndex")]
 pub struct PyHnswIndex {
     inner: Arc<HnswIndex>,
@@ -120,62 +245,78 @@ impl PyHnswIndex {
     ///
     /// Args:
     ///     dimension: Vector dimension (e.g., 768 for text embeddings).
-    ///     m: Max connections per node (default: 16). Higher = better recall, more memory.
-    ///     ef_construction: Construction search depth (default: 100). Higher = better quality, slower build.
+    ///     m: Max connections per node (default: 32). Higher = better recall, more memory.
+    ///     ef_construction: Construction search depth (default: 200). Higher = better quality, slower build.
     ///     metric: Distance metric ("cosine", "euclidean", "dot"). Default: "cosine".
     ///     precision: Quantization precision ("f32", "f16", "bf16"). Default: "f32".
+    ///     seed: Optional int. If set, per-node HNSW levels are deterministic
+    ///         (reproducible across builds, independent of insert order). Pins
+    ///         LEVELS only — see deterministic_build for identical graphs.
+    ///     deterministic_build: If True (requires seed), build single-threaded
+    ///         in fixed id order for a bit-reproducible neighbor graph (slower).
     ///
     /// Example:
     ///     >>> index = HnswIndex(768, m=32, ef_construction=200)
+    ///     >>> repro = HnswIndex(768, seed=42, deterministic_build=True)
     #[new]
-    #[pyo3(signature = (dimension, m=16, ef_construction=100, metric="cosine", precision="f32"))]
+    #[pyo3(signature = (dimension, m=32, ef_construction=200, metric="cosine", precision="f32", seed=None, deterministic_build=false))]
     fn new(
         dimension: usize,
         m: usize,
         ef_construction: usize,
         metric: &str,
         precision: &str,
+        seed: Option<u64>,
+        deterministic_build: bool,
     ) -> PyResult<Self> {
         if dimension == 0 {
             return Err(PyValueError::new_err("dimension must be > 0"));
         }
-        
+
         let distance_metric = match metric.to_lowercase().as_str() {
             "cosine" => DistanceMetric::Cosine,
             "euclidean" | "l2" => DistanceMetric::Euclidean,
             "dot" | "dot_product" | "inner_product" => DistanceMetric::DotProduct,
-            _ => return Err(PyValueError::new_err(
-                format!("Unknown metric: {}. Use 'cosine', 'euclidean', or 'dot'", metric)
-            )),
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "Unknown metric: {}. Use 'cosine', 'euclidean', or 'dot'",
+                    metric
+                )));
+            }
         };
-        
+
         let quant_precision = match precision.to_lowercase().as_str() {
             "f32" | "float32" => Precision::F32,
             "f16" | "float16" => Precision::F16,
             "bf16" | "bfloat16" => Precision::BF16,
-            _ => return Err(PyValueError::new_err(
-                format!("Unknown precision: {}. Use 'f32', 'f16', or 'bf16'", precision)
-            )),
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "Unknown precision: {}. Use 'f32', 'f16', or 'bf16'",
+                    precision
+                )));
+            }
         };
-        
+
         let config = HnswConfig {
             max_connections: m,
             max_connections_layer0: m * 2,
+            level_multiplier: 1.0 / (m as f32).ln(),
             ef_construction,
             metric: distance_metric,
             quantization_precision: Some(quant_precision),
             ..Default::default()
         };
-        
-        let index = HnswIndex::new(dimension, config);
-        
+
+        let index =
+            HnswIndex::new(dimension, config).with_reproducibility(seed, deterministic_build);
+
         Ok(Self {
             inner: Arc::new(index),
             dimension,
             next_id: std::sync::atomic::AtomicU64::new(0),
         })
     }
-    
+
     /// Insert a batch of vectors with auto-generated IDs.
     ///
     /// This is the fastest insertion method - uses zero-copy NumPy access
@@ -199,51 +340,51 @@ impl PyHnswIndex {
         let shape = vectors.shape();
         let n = shape[0];
         let d = shape[1];
-        
+
         if d != self.dimension {
             return Err(PyValueError::new_err(format!(
                 "Dimension mismatch: index has {}, got {}",
                 self.dimension, d
             )));
         }
-        
+
         // Check contiguity for zero-copy
         let is_contiguous = vectors.is_c_contiguous();
         log_insert_path("insert_batch", is_contiguous, n);
-        
+
         // Check safe mode
         if check_safe_mode() {
             return self.insert_batch_safe(py, vectors);
         }
-        
+
         // Generate sequential IDs
-        let start_id = self.next_id.fetch_add(n as u64, std::sync::atomic::Ordering::SeqCst);
+        let start_id = self
+            .next_id
+            .fetch_add(n as u64, std::sync::atomic::Ordering::SeqCst);
         let ids: Vec<u128> = (start_id..start_id + n as u64)
             .map(|id| id as u128)
             .collect();
-        
+
         // Get contiguous slice - this is the zero-copy path
         let vec_slice = if is_contiguous {
             // ZERO-COPY: Direct pointer to NumPy buffer
-            vectors.as_slice().map_err(|e| {
-                PyValueError::new_err(format!("Failed to get slice: {}", e))
-            })?
+            vectors
+                .as_slice()
+                .map_err(|e| PyValueError::new_err(format!("Failed to get slice: {}", e)))?
         } else {
             // Fallback: must copy for non-contiguous arrays (rare)
             return Err(PyValueError::new_err(
-                "Non-contiguous array. Use np.ascontiguousarray(vectors) first."
+                "Non-contiguous array. Use np.ascontiguousarray(vectors) first.",
             ));
         };
-        
+
         // Release GIL for the expensive HNSW work
         let inner = Arc::clone(&self.inner);
-        let result = py.allow_threads(move || {
-            inner.insert_batch_contiguous(&ids, vec_slice, d)
-        });
-        
+        let result = py.allow_threads(move || inner.insert_batch_contiguous(&ids, vec_slice, d));
+
         result.map_err(|e| PyRuntimeError::new_err(e))
     }
-    
+
     /// Insert vectors with explicit IDs.
     ///
     /// Args:
@@ -263,52 +404,52 @@ impl PyHnswIndex {
         ids: PyReadonlyArray1<'py, u64>,
         vectors: PyReadonlyArray2<'py, f32>,
     ) -> PyResult<usize> {
-        let id_slice = ids.as_slice().map_err(|e| {
-            PyValueError::new_err(format!("IDs must be contiguous: {}", e))
-        })?;
-        
+        let id_slice = ids
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("IDs must be contiguous: {}", e)))?;
+
         let shape = vectors.shape();
         let n = shape[0];
         let d = shape[1];
-        
+
         if d != self.dimension {
             return Err(PyValueError::new_err(format!(
                 "Dimension mismatch: index has {}, got {}",
                 self.dimension, d
             )));
         }
-        
+
         if id_slice.len() != n {
             return Err(PyValueError::new_err(format!(
                 "ID count {} != vector count {}",
-                id_slice.len(), n
+                id_slice.len(),
+                n
             )));
         }
-        
+
         // Check contiguity
         if !vectors.is_c_contiguous() {
             return Err(PyValueError::new_err(
-                "Vectors must be C-contiguous. Use np.ascontiguousarray(vectors)."
+                "Vectors must be C-contiguous. Use np.ascontiguousarray(vectors).",
             ));
         }
-        
+
         log_insert_path("insert_batch_with_ids", true, n);
-        
-        let vec_slice = vectors.as_slice().map_err(|e| {
-            PyValueError::new_err(format!("Failed to get slice: {}", e))
-        })?;
-        
+
+        let vec_slice = vectors
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("Failed to get slice: {}", e)))?;
+
         // Release GIL - use u64-optimized method to avoid Python-side allocation
         // The conversion to u128 happens in Rust which is faster than Python
         let inner = Arc::clone(&self.inner);
         let ids_vec: Vec<u64> = id_slice.to_vec();
-        let result = py.allow_threads(move || {
-            inner.insert_batch_contiguous_u64(&ids_vec, vec_slice, d)
-        });
-        
+        let result =
+            py.allow_threads(move || inner.insert_batch_contiguous_u64(&ids_vec, vec_slice, d));
+
         result.map_err(|e| PyRuntimeError::new_err(e))
     }
-    
+
     /// Safe mode insertion (sequential single-insert).
     fn insert_batch_safe<'py>(
         &self,
@@ -318,29 +459,29 @@ impl PyHnswIndex {
         let shape = vectors.shape();
         let n = shape[0];
         let d = shape[1];
-        
-        let vec_data: Vec<f32> = vectors.to_vec().map_err(|e| {
-            PyValueError::new_err(format!("Failed to copy vectors: {}", e))
-        })?;
-        
+
+        let vec_data: Vec<f32> = vectors
+            .to_vec()
+            .map_err(|e| PyValueError::new_err(format!("Failed to copy vectors: {}", e)))?;
+
         let inner = Arc::clone(&self.inner);
         let next_id = &self.next_id;
-        
+
         let mut count = 0usize;
         for i in 0..n {
             let id = next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u128;
             let start = i * d;
             let end = start + d;
             let vec: Vec<f32> = vec_data[start..end].to_vec();
-            
+
             if inner.insert(id, vec).is_ok() {
                 count += 1;
             }
         }
-        
+
         Ok(count)
     }
-    
+
     /// Search for k nearest neighbors.
     ///
     /// Args:
@@ -363,37 +504,119 @@ impl PyHnswIndex {
         py: Python<'py>,
         query: PyReadonlyArray1<'py, f32>,
         k: usize,
-        ef_search: Option<usize>,  // TODO: Support runtime ef_search override
+        ef_search: Option<usize>,
     ) -> PyResult<(Py<PyArray1<u64>>, Py<PyArray1<f32>>)> {
-        let query_slice = query.as_slice().map_err(|e| {
-            PyValueError::new_err(format!("Query must be contiguous: {}", e))
-        })?;
-        
+        let query_slice = query
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("Query must be contiguous: {}", e)))?;
+
         if query_slice.len() != self.dimension {
             return Err(PyValueError::new_err(format!(
                 "Query dimension {} != index dimension {}",
-                query_slice.len(), self.dimension
+                query_slice.len(),
+                self.dimension
             )));
         }
-        
+
         // Release GIL for search
         let inner = Arc::clone(&self.inner);
         let query_vec: Vec<f32> = query_slice.to_vec();
-        
-        let results = py.allow_threads(move || {
-            inner.search(&query_vec, k)
-        }).map_err(|e| PyRuntimeError::new_err(e))?;
-        
+
+        let results = py
+            .allow_threads(move || match ef_search {
+                Some(ef) => inner.search_with_ef(&query_vec, k, ef),
+                None => inner.search(&query_vec, k),
+            })
+            .map_err(|e| PyRuntimeError::new_err(e))?;
+
         // Convert to numpy arrays using ndarray
-        let ids: Vec<u64> = results.iter().map(|(id, _)| *id as u64).collect();
+        let ids: Vec<u64> = results
+            .iter()
+            .map(|(id, _)| {
+                u64::try_from(*id).map_err(|_| {
+                    PyRuntimeError::new_err(format!(
+                        "Vector ID {} exceeds u64 range and cannot be returned",
+                        id
+                    ))
+                })
+            })
+            .collect::<PyResult<Vec<u64>>>()?;
         let distances: Vec<f32> = results.iter().map(|(_, d)| *d as f32).collect();
-        
+
         let ids_array = Array1::from_vec(ids).into_pyarray(py);
         let dists_array = Array1::from_vec(distances).into_pyarray(py);
-        
+
         Ok((ids_array.into(), dists_array.into()))
     }
-    
+
+    /// Search for k nearest neighbors and return metadata for each result.
+    ///
+    /// Args:
+    ///     query: 1D float32 array of dimension D.
+    ///     k: Number of neighbors to return.
+    ///     ef_search: Search depth (default: k * 2). Higher = better recall, slower.
+    ///
+    /// Returns:
+    ///     List of SearchResult objects with id, distance, parent_id, view_type.
+    #[pyo3(signature = (query, k, ef_search=None))]
+    fn search_with_metadata<'py>(
+        &self,
+        py: Python<'py>,
+        query: PyReadonlyArray1<'py, f32>,
+        k: usize,
+        ef_search: Option<usize>,
+    ) -> PyResult<Vec<PySearchResult>> {
+        let query_slice = query
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("Query must be contiguous: {}", e)))?;
+
+        if query_slice.len() != self.dimension {
+            return Err(PyValueError::new_err(format!(
+                "Query dimension {} != index dimension {}",
+                query_slice.len(),
+                self.dimension
+            )));
+        }
+
+        let inner = Arc::clone(&self.inner);
+        let inner_for_meta = Arc::clone(&self.inner);
+        let query_vec: Vec<f32> = query_slice.to_vec();
+
+        let results = py
+            .allow_threads(move || match ef_search {
+                Some(ef) => inner.search_with_ef(&query_vec, k, ef),
+                None => inner.search(&query_vec, k),
+            })
+            .map_err(|e| PyRuntimeError::new_err(e))?;
+
+        let mut out = Vec::with_capacity(results.len());
+        for (id, distance) in results {
+            let metadata = inner_for_meta.get_metadata(id);
+            let mut parent_id = None;
+            let mut view_type = None;
+            if let Some(meta) = metadata {
+                for (key, value) in meta {
+                    if key == "parent_id" {
+                        parent_id = value.parse::<u64>().ok();
+                    } else if key == "view_type" {
+                        view_type = Some(value);
+                    }
+                }
+            }
+            let id_u64 = u64::try_from(id).map_err(|_| {
+                PyRuntimeError::new_err(format!("Vector ID {} exceeds u64 range", id))
+            })?;
+            out.push(PySearchResult {
+                id: id_u64,
+                distance,
+                parent_id,
+                view_type,
+            });
+        }
+
+        Ok(out)
+    }
+
     /// Batch search for multiple queries.
     ///
     /// Args:
@@ -410,46 +633,60 @@ impl PyHnswIndex {
         py: Python<'py>,
         queries: PyReadonlyArray2<'py, f32>,
         k: usize,
-        ef_search: Option<usize>,  // TODO: Support runtime ef_search override
+        ef_search: Option<usize>,
     ) -> PyResult<(Py<PyArray2<u64>>, Py<PyArray2<f32>>)> {
         let shape = queries.shape();
         let num_queries = shape[0];
         let d = shape[1];
-        
+
         if d != self.dimension {
             return Err(PyValueError::new_err(format!(
                 "Query dimension {} != index dimension {}",
                 d, self.dimension
             )));
         }
-        
-        let queries_vec: Vec<f32> = queries.to_vec().map_err(|e| {
-            PyValueError::new_err(format!("Failed to copy queries: {}", e))
-        })?;
-        
+
+        let queries_vec: Vec<f32> = queries
+            .to_vec()
+            .map_err(|e| PyValueError::new_err(format!("Failed to copy queries: {}", e)))?;
+
         // Release GIL for parallel search
         let inner = Arc::clone(&self.inner);
         let all_results = py.allow_threads(move || {
             use rayon::prelude::*;
-            
+
             (0..num_queries)
                 .into_par_iter()
                 .map(|i| {
                     let start = i * d;
                     let end = start + d;
                     let query = &queries_vec[start..end];
-                    inner.search(query, k).unwrap_or_default()
+                    // Honor the runtime ef_search override when supplied: a
+                    // higher ef widens the beam → better recall at lower QPS,
+                    // which is exactly the recall/QPS tradeoff curve ANN
+                    // benchmarks sweep. Without an override, fall back to the
+                    // index's configured/adaptive ef via `search`.
+                    match ef_search {
+                        Some(ef) => inner.search_with_ef(query, k, ef).unwrap_or_default(),
+                        None => inner.search(query, k).unwrap_or_default(),
+                    }
                 })
                 .collect::<Vec<_>>()
         });
-        
+
         // Flatten to 2D arrays
         let mut ids_flat = Vec::with_capacity(num_queries * k);
         let mut dists_flat = Vec::with_capacity(num_queries * k);
-        
+
         for results in all_results {
             for (id, dist) in results.iter().take(k) {
-                ids_flat.push(*id as u64);
+                let id_u64 = u64::try_from(*id).map_err(|_| {
+                    PyRuntimeError::new_err(format!(
+                        "Vector ID {} exceeds u64 range and cannot be returned",
+                        id
+                    ))
+                })?;
+                ids_flat.push(id_u64);
                 dists_flat.push(*dist as f32);
             }
             // Pad if fewer than k results
@@ -458,44 +695,180 @@ impl PyHnswIndex {
                 dists_flat.push(f32::INFINITY);
             }
         }
-        
+
         // Create 2D arrays using ndarray
         let ids_array = Array2::from_shape_vec((num_queries, k), ids_flat)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create IDs array: {}", e)))?
             .into_pyarray(py);
         let dists_array = Array2::from_shape_vec((num_queries, k), dists_flat)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create distances array: {}", e)))?
+            .map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to create distances array: {}", e))
+            })?
             .into_pyarray(py);
-        
+
         Ok((ids_array.into(), dists_array.into()))
     }
-    
+
     /// Get the number of vectors in the index.
     #[getter]
     fn len(&self) -> usize {
         self.inner.len()
     }
-    
+
     /// Get the dimension of vectors.
     #[getter]
     fn dimension(&self) -> usize {
         self.dimension
     }
-    
+
     /// Check if index is empty.
     fn is_empty(&self) -> bool {
         self.inner.len() == 0
     }
-    
+
+    /// Store metadata for a batch of vectors (for filtered search).
+    ///
+    /// Args:
+    ///     dense_indices: 1D uint32 array of dense indices.
+    ///     metadata_list: List of dicts, one per index. Each dict has string keys/values.
+    ///
+    /// Example:
+    ///     >>> index.set_metadata_batch(
+    ///     ...     np.array([0, 1, 2], dtype=np.uint32),
+    ///     ...     [{"tags": "28"}, {"tags": "5"}, {"tags": "28"}],
+    ///     ... )
+    fn set_metadata_batch(
+        &self,
+        node_ids: PyReadonlyArray1<'_, u64>,
+        metadata_list: Vec<std::collections::HashMap<String, String>>,
+    ) -> PyResult<()> {
+        let ids = node_ids
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("IDs must be contiguous: {}", e)))?;
+        if ids.len() != metadata_list.len() {
+            return Err(PyValueError::new_err(format!(
+                "ID count {} != metadata count {}",
+                ids.len(),
+                metadata_list.len()
+            )));
+        }
+        let entries: Vec<(u128, Vec<(String, String)>)> = ids
+            .iter()
+            .zip(metadata_list.iter())
+            .map(|(&id, meta)| {
+                let pairs: Vec<(String, String)> =
+                    meta.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                (id as u128, pairs)
+            })
+            .collect();
+        self.inner.set_metadata_batch(&entries);
+        Ok(())
+    }
+
+    /// Set metadata for a single node as a list of (key, value) pairs.
+    /// Supports repeated keys (e.g. multiple "tags" values).
+    fn set_metadata(&self, node_id: u64, metadata: Vec<(String, String)>) -> PyResult<()> {
+        self.inner.set_metadata(node_id as u128, metadata);
+        Ok(())
+    }
+
+    /// Filtered ANN search — returns only results whose metadata matches the filter.
+    ///
+    /// Args:
+    ///     query: 1D float32 array of dimension D.
+    ///     k: Number of neighbors to return.
+    ///     filter: List of (key, value) tuples. ALL must match (AND semantics).
+    ///     ef_search: Search depth (default: 200).
+    ///
+    /// Returns:
+    ///     Tuple of (ids, distances) as numpy arrays.
+    ///
+    /// Example:
+    ///     >>> ids, dists = index.search_filtered(query, k=10, filter=[("tags", "28")])
+    #[pyo3(signature = (query, k, filter, ef_search=None))]
+    fn search_filtered<'py>(
+        &self,
+        py: Python<'py>,
+        query: PyReadonlyArray1<'py, f32>,
+        k: usize,
+        filter: Vec<(String, String)>,
+        ef_search: Option<usize>,
+    ) -> PyResult<(Py<PyArray1<u64>>, Py<PyArray1<f32>>)> {
+        let query_slice = query
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(format!("Query must be contiguous: {}", e)))?;
+        if query_slice.len() != self.dimension {
+            return Err(PyValueError::new_err(format!(
+                "Query dimension {} != index dimension {}",
+                query_slice.len(),
+                self.dimension
+            )));
+        }
+
+        let ef = ef_search.unwrap_or(200);
+        let filter_pairs: Vec<(String, String)> = filter.into_iter().collect();
+
+        let inner = Arc::clone(&self.inner);
+        let query_vec: Vec<f32> = query_slice.to_vec();
+
+        let results = py
+            .allow_threads(move || inner.search_filtered(&query_vec, k, ef, &filter_pairs))
+            .map_err(|e| PyRuntimeError::new_err(e))?;
+
+        let ids: Vec<u64> = results
+            .iter()
+            .map(|(id, _)| {
+                u64::try_from(*id).map_err(|_| {
+                    PyRuntimeError::new_err(format!(
+                        "Vector ID {} exceeds u64 range and cannot be returned",
+                        id
+                    ))
+                })
+            })
+            .collect::<PyResult<Vec<u64>>>()?;
+        let distances: Vec<f32> = results.iter().map(|(_, d)| *d as f32).collect();
+
+        let ids_array = Array1::from_vec(ids).into_pyarray(py);
+        let dists_array = Array1::from_vec(distances).into_pyarray(py);
+
+        Ok((ids_array.into(), dists_array.into()))
+    }
+
+    /// Refine graph quality after batch construction.
+    ///
+    /// Re-searches the complete graph to find better neighbors for every node,
+    /// fixing suboptimal edges from parallel wave construction. Call this once
+    /// after all inserts are complete.
+    ///
+    /// Returns:
+    ///     Number of nodes whose neighbors were improved.
+    fn refine_graph(&self, py: Python<'_>) -> PyResult<usize> {
+        let inner = Arc::clone(&self.inner);
+        let improved = py.allow_threads(move || inner.refine_graph());
+        Ok(improved)
+    }
+
+    /// Additive-only graph refinement: fills empty neighbor slots by
+    /// re-searching the complete graph. Never removes existing edges.
+    ///
+    /// Returns:
+    ///     Number of edges added.
+    fn refine_graph_additive(&self, py: Python<'_>) -> PyResult<usize> {
+        let inner = Arc::clone(&self.inner);
+        let added = py.allow_threads(move || inner.refine_graph_additive());
+        Ok(added)
+    }
+
     /// Save index to disk (compressed).
     ///
     /// Args:
     ///     path: Output file path.
     fn save(&self, path: &str) -> PyResult<()> {
-        self.inner.save_to_disk_compressed(path)
+        self.inner
+            .save_to_disk_compressed(path)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to save: {}", e)))
     }
-    
+
     /// Load index from disk.
     ///
     /// Args:
@@ -508,33 +881,45 @@ impl PyHnswIndex {
         let index = HnswIndex::load_from_disk_compressed(path)
             .or_else(|_| HnswIndex::load_from_disk(path))
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to load: {}", e)))?;
-        
+
         let stats = index.stats();
         let dimension = stats.dimension;
         let len = stats.num_vectors;
-        
+
         Ok(Self {
             inner: Arc::new(index),
             dimension,
             next_id: std::sync::atomic::AtomicU64::new(len as u64),
         })
     }
-    
+
     /// Get index statistics.
     fn stats(&self) -> PyResult<std::collections::HashMap<String, PyObject>> {
         Python::with_gil(|py| {
             let stats = self.inner.stats();
             let mut map = std::collections::HashMap::new();
-            
-            map.insert("num_vectors".to_string(), stats.num_vectors.into_pyobject(py)?.into());
-            map.insert("dimension".to_string(), stats.dimension.into_pyobject(py)?.into());
-            map.insert("max_layer".to_string(), stats.max_layer.into_pyobject(py)?.into());
-            map.insert("avg_connections".to_string(), stats.avg_connections.into_pyobject(py)?.into());
-            
+
+            map.insert(
+                "num_vectors".to_string(),
+                stats.num_vectors.into_pyobject(py)?.into(),
+            );
+            map.insert(
+                "dimension".to_string(),
+                stats.dimension.into_pyobject(py)?.into(),
+            );
+            map.insert(
+                "max_layer".to_string(),
+                stats.max_layer.into_pyobject(py)?.into(),
+            );
+            map.insert(
+                "avg_connections".to_string(),
+                stats.avg_connections.into_pyobject(py)?.into(),
+            );
+
             Ok(map)
         })
     }
-    
+
     fn __repr__(&self) -> String {
         format!(
             "HnswIndex(dimension={}, vectors={}, max_layer={})",
@@ -543,9 +928,71 @@ impl PyHnswIndex {
             self.inner.stats().max_layer,
         )
     }
-    
+
     fn __len__(&self) -> usize {
         self.inner.len()
+    }
+
+    /// Rebuild layer-0 graph using exact brute-force k-NN.
+    ///
+    /// Call after insert_batch() to fix recall if batch construction
+    /// produced suboptimal connectivity.
+    ///
+    /// Returns:
+    ///     Number of nodes updated.
+    ///
+    /// Example:
+    ///     >>> index.insert_batch(embeddings)
+    ///     >>> index.optimize()   # ~0.3s for 10K vectors
+    fn optimize<'py>(&self, py: Python<'py>) -> PyResult<usize> {
+        let inner = Arc::clone(&self.inner);
+        let result = py.allow_threads(move || inner.rebuild_layer0_exact());
+        Ok(result)
+    }
+
+    /// Repair graph connectivity by reconnecting orphaned nodes.
+    ///
+    /// After batch insertion, some nodes may be unreachable from the entry point.
+    /// This method finds orphans via BFS and reconnects them.
+    ///
+    /// Returns:
+    ///     Number of nodes repaired.
+    fn repair<'py>(&self, py: Python<'py>) -> PyResult<usize> {
+        let inner = Arc::clone(&self.inner);
+        let result = py.allow_threads(move || inner.repair_connectivity());
+        Ok(result)
+    }
+
+    /// Run diagnostic checks on graph health.
+    ///
+    /// Returns dict with reachable nodes, average degree, orphan count.
+    ///
+    /// Example:
+    ///     >>> diag = index.diagnose()
+    ///     >>> print(f"Reachable: {diag['reachable']}/{diag['total']}")
+    fn diagnose<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<std::collections::HashMap<String, PyObject>> {
+        let inner = Arc::clone(&self.inner);
+
+        let (reachable, total, _orphans) = inner.diagnose_connectivity();
+        let (avg_degree, zero_degree, max_degree) = inner.diagnose_degree();
+
+        let mut map = std::collections::HashMap::new();
+        map.insert("reachable".into(), reachable.into_pyobject(py)?.into());
+        map.insert("total".into(), total.into_pyobject(py)?.into());
+        map.insert(
+            "orphan_count".into(),
+            (total - reachable).into_pyobject(py)?.into(),
+        );
+        map.insert("avg_degree".into(), avg_degree.into_pyobject(py)?.into());
+        map.insert(
+            "zero_degree_nodes".into(),
+            zero_degree.into_pyobject(py)?.into(),
+        );
+        map.insert("target_degree".into(), max_degree.into_pyobject(py)?.into());
+        Ok(map)
     }
 }
 
@@ -560,8 +1007,8 @@ impl PyHnswIndex {
 ///
 /// Args:
 ///     embeddings: 2D float32 array of shape (N, D).
-///     m: HNSW max connections (default: 16).
-///     ef_construction: Construction depth (default: 100).
+///     m: HNSW max connections (default: 32).
+///     ef_construction: Construction depth (default: 200).
 ///     metric: Distance metric (default: "cosine").
 ///     ids: Optional 1D uint64 array of IDs.
 ///
@@ -570,10 +1017,10 @@ impl PyHnswIndex {
 ///
 /// Example:
 ///     >>> embeddings = np.random.randn(10000, 768).astype(np.float32)
-///     >>> index = build_index(embeddings, m=16, ef_construction=100)
+///     >>> index = build_index(embeddings, m=32, ef_construction=200)
 ///     >>> index.save("my_index.hnsw")
 #[pyfunction]
-#[pyo3(signature = (embeddings, m=16, ef_construction=100, metric="cosine", ids=None))]
+#[pyo3(signature = (embeddings, m=32, ef_construction=200, metric="cosine", ids=None, seed=None, deterministic_build=false))]
 fn build_index<'py>(
     py: Python<'py>,
     embeddings: PyReadonlyArray2<'py, f32>,
@@ -581,18 +1028,28 @@ fn build_index<'py>(
     ef_construction: usize,
     metric: &str,
     ids: Option<PyReadonlyArray1<'py, u64>>,
+    seed: Option<u64>,
+    deterministic_build: bool,
 ) -> PyResult<PyHnswIndex> {
     let shape = embeddings.shape();
     let d = shape[1];
-    
-    let index = PyHnswIndex::new(d, m, ef_construction, metric, "f32")?;
-    
+
+    let index = PyHnswIndex::new(
+        d,
+        m,
+        ef_construction,
+        metric,
+        "f32",
+        seed,
+        deterministic_build,
+    )?;
+
     if let Some(id_array) = ids {
         index.insert_batch_with_ids(py, id_array, embeddings)?;
     } else {
         index.insert_batch(py, embeddings)?;
     }
-    
+
     Ok(index)
 }
 
@@ -619,21 +1076,21 @@ fn is_safe_mode() -> bool {
 ///
 /// Example:
 ///     >>> import sochdb
-///     >>> 
+///     >>>
 ///     >>> # Open database (creates if not exists)
 ///     >>> db = sochdb.Database.open("./my_db")
-///     >>> 
+///     >>>
 ///     >>> # Simple key-value operations
 ///     >>> db.put(b"user:1", b'{"name": "Alice"}')
 ///     >>> value = db.get(b"user:1")
 ///     >>> print(value)  # b'{"name": "Alice"}'
-///     >>> 
+///     >>>
 ///     >>> # Transaction API
 ///     >>> txn = db.begin()
 ///     >>> db.put(b"user:2", b'{"name": "Bob"}', txn=txn)
 ///     >>> db.put(b"user:3", b'{"name": "Charlie"}', txn=txn)
 ///     >>> db.commit(txn)
-///     >>> 
+///     >>>
 ///     >>> # Scan by prefix
 ///     >>> users = db.scan(b"user:")
 ///     >>> for key, value in users:
@@ -679,10 +1136,10 @@ impl PyDatabase {
                 )));
             }
         };
-        
+
         let inner = DurableConnection::open_with_config(path, conn_config)
             .map_err(|e| PyIOError::new_err(format!("Failed to open database: {}", e)))?;
-        
+
         Ok(Self { inner })
     }
 
@@ -697,7 +1154,7 @@ impl PyDatabase {
     ///
     /// Example:
     ///     >>> db.put(b"key", b"value")
-    ///     >>> 
+    ///     >>>
     ///     >>> # Within transaction
     ///     >>> txn = db.begin()
     ///     >>> db.put(b"key1", b"val1", txn=txn)
@@ -707,13 +1164,16 @@ impl PyDatabase {
     pub fn put(&self, key: &[u8], value: &[u8], txn: Option<u64>) -> PyResult<()> {
         if txn.is_none() {
             // Auto-transaction mode: put and commit
-            self.inner.put(key, value)
+            self.inner
+                .put(key, value)
                 .map_err(|e| PyIOError::new_err(e.to_string()))?;
-            self.inner.commit_txn()
+            self.inner
+                .commit_txn()
                 .map_err(|e| PyIOError::new_err(e.to_string()))?;
         } else {
             // Use existing transaction
-            self.inner.put(key, value)
+            self.inner
+                .put(key, value)
                 .map_err(|e| PyIOError::new_err(e.to_string()))?;
         }
         Ok(())
@@ -733,7 +1193,12 @@ impl PyDatabase {
     ///     >>> if value is not None:
     ///     ...     print(value.decode())
     #[pyo3(signature = (key, txn=None))]
-    pub fn get<'py>(&self, py: Python<'py>, key: &[u8], txn: Option<u64>) -> PyResult<Option<Py<PyBytes>>> {
+    pub fn get<'py>(
+        &self,
+        py: Python<'py>,
+        key: &[u8],
+        txn: Option<u64>,
+    ) -> PyResult<Option<Py<PyBytes>>> {
         let _ = txn; // Transaction context is managed internally
         match self.inner.get(key) {
             Ok(Some(v)) => Ok(Some(PyBytes::new(py, &v).into())),
@@ -753,12 +1218,15 @@ impl PyDatabase {
     #[pyo3(signature = (key, txn=None))]
     pub fn delete(&self, key: &[u8], txn: Option<u64>) -> PyResult<()> {
         if txn.is_none() {
-            self.inner.delete(key)
+            self.inner
+                .delete(key)
                 .map_err(|e| PyIOError::new_err(e.to_string()))?;
-            self.inner.commit_txn()
+            self.inner
+                .commit_txn()
                 .map_err(|e| PyIOError::new_err(e.to_string()))?;
         } else {
-            self.inner.delete(key)
+            self.inner
+                .delete(key)
                 .map_err(|e| PyIOError::new_err(e.to_string()))?;
         }
         Ok(())
@@ -785,14 +1253,14 @@ impl PyDatabase {
         txn: Option<u64>,
     ) -> PyResult<Vec<(Py<PyBytes>, Py<PyBytes>)>> {
         let _ = txn;
-        let results = self.inner.scan(prefix)
+        let results = self
+            .inner
+            .scan(prefix)
             .map_err(|e| PyIOError::new_err(e.to_string()))?;
-        
+
         Ok(results
             .into_iter()
-            .map(|(k, v)| {
-                (PyBytes::new(py, &k).into(), PyBytes::new(py, &v).into())
-            })
+            .map(|(k, v)| (PyBytes::new(py, &k).into(), PyBytes::new(py, &v).into()))
             .collect())
     }
 
@@ -812,7 +1280,8 @@ impl PyDatabase {
     ///     ... except:
     ///     ...     db.abort(txn)
     pub fn begin(&self) -> PyResult<u64> {
-        self.inner.begin_txn()
+        self.inner
+            .begin_txn()
             .map_err(|e| PyIOError::new_err(e.to_string()))
     }
 
@@ -828,7 +1297,8 @@ impl PyDatabase {
     #[pyo3(signature = (txn=None))]
     pub fn commit(&self, txn: Option<u64>) -> PyResult<u64> {
         let _ = txn; // Transaction is tracked internally
-        self.inner.commit_txn()
+        self.inner
+            .commit_txn()
             .map_err(|e| PyIOError::new_err(e.to_string()))
     }
 
@@ -841,7 +1311,8 @@ impl PyDatabase {
     #[pyo3(signature = (txn=None))]
     pub fn abort(&self, txn: Option<u64>) -> PyResult<()> {
         let _ = txn;
-        self.inner.abort_txn()
+        self.inner
+            .abort_txn()
             .map_err(|e| PyIOError::new_err(e.to_string()))
     }
 
@@ -849,7 +1320,8 @@ impl PyDatabase {
     ///
     /// Ensures all committed data is persisted.
     pub fn fsync(&self) -> PyResult<()> {
-        self.inner.fsync()
+        self.inner
+            .fsync()
             .map_err(|e| PyIOError::new_err(e.to_string()))
     }
 
@@ -860,7 +1332,8 @@ impl PyDatabase {
     /// Returns:
     ///     Checkpoint sequence number.
     pub fn checkpoint(&self) -> PyResult<u64> {
-        self.inner.checkpoint()
+        self.inner
+            .checkpoint()
             .map_err(|e| PyIOError::new_err(e.to_string()))
     }
 
@@ -871,8 +1344,22 @@ impl PyDatabase {
     /// Returns:
     ///     Number of versions collected.
     pub fn gc(&self) -> PyResult<usize> {
-        self.inner.gc()
+        self.inner
+            .gc()
             .map_err(|e| PyIOError::new_err(e.to_string()))
+    }
+
+    /// Create a Python context-manager transaction wrapper.
+    pub fn transaction(slf: PyRef<'_, Self>) -> PyResult<PyTransaction> {
+        PyTransaction::new(slf.into())
+    }
+
+    /// Close the database handle.
+    ///
+    /// The underlying Rust connection cleans up on drop, so this is a
+    /// compatibility no-op for Python callers that expect an explicit close().
+    pub fn close(&self) -> PyResult<()> {
+        Ok(())
     }
 
     fn __repr__(&self) -> String {
@@ -977,35 +1464,633 @@ impl PyTransaction {
 /// Example:
 ///     >>> import numpy as np
 ///     >>> import sochdb
-///     >>> 
+///     >>>
 ///     >>> # Build index from embeddings
 ///     >>> embeddings = np.random.randn(10000, 768).astype(np.float32)
 ///     >>> index = sochdb.build_index(embeddings)
-///     >>> 
+///     >>>
 ///     >>> # Search
 ///     >>> query = np.random.randn(768).astype(np.float32)
 ///     >>> ids, distances = index.search(query, k=10)
 ///     >>>
+// =============================================================================
+// Table Database Python Wrapper (Relational / Columnar API)
+// =============================================================================
+
+/// Relational table database with columnar storage.
+///
+/// Provides CREATE TABLE, INSERT, and full-table scan with columnar results.
+/// Used for analytical benchmarks (H2O db-benchmark).
+///
+/// Example:
+///     >>> db = TableDatabase.open("/tmp/mydb", config="throughput")
+///     >>> db.register_table("users", [("id", "int64"), ("name", "text"), ("score", "float64")])
+///     >>> txn = db.begin_write()
+///     >>> db.insert_row(txn, "users", 0, [1, "Alice", 95.5])
+///     >>> db.commit(txn)
+///     >>> txn = db.begin_read()
+///     >>> result = db.scan_columnar(txn, "users")
+///     >>> db.abort_read(txn)
+#[pyclass(name = "TableDatabase")]
+pub struct PyTableDatabase {
+    inner: std::sync::Arc<StorageDatabase>,
+}
+
+#[pymethods]
+impl PyTableDatabase {
+    /// Open a relational table database at the given path.
+    ///
+    /// Args:
+    ///     path: Path to the database directory.
+    ///     config: Optional preset: "default", "throughput", "durable"
+    ///
+    /// Returns:
+    ///     TableDatabase handle.
+    #[staticmethod]
+    #[pyo3(signature = (path, config=None))]
+    pub fn open(path: &str, config: Option<&str>) -> PyResult<Self> {
+        let mut db_config = DatabaseConfig::default();
+        match config {
+            Some("throughput") | Some("fast") => {
+                db_config.sync_mode = SyncMode::Off;
+                db_config.group_commit = true;
+            }
+            Some("durable") | Some("safe") => {
+                db_config.sync_mode = SyncMode::Full;
+            }
+            Some("default") | None => {}
+            Some(other) => {
+                return Err(PyValueError::new_err(format!(
+                    "Unknown config: '{}'. Use 'default', 'throughput', or 'durable'",
+                    other
+                )));
+            }
+        }
+        let inner = StorageDatabase::open_with_config(path, db_config)
+            .map_err(|e| PyIOError::new_err(format!("Failed to open database: {}", e)))?;
+        Ok(Self { inner })
+    }
+
+    /// Register a table schema.
+    ///
+    /// Args:
+    ///     name: Table name.
+    ///     columns: List of (column_name, type_str) tuples.
+    ///              Types: "int64", "uint64", "float64", "text", "binary", "bool"
+    ///
+    /// Example:
+    ///     >>> db.register_table("x", [("id1", "text"), ("v1", "int64"), ("v3", "float64")])
+    pub fn register_table(&self, name: &str, columns: Vec<(String, String)>) -> PyResult<()> {
+        let cols: Vec<ColumnDef> = columns
+            .into_iter()
+            .map(|(col_name, type_str)| {
+                let col_type = match type_str.as_str() {
+                    "int64" | "int" | "integer" => ColumnType::Int64,
+                    "uint64" | "uint" => ColumnType::UInt64,
+                    "float64" | "float" | "double" => ColumnType::Float64,
+                    "text" | "string" | "varchar" => ColumnType::Text,
+                    "binary" | "blob" => ColumnType::Binary,
+                    "bool" | "boolean" => ColumnType::Bool,
+                    _ => ColumnType::Text, // fallback
+                };
+                ColumnDef {
+                    name: col_name,
+                    col_type,
+                    nullable: true,
+                }
+            })
+            .collect();
+
+        let schema = TableSchema {
+            name: name.to_string(),
+            columns: cols,
+        };
+        self.inner
+            .register_table(schema)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    /// Begin a write-only transaction (optimized for bulk inserts).
+    ///
+    /// Returns:
+    ///     Transaction handle (opaque integer pair).
+    pub fn begin_write(&self) -> PyResult<(u64, u64)> {
+        let txn = self
+            .inner
+            .begin_write_only()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((txn.txn_id, txn.snapshot_ts))
+    }
+
+    /// Begin a fast read-only transaction.
+    ///
+    /// Returns:
+    ///     Transaction handle.
+    pub fn begin_read(&self) -> (u64, u64) {
+        let txn = self.inner.begin_read_only_fast();
+        (txn.txn_id, txn.snapshot_ts)
+    }
+
+    /// Commit a write transaction.
+    pub fn commit(&self, txn: (u64, u64)) -> PyResult<u64> {
+        let handle = TxnHandle {
+            txn_id: txn.0,
+            snapshot_ts: txn.1,
+        };
+        self.inner
+            .commit(handle)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    /// Abort a write transaction.
+    pub fn abort(&self, txn: (u64, u64)) -> PyResult<()> {
+        let handle = TxnHandle {
+            txn_id: txn.0,
+            snapshot_ts: txn.1,
+        };
+        self.inner
+            .abort(handle)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    /// Abort a fast read-only transaction.
+    pub fn abort_read(&self, txn: (u64, u64)) {
+        let handle = TxnHandle {
+            txn_id: txn.0,
+            snapshot_ts: txn.1,
+        };
+        self.inner.abort_read_only_fast(handle);
+    }
+
+    /// Insert a row into a table (zero-allocation fast path).
+    ///
+    /// Args:
+    ///     txn: Transaction handle from begin_write().
+    ///     table: Table name.
+    ///     row_id: Row identifier (u64).
+    ///     values: List of values in schema column order. None = NULL.
+    ///
+    /// Example:
+    ///     >>> db.insert_row(txn, "users", 0, [1, "Alice", 95.5])
+    pub fn insert_row(
+        &self,
+        txn: (u64, u64),
+        table: &str,
+        row_id: u64,
+        values: Vec<Option<PyObject>>,
+        py: Python<'_>,
+    ) -> PyResult<()> {
+        let handle = TxnHandle {
+            txn_id: txn.0,
+            snapshot_ts: txn.1,
+        };
+
+        // Get schema to map Python objects to SochValues
+        let schema = self
+            .inner
+            .get_table_schema(table)
+            .ok_or_else(|| PyValueError::new_err(format!("Table '{}' not found", table)))?;
+
+        if values.len() != schema.columns.len() {
+            return Err(PyValueError::new_err(format!(
+                "Expected {} values, got {}",
+                schema.columns.len(),
+                values.len()
+            )));
+        }
+
+        // Convert Python values to SochValues
+        let soch_values: Vec<Option<SochValue>> = values
+            .into_iter()
+            .zip(schema.columns.iter())
+            .map(|(val, col)| match val {
+                None => Ok(None),
+                Some(obj) => {
+                    let sv = match col.col_type {
+                        ColumnType::Int64 => {
+                            let v: i64 = obj.extract(py)?;
+                            SochValue::Int(v)
+                        }
+                        ColumnType::UInt64 => {
+                            let v: u64 = obj.extract(py)?;
+                            SochValue::UInt(v)
+                        }
+                        ColumnType::Float64 => {
+                            let v: f64 = obj.extract(py)?;
+                            SochValue::Float(v)
+                        }
+                        ColumnType::Text => {
+                            let v: String = obj.extract(py)?;
+                            SochValue::Text(v)
+                        }
+                        ColumnType::Binary => {
+                            let v: Vec<u8> = obj.extract(py)?;
+                            SochValue::Binary(v)
+                        }
+                        ColumnType::Bool => {
+                            let v: bool = obj.extract(py)?;
+                            SochValue::Bool(v)
+                        }
+                    };
+                    Ok(Some(sv))
+                }
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+
+        // Build slice references for insert_row_slice
+        let refs: Vec<Option<&SochValue>> = soch_values.iter().map(|v| v.as_ref()).collect();
+
+        self.inner
+            .insert_row_slice(handle, table, row_id, &refs)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    /// Bulk insert rows from a CSV file into a table.
+    ///
+    /// This is the fast path for loading CSV data into SochDB — reads CSV
+    /// in Rust, converts to SochValues, uses insert_row_slice. GIL is
+    /// released during the bulk insert.
+    ///
+    /// Args:
+    ///     table: Table name (must already be registered).
+    ///     csv_path: Path to CSV file (with header row matching schema).
+    ///
+    /// Returns:
+    ///     Number of rows inserted.
+    pub fn load_csv(&self, table: &str, csv_path: &str, py: Python<'_>) -> PyResult<u64> {
+        let table_name = table.to_string();
+        let path = csv_path.to_string();
+        let db = self.inner.clone();
+
+        // Get schema for type mapping
+        let schema = db
+            .get_table_schema(&table_name)
+            .ok_or_else(|| PyValueError::new_err(format!("Table '{}' not found", table_name)))?;
+
+        // Release GIL during bulk insert
+        py.allow_threads(move || {
+            let mut txn = db
+                .begin_write_only()
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+            let mut rdr = csv::ReaderBuilder::new()
+                .from_path(&path)
+                .map_err(|e| PyIOError::new_err(format!("CSV error: {}", e)))?;
+
+            let mut row_id: u64 = 0;
+            let mut row_values: Vec<SochValue> = Vec::with_capacity(schema.columns.len());
+
+            for result in rdr.records() {
+                let record =
+                    result.map_err(|e| PyIOError::new_err(format!("CSV record error: {}", e)))?;
+
+                row_values.clear();
+                for (i, col) in schema.columns.iter().enumerate() {
+                    let field = record.get(i).ok_or_else(|| {
+                        PyValueError::new_err(format!("Row {} missing column {}", row_id, i))
+                    })?;
+
+                    let val = match col.col_type {
+                        ColumnType::Int64 => SochValue::Int(field.parse::<i64>().map_err(|e| {
+                            PyValueError::new_err(format!(
+                                "Row {}, col '{}': {}",
+                                row_id, col.name, e
+                            ))
+                        })?),
+                        ColumnType::UInt64 => {
+                            SochValue::UInt(field.parse::<u64>().map_err(|e| {
+                                PyValueError::new_err(format!(
+                                    "Row {}, col '{}': {}",
+                                    row_id, col.name, e
+                                ))
+                            })?)
+                        }
+                        ColumnType::Float64 => {
+                            SochValue::Float(field.parse::<f64>().map_err(|e| {
+                                PyValueError::new_err(format!(
+                                    "Row {}, col '{}': {}",
+                                    row_id, col.name, e
+                                ))
+                            })?)
+                        }
+                        ColumnType::Text => SochValue::Text(field.to_string()),
+                        ColumnType::Binary => SochValue::Binary(field.as_bytes().to_vec()),
+                        ColumnType::Bool => SochValue::Bool(field == "true" || field == "1"),
+                    };
+                    row_values.push(val);
+                }
+
+                let refs: Vec<Option<&SochValue>> = row_values.iter().map(|v| Some(v)).collect();
+                db.insert_row_slice(txn, &table_name, row_id, &refs)
+                    .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+                row_id += 1;
+
+                // Commit in batches of 100K to avoid WAL pressure
+                if row_id % 100_000 == 0 {
+                    db.commit(txn)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+                    txn = db
+                        .begin_write_only()
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+                }
+            }
+
+            db.commit(txn)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+            Ok(row_id)
+        })
+    }
+
+    /// Scan a table and return columnar results as Python dict of lists.
+    ///
+    /// Returns a dict where keys are column names and values are Python lists.
+    /// Int64 columns return list[int], Float64 → list[float], Text → list[str].
+    ///
+    /// Args:
+    ///     txn: Transaction handle from begin_read().
+    ///     table: Table name.
+    ///     columns: Optional list of column names to project (None = all).
+    ///
+    /// Returns:
+    ///     Dict[str, list] — columnar data.
+    ///
+    /// Example:
+    ///     >>> txn = db.begin_read()
+    ///     >>> data = db.scan_columnar(txn, "users")
+    ///     >>> print(data["name"])  # ['Alice', 'Bob', ...]
+    ///     >>> db.abort_read(txn)
+    #[pyo3(signature = (txn, table, columns=None))]
+    pub fn scan_columnar(
+        &self,
+        py: Python<'_>,
+        txn: (u64, u64),
+        table: &str,
+        columns: Option<Vec<String>>,
+    ) -> PyResult<PyObject> {
+        let handle = TxnHandle {
+            txn_id: txn.0,
+            snapshot_ts: txn.1,
+        };
+
+        let mut query_builder = self.inner.query(handle, table);
+        if let Some(ref cols) = columns {
+            let col_refs: Vec<&str> = cols.iter().map(|s| s.as_str()).collect();
+            query_builder = query_builder.columns(&col_refs);
+        }
+
+        let result = query_builder
+            .as_columnar()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+        // Convert to Python dict of lists
+        let dict = pyo3::types::PyDict::new(py);
+
+        for (i, col_name) in result.columns.iter().enumerate() {
+            let col = &result.data[i];
+            let py_list = match col {
+                sochdb_core::columnar::TypedColumn::Int64 {
+                    values, validity, ..
+                } => {
+                    let list = pyo3::types::PyList::empty(py);
+                    for j in 0..result.row_count {
+                        if !validity.is_valid(j) {
+                            list.append(py.None())?;
+                        } else if j < values.len() {
+                            list.append(values[j])?;
+                        } else {
+                            list.append(py.None())?;
+                        }
+                    }
+                    list
+                }
+                sochdb_core::columnar::TypedColumn::UInt64 {
+                    values, validity, ..
+                } => {
+                    let list = pyo3::types::PyList::empty(py);
+                    for j in 0..result.row_count {
+                        if !validity.is_valid(j) {
+                            list.append(py.None())?;
+                        } else if j < values.len() {
+                            list.append(values[j])?;
+                        } else {
+                            list.append(py.None())?;
+                        }
+                    }
+                    list
+                }
+                sochdb_core::columnar::TypedColumn::Float64 {
+                    values, validity, ..
+                } => {
+                    let list = pyo3::types::PyList::empty(py);
+                    for j in 0..result.row_count {
+                        if !validity.is_valid(j) {
+                            list.append(py.None())?;
+                        } else if j < values.len() {
+                            list.append(values[j])?;
+                        } else {
+                            list.append(py.None())?;
+                        }
+                    }
+                    list
+                }
+                sochdb_core::columnar::TypedColumn::Text {
+                    offsets,
+                    data,
+                    validity,
+                    ..
+                } => {
+                    let list = pyo3::types::PyList::empty(py);
+                    for j in 0..result.row_count {
+                        if !validity.is_valid(j) {
+                            list.append(py.None())?;
+                        } else if j + 1 < offsets.len() {
+                            let start = offsets[j] as usize;
+                            let end = offsets[j + 1] as usize;
+                            let s = std::str::from_utf8(&data[start..end]).unwrap_or("");
+                            list.append(s)?;
+                        } else {
+                            list.append(py.None())?;
+                        }
+                    }
+                    list
+                }
+                sochdb_core::columnar::TypedColumn::Bool {
+                    values, validity, ..
+                } => {
+                    let list = pyo3::types::PyList::empty(py);
+                    for j in 0..result.row_count {
+                        if !validity.is_valid(j) {
+                            list.append(py.None())?;
+                        } else if j < values.len() {
+                            list.append(values[j])?;
+                        } else {
+                            list.append(py.None())?;
+                        }
+                    }
+                    list
+                }
+                sochdb_core::columnar::TypedColumn::Binary {
+                    offsets,
+                    data,
+                    validity,
+                    ..
+                } => {
+                    let list = pyo3::types::PyList::empty(py);
+                    for j in 0..result.row_count {
+                        if !validity.is_valid(j) {
+                            list.append(py.None())?;
+                        } else if j + 1 < offsets.len() {
+                            let start = offsets[j] as usize;
+                            let end = offsets[j + 1] as usize;
+                            list.append(PyBytes::new(py, &data[start..end]))?;
+                        } else {
+                            list.append(py.None())?;
+                        }
+                    }
+                    list
+                }
+            };
+            dict.set_item(col_name, py_list)?;
+        }
+
+        // Add metadata
+        dict.set_item("__row_count__", result.row_count)?;
+        dict.set_item("__bytes_read__", result.bytes_read)?;
+
+        Ok(dict.into())
+    }
+
+    /// Get the number of tables registered.
+    pub fn table_count(&self) -> usize {
+        self.inner.list_tables().len()
+    }
+
+    /// List all registered table names.
+    pub fn list_tables(&self) -> Vec<String> {
+        self.inner.list_tables()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("TableDatabase(tables={})", self.inner.list_tables().len())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn load_csv_rolls_over_transactions_after_batch_commit() {
+        pyo3::prepare_freethreaded_python();
+
+        let dir = tempdir().unwrap();
+        let csv_path = dir.path().join("users.csv");
+        let total_rows = 100_005u64;
+
+        let mut csv_file = File::create(&csv_path).unwrap();
+        writeln!(csv_file, "id,name").unwrap();
+        for row_id in 0..total_rows {
+            writeln!(csv_file, "{},user_{}", row_id, row_id).unwrap();
+        }
+        drop(csv_file);
+
+        Python::with_gil(|py| {
+            let db =
+                PyTableDatabase::open(dir.path().to_str().unwrap(), Some("throughput")).unwrap();
+            db.register_table(
+                "users",
+                vec![
+                    ("id".to_string(), "int64".to_string()),
+                    ("name".to_string(), "text".to_string()),
+                ],
+            )
+            .unwrap();
+
+            let inserted = db
+                .load_csv("users", csv_path.to_str().unwrap(), py)
+                .unwrap();
+            assert_eq!(inserted, total_rows);
+            assert_eq!(db.table_count(), 1);
+
+            let txn = db.inner.begin_read_only_fast();
+
+            let row_before_boundary = db
+                .inner
+                .read_row(txn, "users", 99_999, None)
+                .unwrap()
+                .unwrap();
+            assert_eq!(row_before_boundary.get("id"), Some(&SochValue::Int(99_999)));
+            assert_eq!(
+                row_before_boundary.get("name"),
+                Some(&SochValue::Text("user_99999".to_string()))
+            );
+
+            let row_at_boundary = db
+                .inner
+                .read_row(txn, "users", 100_000, None)
+                .unwrap()
+                .unwrap();
+            assert_eq!(row_at_boundary.get("id"), Some(&SochValue::Int(100_000)));
+            assert_eq!(
+                row_at_boundary.get("name"),
+                Some(&SochValue::Text("user_100000".to_string()))
+            );
+
+            let row_after_boundary = db
+                .inner
+                .read_row(txn, "users", total_rows - 1, None)
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                row_after_boundary.get("id"),
+                Some(&SochValue::Int((total_rows - 1) as i64))
+            );
+            assert_eq!(
+                row_after_boundary.get("name"),
+                Some(&SochValue::Text(format!("user_{}", total_rows - 1)))
+            );
+
+            db.inner.abort_read_only_fast(txn);
+        });
+    }
+}
+
 ///     >>> # Key-value database API
 ///     >>> db = sochdb.Database.open("./my_db")
 ///     >>> db.put(b"key", b"value")
 ///     >>> value = db.get(b"key")
 #[pymodule]
-fn sochdb(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Vector index
     m.add_class::<PyHnswIndex>()?;
+    m.add_class::<PySearchResult>()?;
     m.add_function(wrap_pyfunction!(build_index, m)?)?;
-    
+
+    // Hybrid retrieval primitives from sochdb-vector
+    m.add_class::<PyBM25Index>()?;
+    m.add_class::<PyRRFFusion>()?;
+
+    // Three-lane native hybrid retrieval (grep + BM25 + HNSW → RRF fusion)
+    m.add_class::<hybrid3::PyThreeLaneHybridIndex>()?;
+
     // Database API (Task 5)
     m.add_class::<PyDatabase>()?;
     m.add_class::<PyTransaction>()?;
-    
+
+    // Table Database API (relational/columnar)
+    m.add_class::<PyTableDatabase>()?;
+
     // Utilities
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(is_safe_mode, m)?)?;
-    
+
     // Module metadata
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    
+
     Ok(())
 }

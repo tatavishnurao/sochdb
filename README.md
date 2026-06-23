@@ -1,12 +1,19 @@
 <h1 align="center">
-    <img src="https://github.com/sochdb/sochdb/raw/main/sochdbicon.png" alt="SochDB icon" width="72" height="72" />
+    <img src="https://github.com/sochdb/sochdb/raw/main/sochdbicon.png" alt="SochDB icon" width="150" height="150" />
     <br>
-    SochDB
 </h1>
 
 ## What is SochDB?
 
-SochDB is a **single database** that replaces your vector DB + relational DB + prompt packer stack. Store structured data, embeddings, and conversation history together—then ask SochDB to assemble token-optimized context for your LLM.
+SochDB is an **embedded, AI-native database** that puts your structured data, embeddings, and agent memory in **one engine, one file** — then assembles token-budgeted context for your LLM in a single query.
+
+Instead of wiring a relational DB + a vector DB + a cache + prompt-packing glue, you get it all on one ACID, columnar storage engine — embedded, offline-capable, no servers:
+
+- **SQL** — SQL-92-compatible with `JOIN`s, aggregates (`GROUP BY` / `SUM` / `AVG` / `HAVING`), and MySQL/PostgreSQL/SQLite dialect normalization
+- **Vector + keyword hybrid search** — HNSW vectors fused with BM25 via Reciprocal Rank Fusion
+- **Bi-temporal knowledge graph** — relationships with point-in-time ("as-of") recall
+- **Context Query Builder** — multi-source fusion under a token budget, with TOON dense output
+- **Full ACID** — MVCC + WAL + Serializable Snapshot Isolation
 
 ## Comparison
 
@@ -96,7 +103,7 @@ SochDB is a **single database** that replaces your vector DB + relational DB + p
                                       │
                     ┌─────────────────┴─────────────────┐
                     │  😎 What you actually ship:       │
-                    │  • Single ~700KB embedded DB      │
+                    │  • Single ~2.5MB embedded lib     │
                     │  • Zero external dependencies     │
                     │  • Works offline                  │
                     │  • Deploys anywhere               │
@@ -118,27 +125,13 @@ SochDB is a **single database** that replaces your vector DB + relational DB + p
 
 ## Key Features
 
+🗃️ **Real SQL** — SQL-92-compatible engine with `JOIN`s, aggregates (`GROUP BY`/`SUM`/`AVG`/`HAVING`), and MySQL/PostgreSQL/SQLite dialect normalization  
 🧠 **Context Query Builder** — Assemble system + user + history + retrieval under a token budget  
 🔍 **Hybrid Search** — HNSW vectors + BM25 keywords with reciprocal rank fusion  
-🕸️ **Graph Overlay** — Lightweight relationship tracking for agent memory  
-⚡ **Embedded-First** — ~700KB binary, no runtime dependencies, SQLite-style simplicity  
+🕸️ **Graph + Time-Travel** — Property graph with bi-temporal, point-in-time recall  
+⚡ **Embedded-First** — single ~2.5 MB native library, no runtime dependencies, SQLite-style simplicity  
 🔒 **Full ACID** — MVCC + WAL + Serializable Snapshot Isolation  
 📊 **Columnar Storage** — Read only the columns you need  
-
----
-
-## Why SochDB exists
-
-Most "agent stacks" still glue together:
-
-* a KV store (sessions / state)
-* a vector DB (retrieval)
-* a prompt packer (context budgeting, truncation)
-* a relational DB (metadata)
-
-…and then spend weeks maintaining brittle context assembly and token budgeting.
-
-**SochDB collapses that stack into one LLM‑native substrate**: you store structured data + embeddings + history *and* ask the DB to produce a token‑efficient context payload.
 
 ---
 
@@ -180,20 +173,6 @@ Most "agent stacks" still glue together:
 - **Bulk vector operations** for high-throughput ingestion
   - **BatchAccumulator**: deferred graph construction — 4–5× faster inserts via zero-FFI numpy accumulation + single bulk Rayon-parallel HNSW build
 
-### Known limits
-
-- **Single-node only** (no replication / clustering yet)
----
-
-## SochDB in one picture
-
-| Problem           | Typical approach               | SochDB approach                     |
-| ----------------- | ------------------------------ | ----------------------------------- |
-| Token waste       | JSON/SQL payload bloat         | **TOON**: dense, table-like output  |
-| RAG plumbing      | External vector DB + glue      | **Built-in HNSW** + quantization    |
-| Context assembly  | multiple reads + custom packer | **One context query** with a budget |
-| I/O amplification | row store reads all columns    | **columnar** + projection pushdown  |
-
 ---
 
 ## 📦 Quick Start
@@ -204,16 +183,19 @@ Choose your preferred SDK:
 
 ```bash
 # Rust - add to Cargo.toml
-sochdb = "0.2"
+sochdb = "2.0.4"
 ```
 
 ### SDK Repositories
 
-Language SDKs are maintained in separate repositories with their own release cycles:
+Language SDKs are maintained in separate packages and repos with their own release cycles:
 
 | Language | Repository | Installation |
 |----------|------------|-------------|
+| **Rust** | This repository | `cargo add sochdb` |
 | **Python** | [sochdb-python-sdk](https://github.com/sochdb/sochdb-python-sdk) | `pip install sochdb` |
+| **Node.js/TypeScript** | [sochdb-nodejs-sdk](https://github.com/sochdb/sochdb-nodejs-sdk) | `npm install @sochdb/sochdb` |
+| **Go** | [sochdb-go](https://github.com/sochdb/sochdb-go) | `go get github.com/sochdb/sochdb-go@latest` |
 
 ### 🐳 Docker Deployment
 
@@ -221,15 +203,15 @@ SochDB includes a production-ready Docker setup with gRPC server:
 
 ```bash
 # Pull and run from Docker Hub
-docker pull sushanth53/sochdb:latest
-docker run -d -p 50051:50051 sushanth53/sochdb:latest
+docker pull sochdb/sochdb:latest
+docker run -d -p 50051:50051 sochdb/sochdb:latest
 
 # Or use docker-compose
 cd docker
 docker compose up -d
 ```
 
-**Docker Hub:** [`sushanth53/sochdb`](https://hub.docker.com/r/sushanth53/sochdb)
+**Docker Hub:** [`sochdb/sochdb`](https://hub.docker.com/r/sochdb/sochdb)
 
 **Features:**
 - ✅ Production-ready image (159MB)
@@ -1202,7 +1184,7 @@ with index.batch_accumulator(estimated_size=50_000) as acc:
 
 ### MemoryAgentBench: Head-to-Head RAG Comparison
 
-> **Version**: 0.5.0 | **Benchmark Date**: February 2026 | **LLM**: Azure OpenAI gpt-4.1-mini | **Framework**: [MemoryAgentBench](https://arxiv.org/abs/2507.05257) (UCSD)
+> **Version**: 2.0.0 | **Benchmark Date**: February 2026 | **LLM**: Azure OpenAI gpt-4.1-mini | **Framework**: [MemoryAgentBench](https://arxiv.org/abs/2507.05257) (UCSD)
 
 We evaluated SochDB head-to-head against **7 RAG competitors** using **MemoryAgentBench** — an academic benchmark from UCSD that tests how well memory systems help LLMs retrieve facts from multi-turn conversations over long contexts (up to 197K+ tokens).
 
@@ -1586,11 +1568,12 @@ cargo bench
 
 ---
 
-## ⚠️ Before heavy production use
+## 🛠 Running in production
 
-* **Single node** (no replication / clustering)
-* **WAL growth**: call `checkpoint()` periodically for long-running services (auto-trigger config available via `CheckpointConfig`)
-* **Group commit**: tune per workload (disable for strictly sequential writes)
+SochDB runs as a **single-node embedded engine** today (distributed replication/clustering is on the [roadmap](#-cloud-roadmap)) — ideal for local-first, edge, and per-service deployments. A couple of knobs let you tune it to your workload:
+
+* **Checkpointing**: call `checkpoint()` periodically for long-running services to keep the WAL compact — or enable automatic triggering via `CheckpointConfig`.
+* **Group commit**: tune per workload for throughput vs. latency (disable for strictly sequential writes).
 
 ---
 

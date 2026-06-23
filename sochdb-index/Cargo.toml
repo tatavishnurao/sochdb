@@ -16,7 +16,8 @@ description = "SochDB indexing (HNSW vector index and related utilities)"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-sochdb-core = { version = "0.5.0", path = "../sochdb-core" }
+rustc-hash = "2"  # fast non-crypto hasher for hot-path integer-keyed maps
+sochdb-core = { version = "2.0.11", path = "../sochdb-core" }
 dashmap = { workspace = true }
 parking_lot = { workspace = true }
 moka = { workspace = true }  # LRU cache for path resolution
@@ -62,6 +63,9 @@ fastembed-embeddings = ["dep:fastembed"]
 # Tokio opt-in via "async" (workspace Rule #2)
 async = ["llm-embeddings"]
 llm-embeddings = ["dep:llm", "dep:tokio", "dep:async-trait"]
+# Experimental / not-yet-wired subsystems. Quarantined behind this feature so
+# the default build surface stays minimal. Enable explicitly: `--features experimental`.
+experimental = []
 
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -92,4 +96,8 @@ harness = false
 
 [[bench]]
 name = "perf_regression"
+harness = false
+
+[[bench]]
+name = "recall_latency"
 harness = false

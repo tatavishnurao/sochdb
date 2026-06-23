@@ -89,16 +89,16 @@ impl SimdCapability {
                 return SimdCapability::Sse41;
             }
         }
-        
+
         #[cfg(target_arch = "aarch64")]
         {
             // NEON is always available on aarch64
             return SimdCapability::Neon;
         }
-        
+
         SimdCapability::Scalar
     }
-    
+
     /// Width in f32 elements
     pub fn width(&self) -> usize {
         match self {
@@ -146,7 +146,7 @@ impl DistanceKernel {
     #[inline]
     pub fn l2_squared(&self, a: &[f32], b: &[f32]) -> f32 {
         debug_assert_eq!(a.len(), b.len());
-        
+
         match self.capability {
             #[cfg(target_arch = "x86_64")]
             SimdCapability::Avx512 => unsafe { l2_squared_avx512(a, b) },
@@ -164,7 +164,7 @@ impl DistanceKernel {
     #[inline]
     pub fn dot_product(&self, a: &[f32], b: &[f32]) -> f32 {
         debug_assert_eq!(a.len(), b.len());
-        
+
         match self.capability {
             #[cfg(target_arch = "x86_64")]
             SimdCapability::Avx512 => unsafe { dot_product_avx512(a, b) },
@@ -184,11 +184,11 @@ impl DistanceKernel {
         let dot = self.dot_product(a, b);
         let norm_a = self.dot_product(a, a).sqrt();
         let norm_b = self.dot_product(b, b).sqrt();
-        
+
         if norm_a < 1e-10 || norm_b < 1e-10 {
             return 1.0;
         }
-        
+
         1.0 - (dot / (norm_a * norm_b))
     }
 
@@ -235,18 +235,18 @@ pub fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn l2_squared_avx2(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::x86_64::*;
-    
+
     let n = a.len();
     let mut sum0 = _mm256_setzero_ps();
     let mut sum1 = _mm256_setzero_ps();
     let mut sum2 = _mm256_setzero_ps();
     let mut sum3 = _mm256_setzero_ps();
-    
+
     let chunks = n / 8;
     let chunks4 = chunks / 4;
     let a_ptr = a.as_ptr();
     let b_ptr = b.as_ptr();
-    
+
     for i in 0..chunks4 {
         let base = i * 32;
 
@@ -282,22 +282,22 @@ pub unsafe fn l2_squared_avx2(a: &[f32], b: &[f32]) -> f32 {
     let sum01 = _mm256_add_ps(sum0, sum1);
     let sum23 = _mm256_add_ps(sum2, sum3);
     let sum = _mm256_add_ps(sum01, sum23);
-    
+
     // Horizontal sum
     let sum_high = _mm256_extractf128_ps(sum, 1);
     let sum_low = _mm256_castps256_ps128(sum);
     let sum128 = _mm_add_ps(sum_low, sum_high);
     let sum64 = _mm_add_ps(sum128, _mm_movehl_ps(sum128, sum128));
     let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
-    
+
     let mut result = _mm_cvtss_f32(sum32);
-    
+
     // Handle remainder
     for i in (chunks * 8)..n {
         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
         result += diff * diff;
     }
-    
+
     result
 }
 
@@ -306,35 +306,67 @@ pub unsafe fn l2_squared_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::x86_64::*;
-    
+
     let n = a.len();
-    let mut sum = _mm256_setzero_ps();
-    
+    // Four independent accumulators to hide FMA latency (~4-5 cyc) with ILP — a
+    // single dependent chain is latency-bound at ~1 FMA / 4-5 cyc, leaving the
+    // FMA units idle. Mirrors l2_squared_avx2 / dot_product_neon. Float
+    // reassociation only (≈1e-6, within the SIMD-vs-scalar consistency tolerance).
+    let mut sum0 = _mm256_setzero_ps();
+    let mut sum1 = _mm256_setzero_ps();
+    let mut sum2 = _mm256_setzero_ps();
+    let mut sum3 = _mm256_setzero_ps();
+
     let chunks = n / 8;
+    let chunks4 = chunks / 4;
     let a_ptr = a.as_ptr();
     let b_ptr = b.as_ptr();
-    
-    for i in 0..chunks {
+
+    for i in 0..chunks4 {
+        let base = i * 32;
+
+        let va0 = _mm256_loadu_ps(a_ptr.add(base));
+        let vb0 = _mm256_loadu_ps(b_ptr.add(base));
+        sum0 = _mm256_fmadd_ps(va0, vb0, sum0);
+
+        let va1 = _mm256_loadu_ps(a_ptr.add(base + 8));
+        let vb1 = _mm256_loadu_ps(b_ptr.add(base + 8));
+        sum1 = _mm256_fmadd_ps(va1, vb1, sum1);
+
+        let va2 = _mm256_loadu_ps(a_ptr.add(base + 16));
+        let vb2 = _mm256_loadu_ps(b_ptr.add(base + 16));
+        sum2 = _mm256_fmadd_ps(va2, vb2, sum2);
+
+        let va3 = _mm256_loadu_ps(a_ptr.add(base + 24));
+        let vb3 = _mm256_loadu_ps(b_ptr.add(base + 24));
+        sum3 = _mm256_fmadd_ps(va3, vb3, sum3);
+    }
+
+    for i in (chunks4 * 4)..chunks {
         let offset = i * 8;
         let va = _mm256_loadu_ps(a_ptr.add(offset));
         let vb = _mm256_loadu_ps(b_ptr.add(offset));
-        sum = _mm256_fmadd_ps(va, vb, sum);
+        sum0 = _mm256_fmadd_ps(va, vb, sum0);
     }
-    
+
+    let sum01 = _mm256_add_ps(sum0, sum1);
+    let sum23 = _mm256_add_ps(sum2, sum3);
+    let sum = _mm256_add_ps(sum01, sum23);
+
     // Horizontal sum
     let sum_high = _mm256_extractf128_ps(sum, 1);
     let sum_low = _mm256_castps256_ps128(sum);
     let sum128 = _mm_add_ps(sum_low, sum_high);
     let sum64 = _mm_add_ps(sum128, _mm_movehl_ps(sum128, sum128));
     let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
-    
+
     let mut result = _mm_cvtss_f32(sum32);
-    
+
     // Handle remainder
     for i in (chunks * 8)..n {
         result += *a.get_unchecked(i) * *b.get_unchecked(i);
     }
-    
+
     result
 }
 
@@ -347,14 +379,14 @@ pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn l2_squared_sse41(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::x86_64::*;
-    
+
     let n = a.len();
     let mut sum = _mm_setzero_ps();
-    
+
     let chunks = n / 4;
     let a_ptr = a.as_ptr();
     let b_ptr = b.as_ptr();
-    
+
     for i in 0..chunks {
         let offset = i * 4;
         let va = _mm_loadu_ps(a_ptr.add(offset));
@@ -363,19 +395,19 @@ pub unsafe fn l2_squared_sse41(a: &[f32], b: &[f32]) -> f32 {
         let sq = _mm_mul_ps(diff, diff);
         sum = _mm_add_ps(sum, sq);
     }
-    
+
     // Horizontal sum
     let sum64 = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
     let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
-    
+
     let mut result = _mm_cvtss_f32(sum32);
-    
+
     // Handle remainder
     for i in (chunks * 4)..n {
         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
         result += diff * diff;
     }
-    
+
     result
 }
 
@@ -384,14 +416,14 @@ pub unsafe fn l2_squared_sse41(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn dot_product_sse41(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::x86_64::*;
-    
+
     let n = a.len();
     let mut sum = _mm_setzero_ps();
-    
+
     let chunks = n / 4;
     let a_ptr = a.as_ptr();
     let b_ptr = b.as_ptr();
-    
+
     for i in 0..chunks {
         let offset = i * 4;
         let va = _mm_loadu_ps(a_ptr.add(offset));
@@ -399,18 +431,18 @@ pub unsafe fn dot_product_sse41(a: &[f32], b: &[f32]) -> f32 {
         let prod = _mm_mul_ps(va, vb);
         sum = _mm_add_ps(sum, prod);
     }
-    
+
     // Horizontal sum
     let sum64 = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
     let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
-    
+
     let mut result = _mm_cvtss_f32(sum32);
-    
+
     // Handle remainder
     for i in (chunks * 4)..n {
         result += *a.get_unchecked(i) * *b.get_unchecked(i);
     }
-    
+
     result
 }
 
@@ -423,14 +455,14 @@ pub unsafe fn dot_product_sse41(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn l2_squared_avx512(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::x86_64::*;
-    
+
     let n = a.len();
     let mut sum = _mm512_setzero_ps();
-    
+
     let chunks = n / 16;
     let a_ptr = a.as_ptr();
     let b_ptr = b.as_ptr();
-    
+
     for i in 0..chunks {
         let offset = i * 16;
         let va = _mm512_loadu_ps(a_ptr.add(offset));
@@ -438,16 +470,16 @@ pub unsafe fn l2_squared_avx512(a: &[f32], b: &[f32]) -> f32 {
         let diff = _mm512_sub_ps(va, vb);
         sum = _mm512_fmadd_ps(diff, diff, sum);
     }
-    
+
     // Reduce to scalar
     let mut result = _mm512_reduce_add_ps(sum);
-    
+
     // Handle remainder
     for i in (chunks * 16)..n {
         let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
         result += diff * diff;
     }
-    
+
     result
 }
 
@@ -456,29 +488,61 @@ pub unsafe fn l2_squared_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::x86_64::*;
-    
+
     let n = a.len();
-    let mut sum = _mm512_setzero_ps();
-    
+    // Four independent accumulators for FMA-latency-hiding ILP (see
+    // dot_product_avx2). Float reassociation only; within consistency tolerance.
+    let mut sum0 = _mm512_setzero_ps();
+    let mut sum1 = _mm512_setzero_ps();
+    let mut sum2 = _mm512_setzero_ps();
+    let mut sum3 = _mm512_setzero_ps();
+
     let chunks = n / 16;
+    let chunks4 = chunks / 4;
     let a_ptr = a.as_ptr();
     let b_ptr = b.as_ptr();
-    
-    for i in 0..chunks {
+
+    for i in 0..chunks4 {
+        let base = i * 64;
+        sum0 = _mm512_fmadd_ps(
+            _mm512_loadu_ps(a_ptr.add(base)),
+            _mm512_loadu_ps(b_ptr.add(base)),
+            sum0,
+        );
+        sum1 = _mm512_fmadd_ps(
+            _mm512_loadu_ps(a_ptr.add(base + 16)),
+            _mm512_loadu_ps(b_ptr.add(base + 16)),
+            sum1,
+        );
+        sum2 = _mm512_fmadd_ps(
+            _mm512_loadu_ps(a_ptr.add(base + 32)),
+            _mm512_loadu_ps(b_ptr.add(base + 32)),
+            sum2,
+        );
+        sum3 = _mm512_fmadd_ps(
+            _mm512_loadu_ps(a_ptr.add(base + 48)),
+            _mm512_loadu_ps(b_ptr.add(base + 48)),
+            sum3,
+        );
+    }
+
+    for i in (chunks4 * 4)..chunks {
         let offset = i * 16;
         let va = _mm512_loadu_ps(a_ptr.add(offset));
         let vb = _mm512_loadu_ps(b_ptr.add(offset));
-        sum = _mm512_fmadd_ps(va, vb, sum);
+        sum0 = _mm512_fmadd_ps(va, vb, sum0);
     }
-    
+
+    let sum = _mm512_add_ps(_mm512_add_ps(sum0, sum1), _mm512_add_ps(sum2, sum3));
+
     // Reduce to scalar
     let mut result = _mm512_reduce_add_ps(sum);
-    
+
     // Handle remainder
     for i in (chunks * 16)..n {
         result += *a.get_unchecked(i) * *b.get_unchecked(i);
     }
-    
+
     result
 }
 
@@ -490,15 +554,15 @@ pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn l2_squared_neon(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::aarch64::*;
-    
+
     unsafe {
         let n = a.len();
         let mut sum = vdupq_n_f32(0.0);
-        
+
         let chunks = n / 4;
         let a_ptr = a.as_ptr();
         let b_ptr = b.as_ptr();
-        
+
         for i in 0..chunks {
             let offset = i * 4;
             let va = vld1q_f32(a_ptr.add(offset));
@@ -506,16 +570,16 @@ pub unsafe fn l2_squared_neon(a: &[f32], b: &[f32]) -> f32 {
             let diff = vsubq_f32(va, vb);
             sum = vfmaq_f32(sum, diff, diff);
         }
-        
+
         // Horizontal sum
         let mut result = vaddvq_f32(sum);
-        
+
         // Handle remainder
         for i in (chunks * 4)..n {
             let diff = *a.get_unchecked(i) - *b.get_unchecked(i);
             result += diff * diff;
         }
-        
+
         result
     }
 }
@@ -524,30 +588,48 @@ pub unsafe fn l2_squared_neon(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::aarch64::*;
-    
+
     unsafe {
         let n = a.len();
-        let mut sum = vdupq_n_f32(0.0);
-        
-        let chunks = n / 4;
         let a_ptr = a.as_ptr();
         let b_ptr = b.as_ptr();
-        
-        for i in 0..chunks {
-            let offset = i * 4;
-            let va = vld1q_f32(a_ptr.add(offset));
-            let vb = vld1q_f32(b_ptr.add(offset));
-            sum = vfmaq_f32(sum, va, vb);
+
+        // 4 independent accumulators (16 floats/iter) to hide FMLA latency.
+        // Apple Silicon FMLA has ~3-4 cycle latency but high throughput; a
+        // single dependent accumulator chain stalls, so we widen the ILP.
+        let mut s0 = vdupq_n_f32(0.0);
+        let mut s1 = vdupq_n_f32(0.0);
+        let mut s2 = vdupq_n_f32(0.0);
+        let mut s3 = vdupq_n_f32(0.0);
+
+        let mut i = 0;
+        while i + 16 <= n {
+            s0 = vfmaq_f32(s0, vld1q_f32(a_ptr.add(i)), vld1q_f32(b_ptr.add(i)));
+            s1 = vfmaq_f32(s1, vld1q_f32(a_ptr.add(i + 4)), vld1q_f32(b_ptr.add(i + 4)));
+            s2 = vfmaq_f32(s2, vld1q_f32(a_ptr.add(i + 8)), vld1q_f32(b_ptr.add(i + 8)));
+            s3 = vfmaq_f32(
+                s3,
+                vld1q_f32(a_ptr.add(i + 12)),
+                vld1q_f32(b_ptr.add(i + 12)),
+            );
+            i += 16;
         }
-        
-        // Horizontal sum
-        let mut result = vaddvq_f32(sum);
-        
-        // Handle remainder
-        for i in (chunks * 4)..n {
-            result += *a.get_unchecked(i) * *b.get_unchecked(i);
+
+        // Process remaining 4-element chunks
+        while i + 4 <= n {
+            s0 = vfmaq_f32(s0, vld1q_f32(a_ptr.add(i)), vld1q_f32(b_ptr.add(i)));
+            i += 4;
         }
-        
+
+        // Merge accumulators and horizontally sum
+        let merged = vaddq_f32(vaddq_f32(s0, s1), vaddq_f32(s2, s3));
+        let mut result = vaddvq_f32(merged);
+
+        // Handle scalar remainder (dims not divisible by 4)
+        for j in i..n {
+            result += *a.get_unchecked(j) * *b.get_unchecked(j);
+        }
+
         result
     }
 }
@@ -559,10 +641,10 @@ pub unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
 #[inline]
 pub unsafe fn cosine_distance_neon_fused(a: &[f32], b: &[f32]) -> f32 {
     use std::arch::aarch64::*;
-    
+
     unsafe {
         let n = a.len();
-        
+
         // 6 accumulators for ILP: 2 each for dot, norm_a, norm_b
         let mut dot0 = vdupq_n_f32(0.0);
         let mut dot1 = vdupq_n_f32(0.0);
@@ -570,10 +652,10 @@ pub unsafe fn cosine_distance_neon_fused(a: &[f32], b: &[f32]) -> f32 {
         let mut norm_a1 = vdupq_n_f32(0.0);
         let mut norm_b0 = vdupq_n_f32(0.0);
         let mut norm_b1 = vdupq_n_f32(0.0);
-        
+
         let a_ptr = a.as_ptr();
         let b_ptr = b.as_ptr();
-        
+
         // Process 8 floats per iteration (2 × 4-wide NEON)
         let mut i = 0;
         while i + 8 <= n {
@@ -581,7 +663,7 @@ pub unsafe fn cosine_distance_neon_fused(a: &[f32], b: &[f32]) -> f32 {
             let vb0 = vld1q_f32(b_ptr.add(i));
             let va1 = vld1q_f32(a_ptr.add(i + 4));
             let vb1 = vld1q_f32(b_ptr.add(i + 4));
-            
+
             // All 6 FMLAs are independent - CPU can issue in parallel
             dot0 = vfmaq_f32(dot0, va0, vb0);
             dot1 = vfmaq_f32(dot1, va1, vb1);
@@ -589,10 +671,10 @@ pub unsafe fn cosine_distance_neon_fused(a: &[f32], b: &[f32]) -> f32 {
             norm_a1 = vfmaq_f32(norm_a1, va1, va1);
             norm_b0 = vfmaq_f32(norm_b0, vb0, vb0);
             norm_b1 = vfmaq_f32(norm_b1, vb1, vb1);
-            
+
             i += 8;
         }
-        
+
         // Process remaining 4-element chunks
         while i + 4 <= n {
             let va = vld1q_f32(a_ptr.add(i));
@@ -602,16 +684,16 @@ pub unsafe fn cosine_distance_neon_fused(a: &[f32], b: &[f32]) -> f32 {
             norm_b0 = vfmaq_f32(norm_b0, vb, vb);
             i += 4;
         }
-        
+
         // Merge accumulators
         let dot_sum = vaddq_f32(dot0, dot1);
         let norm_a_sum = vaddq_f32(norm_a0, norm_a1);
         let norm_b_sum = vaddq_f32(norm_b0, norm_b1);
-        
+
         let mut dot = vaddvq_f32(dot_sum);
         let mut norm_a_sq = vaddvq_f32(norm_a_sum);
         let mut norm_b_sq = vaddvq_f32(norm_b_sum);
-        
+
         // Handle remainder
         for j in i..n {
             let av = *a.get_unchecked(j);
@@ -620,10 +702,10 @@ pub unsafe fn cosine_distance_neon_fused(a: &[f32], b: &[f32]) -> f32 {
             norm_a_sq += av * av;
             norm_b_sq += bv * bv;
         }
-        
+
         let norm_a = norm_a_sq.sqrt();
         let norm_b = norm_b_sq.sqrt();
-        
+
         if norm_a < 1e-10 || norm_b < 1e-10 {
             1.0
         } else {
@@ -678,7 +760,7 @@ pub fn dot_product_fast(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Ultra-fast cosine distance (static dispatch, no heap allocation)  
-/// 
+///
 /// For normalized vectors (unit length), this is just 1 - dot_product.
 /// For non-normalized vectors, computes full cosine distance.
 #[inline(always)]
@@ -688,7 +770,7 @@ pub fn cosine_distance_fast(a: &[f32], b: &[f32]) -> f32 {
     {
         return unsafe { cosine_distance_neon_fused(a, b) };
     }
-    
+
     #[cfg(not(target_arch = "aarch64"))]
     {
         get_kernel().cosine_distance(a, b)
@@ -703,7 +785,7 @@ pub fn l2_squared_threshold(a: &[f32], b: &[f32], threshold_squared: f32) -> f32
     if a.len() != b.len() {
         return f32::INFINITY;
     }
-    
+
     // Try AVX2 path if available and worthwhile
     #[cfg(target_arch = "x86_64")]
     if is_x86_feature_detected!("avx2") && a.len() >= 8 {
@@ -718,17 +800,17 @@ pub fn l2_squared_threshold(a: &[f32], b: &[f32], threshold_squared: f32) -> f32
 #[inline]
 fn l2_squared_threshold_scalar(a: &[f32], b: &[f32], threshold_squared: f32) -> f32 {
     let mut sum = 0.0f32;
-    
+
     for (x, y) in a.iter().zip(b.iter()) {
         let diff = x - y;
         sum += diff * diff;
-        
+
         // Early abort if we've exceeded threshold
         if sum > threshold_squared {
             return sum;
         }
     }
-    
+
     sum
 }
 
@@ -742,19 +824,19 @@ unsafe fn l2_squared_threshold_avx2(a: &[f32], b: &[f32], threshold_squared: f32
     let n = a.len();
     let chunks = n / 8;
     let _remainder = n % 8;
-    
+
     let a_ptr = a.as_ptr();
     let b_ptr = b.as_ptr();
-    
+
     let mut sum = _mm256_setzero_ps();
     let _threshold_vec = _mm256_set1_ps(threshold_squared);
-    
+
     // Process 8 elements at a time with early abort checking every few chunks
     let check_interval = 4; // Check threshold every 32 elements
-    
+
     for chunk_group in (0..chunks).step_by(check_interval) {
         let end_chunk = std::cmp::min(chunk_group + check_interval, chunks);
-        
+
         for chunk in chunk_group..end_chunk {
             let offset = chunk * 8;
             unsafe {
@@ -766,9 +848,9 @@ unsafe fn l2_squared_threshold_avx2(a: &[f32], b: &[f32], threshold_squared: f32
                 sum = _mm256_add_ps(sum, sq);
             }
         }
-        
+
         // Check if we've exceeded threshold
-        let sum_scalar = unsafe {
+        let mut sum_scalar = unsafe {
             let sum_high = _mm256_extractf128_ps(sum, 1);
             let sum_low = _mm256_castps256_ps128(sum);
             let sum128 = _mm_add_ps(sum_low, sum_high);
@@ -776,17 +858,17 @@ unsafe fn l2_squared_threshold_avx2(a: &[f32], b: &[f32], threshold_squared: f32
             let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
             _mm_cvtss_f32(sum32)
         };
-        
+
         if sum_scalar > threshold_squared {
             // Add remainder and return (we know we've exceeded threshold)
             for i in (end_chunk * 8)..n {
                 let diff = a[i] - b[i];
-                sum_scalar + diff * diff;
+                sum_scalar += diff * diff;
             }
             return sum_scalar;
         }
     }
-    
+
     // Horizontal sum for final result
     let mut result = unsafe {
         let sum_high = _mm256_extractf128_ps(sum, 1);
@@ -796,24 +878,325 @@ unsafe fn l2_squared_threshold_avx2(a: &[f32], b: &[f32], threshold_squared: f32
         let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
         _mm_cvtss_f32(sum32)
     };
-    
+
     // Handle remainder
     for i in (chunks * 8)..n {
         let diff = a[i] - b[i];
         result += diff * diff;
-        
+
         // Early abort check for remainder
         if result > threshold_squared {
             return result;
         }
     }
-    
+
     result
 }
 
 // ============================================================================
 // Tests
 // ============================================================================
+
+// ============================================================================
+// Step 4: Native f16 SIMD distance kernels (avx2 + f16c + fma)
+// ============================================================================
+//
+// f16 distance previously widened both operands to a freshly heap-allocated
+// Vec<f32> per call (vector_quantized::to_f32) before running the f32 kernel.
+// These kernels widen 8 half lanes at a time directly into AVX2 registers via
+// _mm256_cvtph_ps (round-to-nearest, bit-identical to half::f16::to_f32) and
+// accumulate in registers, never materializing a Vec. The 4-wide accumulator
+// reduction mirrors dot_product_avx2 / l2_squared_avx2, so native_f16_dist ==
+// to_f32_then_avx2_dist within float-reassociation tolerance (< 1e-4, tested).
+//
+// Runtime-gated via f16_simd_available() (no compile-time f16c baseline in
+// .cargo/config.toml); scalar fallback below when f16c is absent.
+
+use half::f16;
+
+/// True iff the running CPU supports the f16 SIMD fast path (f16c+avx2+fma).
+#[inline]
+pub fn f16_simd_available() -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        is_x86_feature_detected!("f16c")
+            && is_x86_feature_detected!("avx2")
+            && is_x86_feature_detected!("fma")
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        false
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2", enable = "fma", enable = "f16c")]
+#[inline]
+unsafe fn dot_product_f16_avx2(a: &[f16], b: &[f16]) -> f32 {
+    use std::arch::x86_64::*;
+    let n = a.len();
+    let mut sum0 = _mm256_setzero_ps();
+    let mut sum1 = _mm256_setzero_ps();
+    let mut sum2 = _mm256_setzero_ps();
+    let mut sum3 = _mm256_setzero_ps();
+
+    let chunks = n / 8;
+    let chunks4 = chunks / 4;
+    // half::f16 is repr(transparent) over u16, bit-compatible with the hw half lane.
+    let a_ptr = a.as_ptr() as *const i16;
+    let b_ptr = b.as_ptr() as *const i16;
+
+    for i in 0..chunks4 {
+        let base = i * 32;
+        let va0 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base) as *const __m128i));
+        let vb0 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base) as *const __m128i));
+        sum0 = _mm256_fmadd_ps(va0, vb0, sum0);
+        let va1 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base + 8) as *const __m128i));
+        let vb1 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base + 8) as *const __m128i));
+        sum1 = _mm256_fmadd_ps(va1, vb1, sum1);
+        let va2 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base + 16) as *const __m128i));
+        let vb2 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base + 16) as *const __m128i));
+        sum2 = _mm256_fmadd_ps(va2, vb2, sum2);
+        let va3 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base + 24) as *const __m128i));
+        let vb3 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base + 24) as *const __m128i));
+        sum3 = _mm256_fmadd_ps(va3, vb3, sum3);
+    }
+    for i in (chunks4 * 4)..chunks {
+        let offset = i * 8;
+        let va = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(offset) as *const __m128i));
+        let vb = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(offset) as *const __m128i));
+        sum0 = _mm256_fmadd_ps(va, vb, sum0);
+    }
+
+    let sum01 = _mm256_add_ps(sum0, sum1);
+    let sum23 = _mm256_add_ps(sum2, sum3);
+    let sum = _mm256_add_ps(sum01, sum23);
+    let sum_high = _mm256_extractf128_ps(sum, 1);
+    let sum_low = _mm256_castps256_ps128(sum);
+    let sum128 = _mm_add_ps(sum_low, sum_high);
+    let sum64 = _mm_add_ps(sum128, _mm_movehl_ps(sum128, sum128));
+    let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
+    let mut result = _mm_cvtss_f32(sum32);
+    for i in (chunks * 8)..n {
+        result += a.get_unchecked(i).to_f32() * b.get_unchecked(i).to_f32();
+    }
+    result
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2", enable = "fma", enable = "f16c")]
+#[inline]
+unsafe fn l2_squared_f16_avx2(a: &[f16], b: &[f16]) -> f32 {
+    use std::arch::x86_64::*;
+    let n = a.len();
+    let mut sum0 = _mm256_setzero_ps();
+    let mut sum1 = _mm256_setzero_ps();
+    let mut sum2 = _mm256_setzero_ps();
+    let mut sum3 = _mm256_setzero_ps();
+
+    let chunks = n / 8;
+    let chunks4 = chunks / 4;
+    let a_ptr = a.as_ptr() as *const i16;
+    let b_ptr = b.as_ptr() as *const i16;
+
+    for i in 0..chunks4 {
+        let base = i * 32;
+        let va0 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base) as *const __m128i));
+        let vb0 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base) as *const __m128i));
+        let d0 = _mm256_sub_ps(va0, vb0);
+        sum0 = _mm256_fmadd_ps(d0, d0, sum0);
+        let va1 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base + 8) as *const __m128i));
+        let vb1 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base + 8) as *const __m128i));
+        let d1 = _mm256_sub_ps(va1, vb1);
+        sum1 = _mm256_fmadd_ps(d1, d1, sum1);
+        let va2 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base + 16) as *const __m128i));
+        let vb2 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base + 16) as *const __m128i));
+        let d2 = _mm256_sub_ps(va2, vb2);
+        sum2 = _mm256_fmadd_ps(d2, d2, sum2);
+        let va3 = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(base + 24) as *const __m128i));
+        let vb3 = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(base + 24) as *const __m128i));
+        let d3 = _mm256_sub_ps(va3, vb3);
+        sum3 = _mm256_fmadd_ps(d3, d3, sum3);
+    }
+    for i in (chunks4 * 4)..chunks {
+        let offset = i * 8;
+        let va = _mm256_cvtph_ps(_mm_loadu_si128(a_ptr.add(offset) as *const __m128i));
+        let vb = _mm256_cvtph_ps(_mm_loadu_si128(b_ptr.add(offset) as *const __m128i));
+        let d = _mm256_sub_ps(va, vb);
+        sum0 = _mm256_fmadd_ps(d, d, sum0);
+    }
+
+    let sum01 = _mm256_add_ps(sum0, sum1);
+    let sum23 = _mm256_add_ps(sum2, sum3);
+    let sum = _mm256_add_ps(sum01, sum23);
+    let sum_high = _mm256_extractf128_ps(sum, 1);
+    let sum_low = _mm256_castps256_ps128(sum);
+    let sum128 = _mm_add_ps(sum_low, sum_high);
+    let sum64 = _mm_add_ps(sum128, _mm_movehl_ps(sum128, sum128));
+    let sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
+    let mut result = _mm_cvtss_f32(sum32);
+    for i in (chunks * 8)..n {
+        let d = a.get_unchecked(i).to_f32() - b.get_unchecked(i).to_f32();
+        result += d * d;
+    }
+    result
+}
+
+/// Scalar f16 dot product fallback (no f16c).
+#[inline]
+pub fn dot_product_f16_scalar(a: &[f16], b: &[f16]) -> f32 {
+    let mut sum = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) {
+        sum += x.to_f32() * y.to_f32();
+    }
+    sum
+}
+
+#[inline]
+pub fn l2_squared_f16_scalar(a: &[f16], b: &[f16]) -> f32 {
+    let mut sum = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) {
+        let d = x.to_f32() - y.to_f32();
+        sum += d * d;
+    }
+    sum
+}
+
+/// Native f16 dot product with runtime f16c dispatch + scalar fallback.
+#[inline]
+pub fn dot_product_f16(a: &[f16], b: &[f16]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
+    #[cfg(target_arch = "x86_64")]
+    {
+        if f16_simd_available() {
+            return unsafe { dot_product_f16_avx2(a, b) };
+        }
+    }
+    dot_product_f16_scalar(a, b)
+}
+
+/// Native f16 L2-squared distance with runtime f16c dispatch + scalar fallback.
+#[inline]
+pub fn l2_squared_f16(a: &[f16], b: &[f16]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
+    #[cfg(target_arch = "x86_64")]
+    {
+        if f16_simd_available() {
+            return unsafe { l2_squared_f16_avx2(a, b) };
+        }
+    }
+    l2_squared_f16_scalar(a, b)
+}
+
+/// Native f16 L2 distance (sqrt of squared) — matches l2_distance_fast shape.
+#[inline]
+pub fn l2_distance_f16(a: &[f16], b: &[f16]) -> f32 {
+    l2_squared_f16(a, b).sqrt()
+}
+
+/// Native f16 cosine distance: 1 - dot/(|a||b|), mirroring DistanceKernel::cosine_distance.
+#[inline]
+pub fn cosine_distance_f16(a: &[f16], b: &[f16]) -> f32 {
+    let dot = dot_product_f16(a, b);
+    let norm_a = dot_product_f16(a, a).sqrt();
+    let norm_b = dot_product_f16(b, b).sqrt();
+    if norm_a < 1e-10 || norm_b < 1e-10 {
+        return 1.0;
+    }
+    1.0 - (dot / (norm_a * norm_b))
+}
+
+#[cfg(test)]
+mod step4_f16_tests {
+    use super::*;
+    use half::f16;
+
+    fn to_f16_vec(v: &[f32]) -> Vec<f16> {
+        v.iter().map(|&x| f16::from_f32(x)).collect()
+    }
+
+    fn rand_vecs(dim: usize, seed: u64) -> (Vec<f32>, Vec<f32>) {
+        let mut s = seed;
+        let mut next = || {
+            s ^= s >> 12;
+            s ^= s << 25;
+            s ^= s >> 27;
+            let v = s.wrapping_mul(0x2545_F491_4F6C_DD1D);
+            ((v >> 11) as f32 / (1u64 << 53) as f32) * 2.0 - 1.0
+        };
+        let a: Vec<f32> = (0..dim).map(|_| next()).collect();
+        let b: Vec<f32> = (0..dim).map(|_| next()).collect();
+        (a, b)
+    }
+
+    #[test]
+    fn test_f16_native_matches_to_f32_path() {
+        // native f16 kernel vs widen-to-f32-then-f32-kernel, the path it replaces.
+        for &dim in &[8usize, 64, 127, 768, 1536] {
+            let (a, b) = rand_vecs(dim, 0xDEAD_BEEF_0000_0001 ^ dim as u64);
+            let af16 = to_f16_vec(&a);
+            let bf16 = to_f16_vec(&b);
+            // Reference: widen each f16 to f32 (exactly what to_f32() did) then f32 kernel.
+            let aw: Vec<f32> = af16.iter().map(|x| x.to_f32()).collect();
+            let bw: Vec<f32> = bf16.iter().map(|x| x.to_f32()).collect();
+
+            let dot_ref = dot_product_fast(&aw, &bw);
+            let dot_native = dot_product_f16(&af16, &bf16);
+            assert!(
+                (dot_ref - dot_native).abs() < 1e-4,
+                "dot dim={} ref={} native={}",
+                dim,
+                dot_ref,
+                dot_native
+            );
+
+            let l2_ref = l2_distance_fast(&aw, &bw);
+            let l2_native = l2_distance_f16(&af16, &bf16);
+            assert!(
+                (l2_ref - l2_native).abs() < 1e-4,
+                "l2 dim={} ref={} native={}",
+                dim,
+                l2_ref,
+                l2_native
+            );
+
+            let cos_ref = cosine_distance_fast(&aw, &bw);
+            let cos_native = cosine_distance_f16(&af16, &bf16);
+            assert!(
+                (cos_ref - cos_native).abs() < 1e-4,
+                "cosine dim={} ref={} native={}",
+                dim,
+                cos_ref,
+                cos_native
+            );
+        }
+    }
+
+    #[test]
+    fn test_f16_native_matches_scalar_fallback() {
+        for &dim in &[8usize, 64, 768] {
+            let (a, b) = rand_vecs(dim, 0x1234 ^ dim as u64);
+            let af16 = to_f16_vec(&a);
+            let bf16 = to_f16_vec(&b);
+            let dot_s = dot_product_f16_scalar(&af16, &bf16);
+            let dot_d = dot_product_f16(&af16, &bf16);
+            assert!(
+                (dot_s - dot_d).abs() < 1e-3,
+                "dot scalar={} dispatch={}",
+                dot_s,
+                dot_d
+            );
+            let l2_s = l2_squared_f16_scalar(&af16, &bf16);
+            let l2_d = l2_squared_f16(&af16, &bf16);
+            assert!(
+                (l2_s - l2_d).abs() < 1e-3,
+                "l2 scalar={} dispatch={}",
+                l2_s,
+                l2_d
+            );
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -829,7 +1212,7 @@ mod tests {
     fn test_l2_squared_scalar() {
         let a = vec![1.0, 2.0, 3.0, 4.0];
         let b = vec![5.0, 6.0, 7.0, 8.0];
-        
+
         let result = l2_squared_scalar(&a, &b);
         // (5-1)^2 + (6-2)^2 + (7-3)^2 + (8-4)^2 = 16 + 16 + 16 + 16 = 64
         assert!((result - 64.0).abs() < 0.01);
@@ -839,7 +1222,7 @@ mod tests {
     fn test_dot_product_scalar() {
         let a = vec![1.0, 2.0, 3.0, 4.0];
         let b = vec![5.0, 6.0, 7.0, 8.0];
-        
+
         let result = dot_product_scalar(&a, &b);
         // 1*5 + 2*6 + 3*7 + 4*8 = 5 + 12 + 21 + 32 = 70
         assert!((result - 70.0).abs() < 0.01);
@@ -849,11 +1232,17 @@ mod tests {
     fn test_kernel_detection() {
         let kernel = DistanceKernel::detect();
         let cap = kernel.capability();
-        
+
         // Should detect something
         #[cfg(target_arch = "x86_64")]
-        assert!(matches!(cap, SimdCapability::Scalar | SimdCapability::Sse41 | SimdCapability::Avx2 | SimdCapability::Avx512));
-        
+        assert!(matches!(
+            cap,
+            SimdCapability::Scalar
+                | SimdCapability::Sse41
+                | SimdCapability::Avx2
+                | SimdCapability::Avx512
+        ));
+
         #[cfg(target_arch = "aarch64")]
         assert_eq!(cap, SimdCapability::Neon);
     }
@@ -862,10 +1251,10 @@ mod tests {
     fn test_l2_squared_consistency() {
         let a = random_vec(768, 42);
         let b = random_vec(768, 123);
-        
+
         let scalar_result = l2_squared_scalar(&a, &b);
         let kernel_result = l2_squared(&a, &b);
-        
+
         // Results should match within floating point tolerance
         let rel_error = (scalar_result - kernel_result).abs() / scalar_result.max(1e-10);
         assert!(rel_error < 1e-5, "Relative error: {}", rel_error);
@@ -875,10 +1264,10 @@ mod tests {
     fn test_dot_product_consistency() {
         let a = random_vec(768, 42);
         let b = random_vec(768, 123);
-        
+
         let scalar_result = dot_product_scalar(&a, &b);
         let kernel_result = dot_product(&a, &b);
-        
+
         // Results should match within floating point tolerance
         let rel_error = (scalar_result - kernel_result).abs() / scalar_result.abs().max(1e-10);
         assert!(rel_error < 1e-5, "Relative error: {}", rel_error);
@@ -888,10 +1277,10 @@ mod tests {
     fn test_cosine_distance() {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![1.0, 0.0, 0.0];
-        
+
         let result = cosine_distance(&a, &b);
         assert!(result.abs() < 0.01); // Same direction = distance 0
-        
+
         let c = vec![0.0, 1.0, 0.0];
         let result2 = cosine_distance(&a, &c);
         assert!((result2 - 1.0).abs() < 0.01); // Orthogonal = distance 1

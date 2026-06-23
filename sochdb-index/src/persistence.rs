@@ -36,15 +36,13 @@
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
 
-use crate::hnsw::{HnswConfig, HnswIndex};
+use crate::hnsw::{HnswConfig, HnswIndex, MAX_M};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::path::Path;
 use std::time::SystemTime;
-
-const MAX_M: usize = 32;
 
 /// Serializable snapshot of HNSW index state
 #[derive(Serialize, Deserialize)]
@@ -74,6 +72,69 @@ pub struct SerializableNode {
     pub layer: usize,
 }
 
+const METADATA_TRAILER_MAGIC: &[u8; 8] = b"SCMETA01";
+
+#[derive(Serialize, Deserialize)]
+struct MetadataTrailer {
+    version: u32,
+    entries: Vec<(u128, Vec<(String, String)>)>,
+}
+
+fn write_metadata_trailer<W: Write>(writer: &mut W, index: &HnswIndex) -> Result<(), String> {
+    let metadata_store = index.metadata_store.read();
+    let entries: Vec<(u128, Vec<(String, String)>)> = index
+        .nodes
+        .iter()
+        .filter_map(|entry| {
+            let node = entry.value();
+            metadata_store
+                .get(node.dense_index as usize)
+                .and_then(|metadata| metadata.clone())
+                .map(|metadata| (*entry.key(), metadata))
+        })
+        .collect();
+
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    writer
+        .write_all(METADATA_TRAILER_MAGIC)
+        .map_err(|e| format!("Metadata trailer write failed: {}", e))?;
+    bincode::serialize_into(
+        writer,
+        &MetadataTrailer {
+            version: 1,
+            entries,
+        },
+    )
+    .map_err(|e| format!("Metadata trailer serialization failed: {}", e))
+}
+
+fn read_metadata_trailer<R: Read>(reader: &mut R) -> Result<Option<MetadataTrailer>, String> {
+    let mut magic = [0_u8; 8];
+    match reader.read_exact(&mut magic) {
+        Ok(()) => {}
+        Err(e) if e.kind() == ErrorKind::UnexpectedEof => return Ok(None),
+        Err(e) => return Err(format!("Metadata trailer read failed: {}", e)),
+    }
+
+    if &magic != METADATA_TRAILER_MAGIC {
+        return Err("Invalid metadata trailer magic".to_string());
+    }
+
+    let trailer: MetadataTrailer = bincode::deserialize_from(reader)
+        .map_err(|e| format!("Metadata trailer deserialization failed: {}", e))?;
+    if trailer.version != 1 {
+        return Err(format!(
+            "Incompatible metadata trailer version: {}",
+            trailer.version
+        ));
+    }
+
+    Ok(Some(trailer))
+}
+
 impl HnswIndex {
     /// Save index to disk using bincode serialization
     ///
@@ -85,8 +146,9 @@ impl HnswIndex {
     /// index.save_to_disk("embeddings.hnsw").unwrap();
     /// ```
     pub fn save_to_disk<P: AsRef<Path>>(&self, path: P) -> Result<(), String> {
-        // Collect all nodes
+        // Collect all nodes — read vectors from vector_store (primary)
         let mut serializable_nodes = Vec::with_capacity(self.nodes.len());
+        let store = self.vector_store.read();
 
         for entry in self.nodes.iter() {
             let node = entry.value();
@@ -97,29 +159,37 @@ impl HnswIndex {
                 neighbors.push(self.dense_neighbors_to_ids(&dense_neighbors));
             }
 
+            let vector = store
+                .get(node.vector_index as usize)
+                .map(|v| v.to_f32().to_vec())
+                .unwrap_or_else(|| node.vector.to_f32().to_vec());
+
             serializable_nodes.push(SerializableNode {
                 id: *entry.key(),
-                vector: node.vector.to_f32().to_vec(), // Convert back to f32 for storage
+                vector,
                 neighbors,
                 layer: node.layer,
             });
         }
+        drop(store);
 
+        let nav = self.navigation_state();
         let snapshot = IndexSnapshot {
             version: 1,
             config: self.config.clone(),
             nodes: serializable_nodes,
-            entry_point: *self.entry_point.read(),
-            max_layer: *self.max_layer.read(),
+            entry_point: nav.entry_point,
+            max_layer: nav.max_layer,
             dimension: self.dimension,
             created_at: SystemTime::now(),
         };
 
         let file = File::create(path).map_err(|e| format!("Failed to create file: {}", e))?;
-        let writer = BufWriter::new(file);
+        let mut writer = BufWriter::new(file);
 
-        bincode::serialize_into(writer, &snapshot)
+        bincode::serialize_into(&mut writer, &snapshot)
             .map_err(|e| format!("Serialization failed: {}", e))?;
+        write_metadata_trailer(&mut writer, self)?;
 
         Ok(())
     }
@@ -134,10 +204,11 @@ impl HnswIndex {
     /// ```
     pub fn load_from_disk<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-        let reader = BufReader::new(file);
+        let mut reader = BufReader::new(file);
 
-        let snapshot: IndexSnapshot = bincode::deserialize_from(reader)
+        let snapshot: IndexSnapshot = bincode::deserialize_from(&mut reader)
             .map_err(|e| format!("Deserialization failed: {}", e))?;
+        let metadata_trailer = read_metadata_trailer(&mut reader)?;
 
         // Validate version compatibility
         if snapshot.version != 1 {
@@ -172,12 +243,13 @@ impl HnswIndex {
                 }));
             }
 
-            let dense_index = index.next_dense_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u32;
+            let dense_index = index
+                .next_dense_index
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                as u32;
             index.record_dense_id(dense_index, snode.id);
-            let quantized = QuantizedVector::from_f32(
-                ndarray::Array1::from_vec(snode.vector),
-                precision,
-            );
+            let quantized =
+                QuantizedVector::from_f32(ndarray::Array1::from_vec(snode.vector), precision);
             let vector_index = {
                 let mut store = index.vector_store.write();
                 let idx = store.len() as u32;
@@ -217,9 +289,21 @@ impl HnswIndex {
             }
         }
 
-        // Restore metadata
-        *index.entry_point.write() = snapshot.entry_point;
-        *index.max_layer.write() = snapshot.max_layer;
+        // Restore metadata via atomic nav_state
+        if let Some(ep_id) = snapshot.entry_point {
+            if let Some(dense) = index.node_id_to_dense(ep_id) {
+                index
+                    .nav_state
+                    .store(Some(dense as u64), snapshot.max_layer);
+                index
+                    .entry_point_dense
+                    .store(dense, std::sync::atomic::Ordering::Release);
+            }
+        }
+
+        if let Some(trailer) = metadata_trailer {
+            index.set_metadata_batch(&trailer.entries);
+        }
 
         Ok(index)
     }
@@ -230,6 +314,7 @@ impl HnswIndex {
         use flate2::write::GzEncoder;
 
         let mut serializable_nodes = Vec::with_capacity(self.nodes.len());
+        let store = self.vector_store.read();
 
         for entry in self.nodes.iter() {
             let node = entry.value();
@@ -240,29 +325,37 @@ impl HnswIndex {
                 neighbors.push(self.dense_neighbors_to_ids(&dense_neighbors));
             }
 
+            let vector = store
+                .get(node.vector_index as usize)
+                .map(|v| v.to_f32().to_vec())
+                .unwrap_or_else(|| node.vector.to_f32().to_vec());
+
             serializable_nodes.push(SerializableNode {
                 id: *entry.key(),
-                vector: node.vector.to_f32().to_vec(),
+                vector,
                 neighbors,
                 layer: node.layer,
             });
         }
+        drop(store);
 
+        let nav = self.navigation_state();
         let snapshot = IndexSnapshot {
             version: 1,
             config: self.config.clone(),
             nodes: serializable_nodes,
-            entry_point: *self.entry_point.read(),
-            max_layer: *self.max_layer.read(),
+            entry_point: nav.entry_point,
+            max_layer: nav.max_layer,
             dimension: self.dimension,
             created_at: SystemTime::now(),
         };
 
         let file = File::create(path).map_err(|e| format!("Failed to create file: {}", e))?;
-        let encoder = GzEncoder::new(file, Compression::default());
+        let mut encoder = GzEncoder::new(file, Compression::default());
 
-        bincode::serialize_into(encoder, &snapshot)
+        bincode::serialize_into(&mut encoder, &snapshot)
             .map_err(|e| format!("Serialization failed: {}", e))?;
+        write_metadata_trailer(&mut encoder, self)?;
 
         Ok(())
     }
@@ -273,10 +366,11 @@ impl HnswIndex {
 
         let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
         let decoder = GzDecoder::new(file);
-        let reader = BufReader::new(decoder);
+        let mut reader = BufReader::new(decoder);
 
-        let snapshot: IndexSnapshot = bincode::deserialize_from(reader)
+        let snapshot: IndexSnapshot = bincode::deserialize_from(&mut reader)
             .map_err(|e| format!("Deserialization failed: {}", e))?;
+        let metadata_trailer = read_metadata_trailer(&mut reader)?;
 
         if snapshot.version != 1 {
             return Err(format!(
@@ -308,12 +402,13 @@ impl HnswIndex {
                 }));
             }
 
-            let dense_index = index.next_dense_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u32;
+            let dense_index = index
+                .next_dense_index
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                as u32;
             index.record_dense_id(dense_index, snode.id);
-            let quantized = QuantizedVector::from_f32(
-                ndarray::Array1::from_vec(snode.vector),
-                precision,
-            );
+            let quantized =
+                QuantizedVector::from_f32(ndarray::Array1::from_vec(snode.vector), precision);
             let vector_index = {
                 let mut store = index.vector_store.write();
                 let idx = store.len() as u32;
@@ -353,8 +448,21 @@ impl HnswIndex {
             }
         }
 
-        *index.entry_point.write() = snapshot.entry_point;
-        *index.max_layer.write() = snapshot.max_layer;
+        // Restore metadata via atomic nav_state
+        if let Some(ep_id) = snapshot.entry_point {
+            if let Some(dense) = index.node_id_to_dense(ep_id) {
+                index
+                    .nav_state
+                    .store(Some(dense as u64), snapshot.max_layer);
+                index
+                    .entry_point_dense
+                    .store(dense, std::sync::atomic::Ordering::Release);
+            }
+        }
+
+        if let Some(trailer) = metadata_trailer {
+            index.set_metadata_batch(&trailer.entries);
+        }
 
         Ok(index)
     }
@@ -364,6 +472,7 @@ impl HnswIndex {
 mod tests {
     // use super::*;
     use crate::hnsw::{HnswConfig, HnswIndex};
+    use std::io::Write;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -417,6 +526,65 @@ mod tests {
     }
 
     #[test]
+    fn test_save_and_load_preserves_metadata_trailer() {
+        let config = HnswConfig::default();
+        let index = HnswIndex::new(4, config);
+
+        index.insert(1, vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+        index.insert(2, vec![0.0, 1.0, 0.0, 0.0]).unwrap();
+        index.set_metadata(
+            1,
+            vec![
+                ("parent_id".to_string(), "0".to_string()),
+                ("view_type".to_string(), "turn".to_string()),
+            ],
+        );
+        index.set_metadata(
+            2,
+            vec![
+                ("parent_id".to_string(), "712".to_string()),
+                ("view_type".to_string(), "event".to_string()),
+            ],
+        );
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path();
+        index.save_to_disk(path).unwrap();
+
+        let loaded = HnswIndex::load_from_disk(path).unwrap();
+
+        assert_eq!(
+            loaded.get_metadata(1).unwrap(),
+            vec![
+                ("parent_id".to_string(), "0".to_string()),
+                ("view_type".to_string(), "turn".to_string()),
+            ]
+        );
+        assert_eq!(
+            loaded.get_metadata(2).unwrap(),
+            vec![
+                ("parent_id".to_string(), "712".to_string()),
+                ("view_type".to_string(), "event".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_save_and_load_without_metadata_trailer_leaves_metadata_empty() {
+        let config = HnswConfig::default();
+        let index = HnswIndex::new(4, config);
+
+        index.insert(1, vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path();
+        index.save_to_disk(path).unwrap();
+
+        let loaded = HnswIndex::load_from_disk(path).unwrap();
+        assert_eq!(loaded.get_metadata(1), None);
+    }
+
+    #[test]
     fn test_compressed_save_load() {
         let config = HnswConfig::default();
         let index = HnswIndex::new(64, config);
@@ -450,6 +618,106 @@ mod tests {
         let loaded_index = HnswIndex::load_from_disk(path).unwrap();
 
         assert_eq!(loaded_index.nodes.len(), 0);
+    }
+
+    #[test]
+    fn test_malformed_trailer_rejects_invalid_magic() {
+        let config = HnswConfig::default();
+        let index = HnswIndex::new(4, config);
+        index.insert(1, vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path();
+        index.save_to_disk(path).unwrap();
+
+        // Append a fake trailer with an invalid magic marker.
+        // The snapshot itself has no metadata trailer, so appending
+        // garbage that looks like a trailer start should be rejected.
+        let mut file = std::fs::OpenOptions::new().append(true).open(path).unwrap();
+        file.write_all(b"BADMAGIC").unwrap();
+        drop(file);
+
+        let result = HnswIndex::load_from_disk(path);
+        assert!(result.is_err(), "expected error for malformed trailer");
+        let err = result.err().unwrap();
+        assert!(
+            err.contains("Invalid metadata trailer magic") || err.contains("trailer"),
+            "error should mention trailer: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_truncated_trailer_produces_error() {
+        let config = HnswConfig::default();
+        let index = HnswIndex::new(4, config);
+        index.insert(1, vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+        index.set_metadata(1, vec![("parent_id".to_string(), "0".to_string())]);
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path();
+        index.save_to_disk(path).unwrap();
+
+        // Truncate the file partway through the trailer
+        let data = std::fs::read(path).unwrap();
+        let truncated = &data[..data.len() - 4];
+        std::fs::write(path, truncated).unwrap();
+
+        let result = HnswIndex::load_from_disk(path);
+        assert!(result.is_err(), "expected error for truncated trailer");
+        let err = result.err().unwrap();
+        assert!(
+            err.contains("trailer") || err.contains("metadata") || err.contains("EOF"),
+            "error should mention trailer or EOF: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_index_isolation_metadata_not_leaked() {
+        let config = HnswConfig::default();
+        let index_a = HnswIndex::new(4, config.clone());
+        let index_b = HnswIndex::new(4, config);
+
+        // Same ID in both indexes
+        index_a.insert(42, vec![1.0, 0.0, 0.0, 0.0]).unwrap();
+        index_b.insert(42, vec![0.0, 1.0, 0.0, 0.0]).unwrap();
+
+        // Metadata only on index_a
+        index_a.set_metadata(
+            42,
+            vec![
+                ("parent_id".to_string(), "99".to_string()),
+                ("view_type".to_string(), "turn".to_string()),
+            ],
+        );
+
+        assert_eq!(
+            index_a.get_metadata(42).unwrap(),
+            vec![
+                ("parent_id".to_string(), "99".to_string()),
+                ("view_type".to_string(), "turn".to_string()),
+            ]
+        );
+        assert_eq!(index_b.get_metadata(42), None);
+
+        // Save and load both independently
+        let temp_a = NamedTempFile::new().unwrap();
+        let temp_b = NamedTempFile::new().unwrap();
+        index_a.save_to_disk(temp_a.path()).unwrap();
+        index_b.save_to_disk(temp_b.path()).unwrap();
+
+        let loaded_a = HnswIndex::load_from_disk(temp_a.path()).unwrap();
+        let loaded_b = HnswIndex::load_from_disk(temp_b.path()).unwrap();
+
+        assert_eq!(
+            loaded_a.get_metadata(42).unwrap(),
+            vec![
+                ("parent_id".to_string(), "99".to_string()),
+                ("view_type".to_string(), "turn".to_string()),
+            ]
+        );
+        assert_eq!(loaded_b.get_metadata(42), None);
     }
 }
 
@@ -737,8 +1005,17 @@ impl HnswIndex {
                 self.nodes.remove(id);
             }
             HnswWalEntry::SetEntryPoint { id, max_layer } => {
-                *self.entry_point.write() = *id;
-                *self.max_layer.write() = *max_layer;
+                if let Some(ep_id) = *id {
+                    if let Some(dense) = self.node_id_to_dense(ep_id) {
+                        self.nav_state.store(Some(dense as u64), *max_layer);
+                        self.entry_point_dense
+                            .store(dense, std::sync::atomic::Ordering::Release);
+                    }
+                } else {
+                    self.nav_state.store(None, *max_layer);
+                    self.entry_point_dense
+                        .store(u32::MAX, std::sync::atomic::Ordering::Release);
+                }
             }
             // AddNeighbor and RemoveNeighbor are handled by insert()
             // which rebuilds connections. For incremental edge updates,

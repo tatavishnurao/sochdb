@@ -233,7 +233,7 @@ impl SsiTransaction {
         self.read_set.insert(ik);
         // Update Bloom filter — 2 hash slots from xxh3
         let h = twox_hash::xxh3::hash64(key);
-        let h1 = (h & 0xFF) as usize;       // bit index 0..255
+        let h1 = (h & 0xFF) as usize; // bit index 0..255
         let h2 = ((h >> 8) & 0xFF) as usize; // second bit index
         self.read_bloom[h1 / 64] |= 1u64 << (h1 % 64);
         self.read_bloom[h2 / 64] |= 1u64 << (h2 % 64);
@@ -345,16 +345,27 @@ impl SsiManager {
         }
     }
 
-    /// Begin a new transaction
+    /// Begin a new transaction (allocates an SSI-internal id).
     pub fn begin(&self) -> Result<(TxnId, Timestamp), SsiConflictError> {
         let txn_id = self.next_txn_id.fetch_add(1, Ordering::SeqCst);
+        let start_ts = self.begin_with_id(txn_id)?;
+        Ok((txn_id, start_ts))
+    }
+
+    /// Begin a transaction under a caller-supplied id.
+    ///
+    /// Lets an outer coordinator (e.g. `MvccTransactionManager`) keep ONE
+    /// consistent transaction identity across both managers, so later
+    /// `record_read`/`record_write`/`commit` calls keyed by that id resolve to
+    /// the transaction created here. Allocates only the SSI start timestamp.
+    pub fn begin_with_id(&self, txn_id: TxnId) -> Result<Timestamp, SsiConflictError> {
         let start_ts = self.timestamp.fetch_add(1, Ordering::SeqCst);
 
         let txn = SsiTransaction::new(txn_id, start_ts);
         self.transactions.write().insert(txn_id, txn);
         self.txn_states.set_status(txn_id, SsiTxnStatus::Active);
 
-        Ok((txn_id, start_ts))
+        Ok(start_ts)
     }
 
     /// Record a read and check for rw-antidependencies

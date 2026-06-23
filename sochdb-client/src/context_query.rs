@@ -624,7 +624,10 @@ impl ContextQuery {
     }
 
     /// Convert a client section to canonical section
-    fn convert_section(&self, section: &ContextSection) -> sochdb_query::context_query::ContextSection {
+    fn convert_section(
+        &self,
+        section: &ContextSection,
+    ) -> sochdb_query::context_query::ContextSection {
         use sochdb_query::context_query as cq;
 
         let content = match &section.content {
@@ -661,14 +664,22 @@ impl ContextQuery {
                 where_clause: section.filter.as_ref().map(|f| self.convert_filter(f)),
                 limit: *limit,
             },
-            SectionContent::Literal(text) => cq::SectionContent::Literal { value: text.clone() },
+            SectionContent::Literal(text) => cq::SectionContent::Literal {
+                value: text.clone(),
+            },
             SectionContent::Variable(name) => cq::SectionContent::Variable { name: name.clone() },
         };
 
         let transform = section.transform.as_ref().map(|t| match t {
-            TransformExpr::Summarize(tokens) => cq::SectionTransform::Summarize { max_tokens: *tokens },
-            TransformExpr::Project(fields) => cq::SectionTransform::Project { fields: fields.clone() },
-            TransformExpr::Template(tpl) => cq::SectionTransform::Template { template: tpl.clone() },
+            TransformExpr::Summarize(tokens) => cq::SectionTransform::Summarize {
+                max_tokens: *tokens,
+            },
+            TransformExpr::Project(fields) => cq::SectionTransform::Project {
+                fields: fields.clone(),
+            },
+            TransformExpr::Template(tpl) => cq::SectionTransform::Template {
+                template: tpl.clone(),
+            },
         });
 
         cq::ContextSection {
@@ -736,7 +747,11 @@ impl ContextQuery {
                 vec![tq::Condition {
                     column: col.clone(),
                     operator: tq::ComparisonOp::In,
-                    value: tq::SochValue::Array(vals.iter().map(|v| tq::SochValue::Text(v.clone())).collect()),
+                    value: tq::SochValue::Array(
+                        vals.iter()
+                            .map(|v| tq::SochValue::Text(v.clone()))
+                            .collect(),
+                    ),
                 }],
                 tq::LogicalOp::And,
             ),
@@ -756,7 +771,10 @@ impl ContextQuery {
             }
         };
 
-        tq::WhereClause { conditions, operator }
+        tq::WhereClause {
+            conditions,
+            operator,
+        }
     }
 
     /// Execute a single section
@@ -1015,10 +1033,8 @@ impl ContextQuery {
             }
             FilterExpr::And(filters) => {
                 // Full AND support: convert all child filters
-                let clauses: Vec<WhereClause> = filters
-                    .iter()
-                    .map(|f| self.filter_to_where(f))
-                    .collect();
+                let clauses: Vec<WhereClause> =
+                    filters.iter().map(|f| self.filter_to_where(f)).collect();
                 if clauses.is_empty() {
                     // Empty AND is always true - use a tautology
                     WhereClause::Simple {
@@ -1034,10 +1050,8 @@ impl ContextQuery {
             }
             FilterExpr::Or(filters) => {
                 // Full OR support: convert all child filters
-                let clauses: Vec<WhereClause> = filters
-                    .iter()
-                    .map(|f| self.filter_to_where(f))
-                    .collect();
+                let clauses: Vec<WhereClause> =
+                    filters.iter().map(|f| self.filter_to_where(f)).collect();
                 if clauses.is_empty() {
                     // Empty OR is always false - use a contradiction
                     WhereClause::Simple {
@@ -1517,8 +1531,11 @@ mod tests {
     #[test]
     fn test_estimate_tokens() {
         assert_eq!(estimate_tokens(""), 0);
-        assert_eq!(estimate_tokens("test"), 1);
-        assert_eq!(estimate_tokens("hello world!"), 3);
+        // estimate_tokens applies the deliberate ~1.15x safety margin (it is a
+        // budget estimate, intentionally conservative): ceil(4/4 * 1.15)=2 and
+        // ceil(3 * 1.15)=4. The old 1/3 expectations ignored the margin.
+        assert_eq!(estimate_tokens("test"), 2);
+        assert_eq!(estimate_tokens("hello world!"), 4);
     }
 
     #[test]

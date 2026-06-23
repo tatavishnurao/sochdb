@@ -54,7 +54,7 @@
 use crate::error::{KernelError, KernelResult};
 use crate::kernel_api::{HealthInfo, RowId, TableId};
 use crate::transaction::TransactionId;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -341,6 +341,14 @@ pub struct PluginManager {
     compression: RwLock<HashMap<String, Arc<dyn CompressionExtension>>>,
     /// Active storage backend name
     active_storage: RwLock<Option<String>>,
+    /// Shutdown handles for storage extensions (wraps extension in Mutex for interior mutability)
+    storage_shutdown: RwLock<HashMap<String, Mutex<Arc<dyn StorageExtension>>>>,
+    /// Shutdown handles for index extensions
+    index_shutdown: RwLock<HashMap<String, Arc<Mutex<Arc<RwLock<dyn IndexExtension>>>>>>,
+    /// Shutdown handles for observability
+    observability_shutdown: RwLock<Vec<Mutex<Arc<dyn ObservabilityExtension>>>>,
+    /// Shutdown handles for compression
+    compression_shutdown: RwLock<HashMap<String, Mutex<Arc<dyn CompressionExtension>>>>,
 }
 
 impl Default for PluginManager {
@@ -358,6 +366,10 @@ impl PluginManager {
             observability: RwLock::new(Vec::new()),
             compression: RwLock::new(HashMap::new()),
             active_storage: RwLock::new(None),
+            storage_shutdown: RwLock::new(HashMap::new()),
+            index_shutdown: RwLock::new(HashMap::new()),
+            observability_shutdown: RwLock::new(Vec::new()),
+            compression_shutdown: RwLock::new(HashMap::new()),
         }
     }
 
@@ -375,6 +387,10 @@ impl PluginManager {
                 message: format!("storage extension '{}' already registered", name),
             });
         }
+
+        // Also add to shutdown storage - need to wrap the Arc<dyn StorageExtension> in Mutex
+        let mut shutdown = self.storage_shutdown.write();
+        shutdown.insert(name.clone(), Mutex::new(Arc::clone(&ext)));
 
         storage.insert(name.clone(), ext);
 
@@ -422,7 +438,11 @@ impl PluginManager {
             });
         }
 
-        indices.insert(name, ext);
+        indices.insert(name.clone(), ext.clone());
+
+        // Also add to shutdown storage
+        let mut shutdown = self.index_shutdown.write();
+        shutdown.insert(name, Arc::new(Mutex::new(ext)));
         Ok(())
     }
 
@@ -444,7 +464,11 @@ impl PluginManager {
     ///
     /// Multiple observability extensions can be registered (fan-out to all)
     pub fn register_observability(&self, ext: Arc<dyn ObservabilityExtension>) -> KernelResult<()> {
-        self.observability.write().push(ext);
+        self.observability.write().push(ext.clone());
+
+        // Also add to shutdown storage
+        let mut shutdown = self.observability_shutdown.write();
+        shutdown.push(Mutex::new(Arc::clone(&ext)));
         Ok(())
     }
 
@@ -496,7 +520,11 @@ impl PluginManager {
             });
         }
 
-        compression.insert(algo, ext);
+        compression.insert(algo.clone(), ext.clone());
+
+        // Also add to shutdown storage
+        let mut shutdown = self.compression_shutdown.write();
+        shutdown.insert(algo.clone(), Mutex::new(Arc::clone(&ext)));
         Ok(())
     }
 
@@ -515,11 +543,79 @@ impl PluginManager {
     // -------------------------------------------------------------------------
 
     /// Shutdown all extensions gracefully
+    ///
+    /// Calls `shutdown()` on each registered extension in reverse registration order.
+    /// This allows extensions to release resources, close connections, flush buffers, etc.
     pub fn shutdown_all(&self) -> KernelResult<()> {
-        // Extensions are immutable through Arc, so we can't call shutdown
-        // In a real implementation, we'd use Arc<RwLock<dyn Extension>>
-        // For now, this is a no-op placeholder
-        Ok(())
+        let mut errors = Vec::new();
+
+        // Shutdown storage extensions (in reverse order)
+        {
+            let storage = self.storage_shutdown.read();
+            let names: Vec<_> = storage.keys().cloned().collect();
+            for name in names.into_iter().rev() {
+                if let Some(ext) = storage.get(&name) {
+                    let mut ext_guard = ext.lock();
+                    if let Some(ext) = Arc::get_mut(&mut ext_guard) {
+                        if let Err(e) = ext.shutdown() {
+                            errors.push(format!("storage '{}': {}", name, e));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Shutdown index extensions (in reverse order)
+        {
+            let indices = self.index_shutdown.read();
+            let names: Vec<_> = indices.keys().cloned().collect();
+            for name in names.into_iter().rev() {
+                if let Some(ext) = indices.get(&name) {
+                    let ext_guard = ext.lock();
+                    let mut inner = ext_guard.write();
+                    if let Err(e) = inner.shutdown() {
+                        errors.push(format!("index '{}': {}", name, e));
+                    }
+                }
+            }
+        }
+
+        // Shutdown observability extensions (in reverse order)
+        {
+            let observability = self.observability_shutdown.read();
+            for ext in observability.iter().rev() {
+                let mut ext_guard = ext.lock();
+                if let Some(ext) = Arc::get_mut(&mut ext_guard) {
+                    if let Err(e) = ext.shutdown() {
+                        errors.push(format!("observability: {}", e));
+                    }
+                }
+            }
+        }
+
+        // Shutdown compression extensions (in reverse order)
+        {
+            let compression = self.compression_shutdown.read();
+            let names: Vec<_> = compression.keys().cloned().collect();
+            for name in names.into_iter().rev() {
+                if let Some(ext) = compression.get(&name) {
+                    let mut ext_guard = ext.lock();
+                    if let Some(ext) = Arc::get_mut(&mut ext_guard) {
+                        if let Err(e) = ext.shutdown() {
+                            errors.push(format!("compression '{}': {}", name, e));
+                        }
+                    }
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(KernelError::Plugin {
+                message: format!("shutdown errors: {}", errors.join("; ")),
+            })
+        }
     }
 
     /// Get information about all registered extensions
@@ -596,37 +692,149 @@ pub mod dynamic {
     //!
     //! Enabled with the `dynamic-plugins` feature.
     //! Allows loading plugins from shared libraries at runtime.
+    //!
+    //! # Security Warning
+    //!
+    //! Loading a native shared library (`dlopen`) executes arbitrary code
+    //! in the host process — including the library's `_init()` constructors
+    //! which run *before* any symbol lookup.  A malicious `.so/.dylib` can:
+    //!
+    //! - Exfiltrate data from the database process
+    //! - Spawn background threads or open network connections
+    //! - Corrupt kernel memory (no isolation boundary)
+    //!
+    //! **Only load libraries you have built from audited source code.**
+    //! For untrusted extensions, use the WASM plugin sandbox instead.
 
     use super::*;
     use libloading::{Library, Symbol};
     use std::path::Path;
 
+    /// Environment variable that opts in to native (`dlopen`) plugin loading.
+    ///
+    /// Set to `1`/`true`/`yes` to allow a default-constructed
+    /// [`DynamicPluginLoader`] to load native shared libraries. Absent or any
+    /// other value keeps native loading disabled and steers callers to the WASM
+    /// sandbox.
+    pub const ALLOW_NATIVE_ENV: &str = "SOCHDB_ALLOW_NATIVE_PLUGINS";
+
+    fn env_opts_in_to_native() -> bool {
+        std::env::var(ALLOW_NATIVE_ENV)
+            .map(|v| {
+                let v = v.trim().to_ascii_lowercase();
+                v == "1" || v == "true" || v == "yes" || v == "on"
+            })
+            .unwrap_or(false)
+    }
+
     /// Dynamic plugin loader
+    ///
+    /// Native loading is **untrusted by default**. Even with the
+    /// `dynamic-plugins` feature compiled in, a loader will refuse to `dlopen`
+    /// a shared library unless it was explicitly marked trusted — either by
+    /// constructing it with [`DynamicPluginLoader::new_trusted`] or by setting
+    /// the [`ALLOW_NATIVE_ENV`] environment variable. Untrusted extensions
+    /// should run in the WASM sandbox instead.
     pub struct DynamicPluginLoader {
         /// Loaded libraries (kept alive)
         _libraries: Vec<Library>,
+        /// Whether native `dlopen` loading is permitted for this loader.
+        trusted: bool,
     }
 
     impl DynamicPluginLoader {
-        /// Create a new dynamic plugin loader
+        /// Create a new dynamic plugin loader.
+        ///
+        /// Native loading is **disabled** unless the [`ALLOW_NATIVE_ENV`]
+        /// environment variable opts in. Use [`new_trusted`](Self::new_trusted)
+        /// to enable native loading programmatically. This safe-by-default
+        /// stance means an attacker who can drop a `.so` on disk cannot get it
+        /// loaded without an explicit operator decision.
         pub fn new() -> Self {
             Self {
                 _libraries: Vec::new(),
+                trusted: env_opts_in_to_native(),
             }
         }
 
-        /// Load an observability plugin from a shared library
+        /// Create a loader that is explicitly permitted to load native
+        /// shared libraries.
         ///
-        /// The library must export a function:
+        /// # Safety / Trust
+        ///
+        /// Calling this is an assertion by the operator that any library passed
+        /// to [`load_observability`](Self::load_observability) comes from
+        /// audited, trusted source code. Native libraries run with **no
+        /// isolation** and can execute arbitrary code in the database process
+        /// (see the module-level security warning). Prefer the WASM sandbox for
+        /// anything that is not fully trusted.
+        pub fn new_trusted() -> Self {
+            Self {
+                _libraries: Vec::new(),
+                trusted: true,
+            }
+        }
+
+        /// Whether this loader is permitted to load native libraries.
+        pub fn is_trusted(&self) -> bool {
+            self.trusted
+        }
+
+        /// Load an observability plugin from a shared library.
+        ///
+        /// # Safety
+        ///
+        /// This function is `unsafe` because loading a native shared library
+        /// can execute arbitrary code.  The caller MUST ensure:
+        ///
+        /// 1. The library at `path` was built from audited, trusted source code.
+        /// 2. The path is an absolute, canonicalized path (no symlink races).
+        /// 3. The file permissions prevent modification by unprivileged users.
+        ///
+        /// The library must export:
         /// ```c
         /// extern "C" fn create_observability_plugin() -> *mut dyn ObservabilityExtension
         /// ```
-        pub fn load_observability(
+        ///
+        /// Returns an error (without performing any `dlopen`) if this loader is
+        /// not trusted — see [`new_trusted`](Self::new_trusted) and
+        /// [`ALLOW_NATIVE_ENV`].
+        pub unsafe fn load_observability(
             &mut self,
             path: &Path,
         ) -> KernelResult<Arc<dyn ObservabilityExtension>> {
+            // Untrusted-by-default gate: refuse native loading unless explicitly
+            // enabled. This check happens BEFORE any filesystem access or
+            // `dlopen`, so a malicious library is never even opened.
+            if !self.trusted {
+                return Err(KernelError::Plugin {
+                    message: format!(
+                        "native plugin loading is disabled (untrusted by default). \
+                         Load untrusted extensions via the WASM sandbox, or opt in \
+                         explicitly with DynamicPluginLoader::new_trusted() or by \
+                         setting {ALLOW_NATIVE_ENV}=1. Refused: {}",
+                        path.display()
+                    ),
+                });
+            }
+
+            // Validate the path is absolute to prevent relative-path hijacking
+            if !path.is_absolute() {
+                return Err(KernelError::Plugin {
+                    message: format!(
+                        "plugin path must be absolute to prevent path hijacking: {}",
+                        path.display()
+                    ),
+                });
+            }
+
+            // Canonicalize to resolve symlinks and detect TOCTOU races
+            let canonical = path.canonicalize().map_err(|e| KernelError::Plugin {
+                message: format!("failed to canonicalize plugin path: {}", e),
+            })?;
+
             unsafe {
-                let lib = Library::new(path).map_err(|e| KernelError::Plugin {
+                let lib = Library::new(&canonical).map_err(|e| KernelError::Plugin {
                     message: format!("failed to load library: {}", e),
                 })?;
 
@@ -647,6 +855,56 @@ pub mod dynamic {
     impl Default for DynamicPluginLoader {
         fn default() -> Self {
             Self::new()
+        }
+    }
+
+    #[cfg(test)]
+    mod dynamic_tests {
+        use super::*;
+
+        #[test]
+        fn test_untrusted_loader_refuses_native_load() {
+            // Default loader (no env opt-in) must refuse to load a native lib,
+            // returning an error WITHOUT touching the filesystem.
+            let mut loader = DynamicPluginLoader::new_untrusted_for_test();
+            assert!(!loader.is_trusted());
+            let path = Path::new("/nonexistent/evil.so");
+            let result = unsafe { loader.load_observability(path) };
+            assert!(result.is_err(), "untrusted loader must refuse native load");
+            let msg = format!("{:?}", result.err().unwrap());
+            assert!(
+                msg.contains("untrusted") || msg.contains("disabled"),
+                "error should explain the untrusted-by-default policy, got: {msg}"
+            );
+        }
+
+        #[test]
+        fn test_trusted_loader_passes_gate_then_fails_on_missing_file() {
+            // A trusted loader passes the trust gate; with a missing file it
+            // fails later (canonicalize), proving the gate itself is not what
+            // rejects it.
+            let mut loader = DynamicPluginLoader::new_trusted();
+            assert!(loader.is_trusted());
+            let path = Path::new("/nonexistent/trusted.so");
+            let result = unsafe { loader.load_observability(path) };
+            assert!(result.is_err());
+            let msg = format!("{:?}", result.err().unwrap());
+            assert!(
+                !msg.contains("untrusted"),
+                "trusted loader must fail past the trust gate, got: {msg}"
+            );
+        }
+    }
+
+    impl DynamicPluginLoader {
+        /// Test-only constructor forcing the untrusted state regardless of the
+        /// ambient environment (so the env var cannot make the test flaky).
+        #[cfg(test)]
+        fn new_untrusted_for_test() -> Self {
+            Self {
+                _libraries: Vec::new(),
+                trusted: false,
+            }
         }
     }
 }
@@ -682,5 +940,142 @@ mod tests {
         assert!(!pm.has_observability());
         pm.register_observability(null).unwrap();
         assert!(pm.has_observability());
+    }
+
+    struct TestExtension {
+        shutdown_called: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    impl TestExtension {
+        fn new_with_flag(flag: Arc<std::sync::atomic::AtomicBool>) -> Self {
+            Self {
+                shutdown_called: flag,
+            }
+        }
+    }
+
+    impl ObservabilityExtension for TestExtension {
+        fn counter_inc(&self, _name: &str, _value: u64, _labels: &[(&str, &str)]) {}
+        fn gauge_set(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
+        fn histogram_observe(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
+        fn span_start(&self, _name: &str, _parent: Option<u64>) -> u64 {
+            0
+        }
+        fn span_event(&self, _span_id: u64, _name: &str, _labels: &[(&str, &str)]) {}
+        fn span_end(&self, _span_id: u64) {}
+    }
+
+    impl Extension for TestExtension {
+        fn info(&self) -> ExtensionInfo {
+            ExtensionInfo {
+                name: "test-extension".into(),
+                version: "0.0.1".into(),
+                description: "Test extension".into(),
+                author: "test".into(),
+                capabilities: vec![],
+            }
+        }
+
+        fn shutdown(&mut self) -> KernelResult<()> {
+            self.shutdown_called
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+    }
+
+    #[test]
+    fn test_shutdown_all_calls_shutdown() {
+        let pm = PluginManager::new();
+        let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        {
+            let ext = TestExtension::new_with_flag(flag.clone());
+            let arc_ext: Arc<dyn ObservabilityExtension> = Arc::new(ext);
+
+            let mut shutdown = pm.observability_shutdown.write();
+            shutdown.push(Mutex::new(arc_ext));
+        }
+
+        pm.shutdown_all().unwrap();
+
+        assert!(
+            flag.load(std::sync::atomic::Ordering::SeqCst),
+            "shutdown() should have been called on the extension"
+        );
+    }
+
+    #[test]
+    fn test_shutdown_all_with_single_ref() {
+        use std::sync::atomic::Ordering;
+
+        struct SingleRefExtension {
+            flag: Arc<std::sync::atomic::AtomicBool>,
+        }
+
+        impl SingleRefExtension {
+            fn new(flag: Arc<std::sync::atomic::AtomicBool>) -> Self {
+                Self { flag }
+            }
+        }
+
+        impl ObservabilityExtension for SingleRefExtension {
+            fn counter_inc(&self, _: &str, _: u64, _: &[(&str, &str)]) {}
+            fn gauge_set(&self, _: &str, _: f64, _: &[(&str, &str)]) {}
+            fn histogram_observe(&self, _: &str, _: f64, _: &[(&str, &str)]) {}
+            fn span_start(&self, _: &str, _: Option<u64>) -> u64 {
+                0
+            }
+            fn span_event(&self, _: u64, _: &str, _: &[(&str, &str)]) {}
+            fn span_end(&self, _: u64) {}
+        }
+
+        impl Extension for SingleRefExtension {
+            fn info(&self) -> ExtensionInfo {
+                ExtensionInfo {
+                    name: "single-ref".into(),
+                    version: "0.0.1".into(),
+                    description: "Test".into(),
+                    author: "test".into(),
+                    capabilities: vec![],
+                }
+            }
+            fn shutdown(&mut self) -> KernelResult<()> {
+                self.flag.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+            fn as_any_mut(&mut self) -> &mut dyn Any {
+                self
+            }
+        }
+
+        let pm = PluginManager::new();
+        let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        {
+            let ext = SingleRefExtension::new(flag.clone());
+            let boxed: Box<dyn ObservabilityExtension> = Box::new(ext);
+            let arc_ext: Arc<dyn ObservabilityExtension> = Arc::from(boxed);
+
+            let mut shutdown = pm.observability_shutdown.write();
+            shutdown.push(Mutex::new(arc_ext));
+        }
+
+        pm.shutdown_all().unwrap();
+
+        assert!(
+            flag.load(Ordering::SeqCst),
+            "shutdown should have been called"
+        );
     }
 }

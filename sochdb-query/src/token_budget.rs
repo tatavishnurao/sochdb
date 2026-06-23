@@ -52,6 +52,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 // ============================================================================
 
 /// Token estimation configuration
+///
+/// **Important**: This estimator uses a linear bytes-per-token heuristic,
+/// not actual BPE tokenization.  Accuracy varies by content:
+///
+/// - English prose: ~5% error (well-calibrated)
+/// - CJK / non-Latin: up to 30% *under*-estimate
+/// - Code / URLs / special chars: up to 20% error
+///
+/// A `safety_margin` factor (default 1.15) is applied to all estimates
+/// to reduce the risk of exceeding the LLM's context window.  For
+/// exact token counting, use `ExactTokenCounter` with a BPE vocabulary.
 #[derive(Debug, Clone)]
 pub struct TokenEstimatorConfig {
     /// Multiplier for integer values
@@ -64,6 +75,9 @@ pub struct TokenEstimatorConfig {
     pub hex_factor: f32,
     /// Bytes per token (approximate)
     pub bytes_per_token: f32,
+    /// Safety margin multiplier applied to all estimates to prevent
+    /// context window overflow.  1.15 = 15% headroom.
+    pub safety_margin: f32,
     /// Separator cost in tokens
     pub separator_tokens: usize,
     /// Newline cost in tokens
@@ -80,6 +94,7 @@ impl Default for TokenEstimatorConfig {
             string_factor: 1.1,
             hex_factor: 2.5,
             bytes_per_token: 4.0, // ~4 chars per token for English
+            safety_margin: 1.15,  // 15% headroom for non-Latin and special chars
             separator_tokens: 1,
             newline_tokens: 1,
             header_tokens: 10, // table[N]{cols}: header
@@ -92,6 +107,7 @@ impl TokenEstimatorConfig {
     pub fn gpt4() -> Self {
         Self {
             bytes_per_token: 3.8,
+            safety_margin: 1.15,
             ..Default::default()
         }
     }
@@ -100,6 +116,7 @@ impl TokenEstimatorConfig {
     pub fn claude() -> Self {
         Self {
             bytes_per_token: 4.2,
+            safety_margin: 1.15,
             ..Default::default()
         }
     }
@@ -112,6 +129,7 @@ impl TokenEstimatorConfig {
             string_factor: 1.3,
             hex_factor: 3.0,
             bytes_per_token: 3.5,
+            safety_margin: 1.25, // 25% headroom for safety
             ..Default::default()
         }
     }
@@ -135,8 +153,17 @@ impl TokenEstimator {
         Self { config }
     }
 
-    /// Estimate tokens for a single value
+    /// Estimate tokens for a single value.
+    ///
+    /// Applies `safety_margin` to the raw estimate to reduce the risk
+    /// of exceeding the LLM context window with non-Latin or structured text.
     pub fn estimate_value(&self, value: &SochValue) -> usize {
+        let raw = self.estimate_value_raw(value);
+        ((raw as f32) * self.config.safety_margin).ceil() as usize
+    }
+
+    /// Raw token estimate without safety margin (for internal use / testing).
+    fn estimate_value_raw(&self, value: &SochValue) -> usize {
         match value {
             SochValue::Null => 1,
             SochValue::Bool(_) => 1, // "true" or "false" is typically 1 token
@@ -226,7 +253,8 @@ impl TokenEstimator {
 
     /// Estimate tokens for plain text
     pub fn estimate_text(&self, text: &str) -> usize {
-        ((text.len() as f32) / self.config.bytes_per_token).ceil() as usize
+        let raw = ((text.len() as f32) / self.config.bytes_per_token).ceil() as usize;
+        ((raw as f32) * self.config.safety_margin).ceil() as usize
     }
 
     /// Truncate text to fit within token budget
@@ -530,10 +558,7 @@ impl TokenBudgetEnforcer {
                         requested: section.estimated_tokens,
                         allocated: 0,
                         outcome: AllocationOutcome::Dropped,
-                        reason: format!(
-                            "Minimum {} exceeds remaining {} tokens",
-                            min, remaining
-                        ),
+                        reason: format!("Minimum {} exceeds remaining {} tokens", min, remaining),
                     });
                 }
             } else {
@@ -586,28 +611,31 @@ impl TokenBudgetEnforcer {
                 let proportional = ((available as f32) * s.weight / total_weight).floor() as usize;
                 let capped = proportional.min(s.estimated_tokens);
                 let min = s.minimum_tokens.unwrap_or(0);
-                (capped.max(min), s.estimated_tokens, capped < s.estimated_tokens)
+                (
+                    capped.max(min),
+                    s.estimated_tokens,
+                    capped < s.estimated_tokens,
+                )
             })
             .collect();
 
         // Phase 2: Adjust to fit budget (water-filling)
         let mut total: usize = allocations.iter().map(|(a, _, _)| *a).sum();
-        
+
         // If over budget, reduce proportionally from largest allocations
         while total > available {
             // Find the section with largest allocation that can be reduced
             let max_idx = allocations
                 .iter()
                 .enumerate()
-                .filter(|(i, (a, _, _))| {
-                    *a > sections[*i].minimum_tokens.unwrap_or(0)
-                })
+                .filter(|(i, (a, _, _))| *a > sections[*i].minimum_tokens.unwrap_or(0))
                 .max_by_key(|(_, (a, _, _))| *a)
                 .map(|(i, _)| i);
 
             match max_idx {
                 Some(idx) => {
-                    let reduce = (total - available).min(allocations[idx].0 - sections[idx].minimum_tokens.unwrap_or(0));
+                    let reduce = (total - available)
+                        .min(allocations[idx].0 - sections[idx].minimum_tokens.unwrap_or(0));
                     allocations[idx].0 -= reduce;
                     total -= reduce;
                 }
@@ -618,7 +646,7 @@ impl TokenBudgetEnforcer {
         // Phase 3: Record results
         for (i, section) in sections.iter().enumerate() {
             let (allocated, requested, truncated) = allocations[i];
-            
+
             if allocated == 0 {
                 allocation.dropped_sections.push(section.name.clone());
                 allocation.explain.push(AllocationDecision {
@@ -630,11 +658,9 @@ impl TokenBudgetEnforcer {
                     reason: "No budget available after proportional allocation".to_string(),
                 });
             } else if truncated {
-                allocation.truncated_sections.push((
-                    section.name.clone(),
-                    requested,
-                    allocated,
-                ));
+                allocation
+                    .truncated_sections
+                    .push((section.name.clone(), requested, allocated));
                 allocation.tokens_allocated += allocated;
                 allocation.tokens_remaining = allocation.tokens_remaining.saturating_sub(allocated);
                 allocation.explain.push(AllocationDecision {
@@ -674,7 +700,7 @@ impl TokenBudgetEnforcer {
     fn allocate_strict(&self, sections: &[BudgetSection]) -> BudgetAllocation {
         let mut sorted: Vec<_> = sections.iter().collect();
         sorted.sort_by_key(|s| (if s.required { 0 } else { 1 }, s.priority));
-        
+
         // First pass: allocate minimums for required sections
         let mut allocation = BudgetAllocation {
             full_sections: Vec::new(),
@@ -787,7 +813,10 @@ impl TokenBudgetEnforcer {
                     requested: section.estimated_tokens,
                     allocated: 0,
                     outcome: AllocationOutcome::Dropped,
-                    reason: format!("Requested {} exceeds remaining {}", section.estimated_tokens, remaining),
+                    reason: format!(
+                        "Requested {} exceeds remaining {}",
+                        section.estimated_tokens, remaining
+                    ),
                 });
             }
         }
@@ -850,15 +879,20 @@ impl BudgetAllocation {
             full_sections: self.full_sections.clone(),
             truncated_sections: self.truncated_sections.clone(),
             dropped_sections: self.dropped_sections.clone(),
-            decisions: self.explain.iter().map(|d| ExplainDecision {
-                section: d.section.clone(),
-                priority: d.priority,
-                requested: d.requested,
-                allocated: d.allocated,
-                outcome: format!("{:?}", d.outcome),
-                reason: d.reason.clone(),
-            }).collect(),
-        }).unwrap_or_else(|_| "{}".to_string())
+            decisions: self
+                .explain
+                .iter()
+                .map(|d| ExplainDecision {
+                    section: d.section.clone(),
+                    priority: d.priority,
+                    requested: d.requested,
+                    allocated: d.allocated,
+                    outcome: format!("{:?}", d.outcome),
+                    reason: d.reason.clone(),
+                })
+                .collect(),
+        })
+        .unwrap_or_else(|_| "{}".to_string())
     }
 }
 

@@ -149,7 +149,10 @@ impl TbpColumnType {
             TbpColumnType::Int8 | TbpColumnType::UInt8 => Some(1),
             TbpColumnType::Int16 | TbpColumnType::UInt16 => Some(2),
             TbpColumnType::Int32 | TbpColumnType::UInt32 | TbpColumnType::Float32 => Some(4),
-            TbpColumnType::Int64 | TbpColumnType::UInt64 | TbpColumnType::Float64 | TbpColumnType::Timestamp => Some(8),
+            TbpColumnType::Int64
+            | TbpColumnType::UInt64
+            | TbpColumnType::Float64
+            | TbpColumnType::Timestamp => Some(8),
             TbpColumnType::String | TbpColumnType::Binary => None,
             TbpColumnType::FixedBinary => None, // Size specified per column
         }
@@ -241,8 +244,8 @@ impl TbpSchema {
 
     /// Compute a hash of the schema for validation
     fn compute_schema_id(name: &str, columns: &[TbpColumn]) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         name.hash(&mut hasher);
@@ -327,16 +330,22 @@ impl TbpHeader {
     /// Read header from a buffer
     pub fn read(data: &[u8]) -> io::Result<Self> {
         if data.len() < TBP_HEADER_SIZE {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Header too short"));
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Header too short",
+            ));
         }
 
         let mut cursor = std::io::Cursor::new(data);
         let magic = cursor.read_u32::<LittleEndian>()?;
         if magic != TBP_MAGIC {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid TBP magic"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid TBP magic",
+            ));
         }
 
-        Ok(Self {
+        let header = Self {
             magic,
             version: cursor.read_u16::<LittleEndian>()?,
             flags: TbpFlags(cursor.read_u16::<LittleEndian>()?),
@@ -346,7 +355,36 @@ impl TbpHeader {
             reserved: cursor.read_u16::<LittleEndian>()?,
             null_bitmap_offset: cursor.read_u32::<LittleEndian>()?,
             row_index_offset: cursor.read_u32::<LittleEndian>()?,
-        })
+        };
+
+        let data_len = data.len() as u64;
+
+        // Validate offsets are within the buffer to prevent OOB access
+        // from malformed or adversarial TBP payloads.
+        // Only validate when the buffer contains more than just the header
+        // (header-only buffers are used for serialization roundtrip tests).
+        if data_len > TBP_HEADER_SIZE as u64 {
+            if header.null_bitmap_offset != 0 && (header.null_bitmap_offset as u64) >= data_len {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "null_bitmap_offset ({}) exceeds data length ({})",
+                        header.null_bitmap_offset, data_len
+                    ),
+                ));
+            }
+            if header.row_index_offset != 0 && (header.row_index_offset as u64) >= data_len {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "row_index_offset ({}) exceeds data length ({})",
+                        header.row_index_offset, data_len
+                    ),
+                ));
+            }
+        }
+
+        Ok(header)
     }
 }
 
@@ -609,11 +647,7 @@ impl TbpWriter {
         } else {
             0
         };
-        let row_index_size = if has_variable {
-            self.row_count * 4
-        } else {
-            0
-        };
+        let row_index_size = if has_variable { self.row_count * 4 } else { 0 };
 
         let data_offset = TBP_HEADER_SIZE + null_bitmap_size + row_index_size;
 
@@ -644,7 +678,9 @@ impl TbpWriter {
         // Write row index
         if has_variable {
             for offset in &self.row_index {
-                buffer.write_u32::<LittleEndian>(*offset + data_offset as u32).unwrap();
+                buffer
+                    .write_u32::<LittleEndian>(*offset + data_offset as u32)
+                    .unwrap();
             }
         }
 
@@ -714,7 +750,10 @@ impl<'a> TbpRowWriter<'a> {
     /// Write a string (variable length)
     pub fn write_string(mut self, value: &str) -> Self {
         let bytes = value.as_bytes();
-        self.writer.data.write_u32::<LittleEndian>(bytes.len() as u32).unwrap();
+        self.writer
+            .data
+            .write_u32::<LittleEndian>(bytes.len() as u32)
+            .unwrap();
         self.writer.data.extend_from_slice(bytes);
         self.col_idx += 1;
         self
@@ -722,7 +761,10 @@ impl<'a> TbpRowWriter<'a> {
 
     /// Write binary data (variable length)
     pub fn write_binary(mut self, value: &[u8]) -> Self {
-        self.writer.data.write_u32::<LittleEndian>(value.len() as u32).unwrap();
+        self.writer
+            .data
+            .write_u32::<LittleEndian>(value.len() as u32)
+            .unwrap();
         self.writer.data.extend_from_slice(value);
         self.col_idx += 1;
         self

@@ -117,6 +117,9 @@ message InsertBatchRequest {
   
   // Flat vector data (row-major, length = len(ids) * dimension)
   repeated float vectors = 3;
+
+  // Optional per-vector metadata. If present, length must match ids.
+  repeated VectorMetadata metadata = 4;
 }
 
 message InsertBatchResponse {
@@ -137,6 +140,17 @@ message InsertStreamRequest {
   // Single vector to insert
   uint64 id = 2;
   repeated float vector = 3;
+
+  // Optional metadata for this vector.
+  VectorMetadata metadata = 4;
+}
+
+message VectorMetadata {
+  // Logical parent/source identifier. ID 0 is valid when explicitly present.
+  optional uint64 parent_id = 1;
+
+  // Representation/view type for this vector.
+  optional string view_type = 2;
 }
 
 message InsertStreamResponse {
@@ -166,25 +180,55 @@ message SearchRequest {
   
   // Expansion factor during search (optional, default: ef_search from config)
   uint32 ef = 4;
+
+  // Optional parent-aware grouped search. When set, results are grouped
+  // by parent_id so that multiple vector views of the same logical source
+  // do not consume multiple top-K slots.
+  GroupingOptions grouping = 5;
 }
 
 message SearchResponse {
   // Search results ordered by distance (ascending)
   repeated SearchResult results = 1;
-  
+
   // Duration in microseconds
   uint64 duration_us = 2;
-  
+
   // Error message if any
   string error = 3;
+
+  // Typed distance metric used for this search. Canonical at the response
+  // level; per-result `SearchResult.metric` (field 3) carries the same
+  // value as a human-readable label for convenience.
+  DistanceMetric metric = 4;
+
+  // Grouping diagnostics, present only when SearchRequest.grouping is set.
+  GroupingInfo grouping = 5;
 }
 
 message SearchResult {
   // Vector ID
   uint64 id = 1;
-  
-  // Distance to query vector
+
+  // Distance to query vector — always lower-is-better (ascending sort).
+  //
+  // The interpretation depends on `metric`:
+  //   cosine     → 1 - cosine_similarity      (0 = identical, 2 = opposite)
+  //   euclidean   → sqrt(sum(diff²))           (0 = identical)
+  //   dot_product → -dot_product               (more negative = more similar;
+  //                         recover raw dot as -distance)
   float distance = 2;
+
+  // Human-readable distance metric label. One of:
+  // "cosine" | "euclidean" | "dot_product" | "unspecified".
+  // The canonical typed metric is `SearchResponse.metric` / `SearchBatchResponse.metric`.
+  string metric = 3;
+
+  // Logical parent/source identifier, when stored for this vector.
+  optional uint64 parent_id = 4;
+
+  // Representation/view type, when stored for this vector.
+  optional string view_type = 5;
 }
 
 message SearchBatchRequest {
@@ -202,18 +246,27 @@ message SearchBatchRequest {
   
   // Expansion factor
   uint32 ef = 5;
+
+  // Optional parent-aware grouped search, applies to all queries.
+  GroupingOptions grouping = 6;
 }
 
 message SearchBatchResponse {
   // Results for each query
   repeated QueryResults results = 1;
-  
+
   // Total duration in microseconds
   uint64 duration_us = 2;
+
+  // Typed distance metric used for this batch search.
+  DistanceMetric metric = 3;
 }
 
 message QueryResults {
   repeated SearchResult results = 1;
+
+  // Grouping diagnostics for this query, present only when grouping was active.
+  GroupingInfo grouping = 2;
 }
 
 // =============================================================================
@@ -266,6 +319,44 @@ message HealthCheckResponse {
   
   // Available indexes
   repeated string indexes = 3;
+}
+
+// =============================================================================
+// GROUPING TYPES
+// =============================================================================
+
+enum GroupBy {
+  GROUP_BY_UNSPECIFIED = 0;
+  GROUP_BY_PARENT_ID = 1;
+}
+
+message GroupingOptions {
+  // Grouping criterion.
+  GroupBy group_by = 1;
+
+  // Maximum results to return per group (0 treated as 1).
+  uint32 max_per_group = 2;
+
+  // Number of raw ANN candidates to over-fetch before grouping.
+  // Must be >= k when grouping is active.
+  uint32 candidate_k = 3;
+}
+
+message GroupingInfo {
+  // Grouping criterion used.
+  GroupBy group_by = 1;
+
+  // The k value originally requested.
+  uint32 requested_k = 2;
+
+  // The effective candidate_k used (may differ from request if defaulted).
+  uint32 candidate_k = 3;
+
+  // Total raw ANN candidates examined before grouping.
+  uint32 raw_candidate_count = 4;
+
+  // Number of unique groups in the final result set.
+  uint32 returned_group_count = 5;
 }
 
 // =============================================================================
@@ -611,6 +702,9 @@ message DeletePolicyResponse {
 service ContextService {
   // Execute a context query
   rpc Query(ContextQueryRequest) returns (ContextQueryResponse);
+
+  // Ingest an episode into agent memory (write-time lexical index)
+  rpc WriteEpisode(WriteEpisodeRequest) returns (WriteEpisodeResponse);
   
   // Estimate tokens for content
   rpc EstimateTokens(EstimateTokensRequest) returns (EstimateTokensResponse);
@@ -679,6 +773,22 @@ message FormatContextRequest {
 
 message FormatContextResponse {
   string formatted = 1;
+}
+
+message WriteEpisodeRequest {
+  string namespace = 1;
+  string text = 2;
+  optional uint64 t_valid_from = 3;
+  string metadata_json = 4;  // Optional JSON object
+}
+
+message WriteEpisodeResponse {
+  uint64 episode_id = 1;
+  uint64 t_created = 2;
+  bool lexical_indexed = 3;
+  uint64 ingestion_lag_us = 4;
+  bool enrichment_queued = 5;
+  string error = 6;
 }
 
 // =============================================================================

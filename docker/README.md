@@ -60,13 +60,13 @@ docker compose down
 
 ## 📦 AvaiTags | Size | Description |
 |-------|------|------|-------------|
-| `sushanth53/sochdb` | `latest`, `0.5.0` | 159MB (34MB compressed) | Debian-based, production-ready |
+| `sushanth53/sochdb` | `latest`, `2.0.0` | 159MB (34MB compressed) | Debian-based, production-ready |
 | `sushanth53/sochdb` | `slim` | ~25MB | Alpine-based, minimal (coming soon) |
 
 ### Image Tags
 
 - `latest` - Latest stable release
-- `0.5.0` - Specific version
+- `2.0.0` - Specific version
 - `slim` - Minimal Alpine-based image (coming soon)
 | `sochdb/sochdb-grpc:latest` | ~50MB | Debian-based, stable |
 | `sochdb/sochdb-grpc:slim` | ~25MB | Alpine-based, minimal |
@@ -331,7 +331,7 @@ docker run -d \
 
 ## 📄 License
 
-Apache License 2.0 - See [LICENSE](../sochdb/LICENSE)
+AGPL-3.0-or-later - See [LICENSE](../sochdb/LICENSE)
 
 ## 🔗 Links
 

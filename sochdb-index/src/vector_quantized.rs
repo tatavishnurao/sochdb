@@ -25,6 +25,44 @@ use half::{bf16, f16};
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
 
+use std::cell::RefCell;
+
+// Step 4 (Phase A): thread-local f32 scratch buffers reused across f16/bf16
+// distance calls so the widen-to-f32 path never heap-allocates per distance.
+// Used for bf16 (no f16c hardware path) and any mixed-precision pair.
+thread_local! {
+    static CONV_A: RefCell<Vec<f32>> = RefCell::new(Vec::with_capacity(1536));
+    static CONV_B: RefCell<Vec<f32>> = RefCell::new(Vec::with_capacity(1536));
+}
+
+#[inline]
+fn fill_f32(buf: &mut Vec<f32>, v: &QuantizedVector) {
+    buf.clear();
+    match v {
+        QuantizedVector::F32(arr) => buf.extend_from_slice(arr.as_slice().unwrap()),
+        QuantizedVector::F16(vec) => buf.extend(vec.iter().map(|x| x.to_f32())),
+        QuantizedVector::BF16(vec) => buf.extend(vec.iter().map(|x| x.to_f32())),
+    }
+}
+
+/// Run `f` over both operands widened into thread-local f32 scratch (no heap alloc).
+#[inline]
+fn with_widened<R>(
+    a: &QuantizedVector,
+    b: &QuantizedVector,
+    f: impl FnOnce(&[f32], &[f32]) -> R,
+) -> R {
+    CONV_A.with(|ca| {
+        CONV_B.with(|cb| {
+            let mut ba = ca.borrow_mut();
+            let mut bb = cb.borrow_mut();
+            fill_f32(&mut ba, a);
+            fill_f32(&mut bb, b);
+            f(&ba, &bb)
+        })
+    })
+}
+
 /// Quantization precision level
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Precision {
@@ -60,6 +98,14 @@ pub enum QuantizedVector {
 }
 
 impl QuantizedVector {
+    /// Zero-length sentinel — occupies no heap memory for vector data.
+    /// Used when the real vector lives in `vector_store` and the node
+    /// only needs `vector_index` to reference it.
+    #[inline]
+    pub fn empty() -> Self {
+        QuantizedVector::F32(Array1::zeros(0))
+    }
+
     /// Create quantized vector from f32 array
     pub fn from_f32(data: Array1<f32>, precision: Precision) -> Self {
         match precision {
@@ -81,15 +127,15 @@ impl QuantizedVector {
         // Calculate L2 norm
         let norm_squared: f32 = data.iter().map(|&x| x * x).sum();
         let norm = norm_squared.sqrt();
-        
+
         // Handle zero vector edge case
         if norm < 1e-10 {
             return Self::from_f32(data, precision);
         }
-        
+
         // Normalize to unit length
         let normalized_data = data.mapv(|x| x / norm);
-        
+
         Self::from_f32(normalized_data, precision)
     }
 
@@ -141,7 +187,7 @@ impl QuantizedVector {
     }
 
     /// Get as f32 slice (zero-copy for F32, converts for F16/BF16)
-    /// 
+    ///
     /// For F32 precision, returns a slice directly into the underlying storage.
     /// For F16/BF16, returns None (caller should use to_f32() instead).
     pub fn as_f32_slice(&self) -> Option<&[f32]> {
@@ -165,61 +211,58 @@ impl QuantizedVector {
 
 /// Fast dot product for quantized vectors (converted to f32 on-the-fly)
 pub fn dot_product_quantized(a: &QuantizedVector, b: &QuantizedVector) -> f32 {
-    use crate::vector_simd;
+    use crate::simd_distance;
 
     match (a, b) {
         (QuantizedVector::F32(a_arr), QuantizedVector::F32(b_arr)) => {
-            vector_simd::dot_product_f32(a_arr.as_slice().unwrap(), b_arr.as_slice().unwrap())
+            simd_distance::dot_product_fast(a_arr.as_slice().unwrap(), b_arr.as_slice().unwrap())
+        }
+        // Step 4: native f16 SIMD (f16c) — no heap alloc, IEEE-equivalent to to_f32 path.
+        (QuantizedVector::F16(a16), QuantizedVector::F16(b16)) => {
+            simd_distance::dot_product_f16(a16, b16)
         }
         _ => {
-            // Convert to f32 and compute
-            let a_f32 = a.to_f32();
-            let b_f32 = b.to_f32();
-            vector_simd::dot_product_f32(a_f32.as_slice().unwrap(), b_f32.as_slice().unwrap())
+            // bf16 / mixed: widen into reusable thread-local scratch (no per-call alloc).
+            with_widened(a, b, |af, bf| simd_distance::dot_product_fast(af, bf))
         }
     }
 }
 
 /// Fast cosine distance for quantized vectors
 pub fn cosine_distance_quantized(a: &QuantizedVector, b: &QuantizedVector) -> f32 {
-    use crate::vector_simd;
+    use crate::simd_distance;
 
     match (a, b) {
         (QuantizedVector::F32(a_arr), QuantizedVector::F32(b_arr)) => {
-            vector_simd::cosine_distance_f32(a_arr.as_slice().unwrap(), b_arr.as_slice().unwrap())
+            simd_distance::cosine_distance_fast(
+                a_arr.as_slice().unwrap(),
+                b_arr.as_slice().unwrap(),
+            )
         }
-        _ => {
-            let a_f32 = a.to_f32();
-            let b_f32 = b.to_f32();
-            vector_simd::cosine_distance_f32(a_f32.as_slice().unwrap(), b_f32.as_slice().unwrap())
+        (QuantizedVector::F16(a16), QuantizedVector::F16(b16)) => {
+            simd_distance::cosine_distance_f16(a16, b16)
         }
+        _ => with_widened(a, b, |af, bf| simd_distance::cosine_distance_fast(af, bf)),
     }
 }
 
 /// Fast Euclidean distance for quantized vectors
 pub fn euclidean_distance_quantized(a: &QuantizedVector, b: &QuantizedVector) -> f32 {
-    use crate::vector_simd;
+    use crate::simd_distance;
 
     match (a, b) {
         (QuantizedVector::F32(a_arr), QuantizedVector::F32(b_arr)) => {
-            vector_simd::euclidean_distance_f32(
-                a_arr.as_slice().unwrap(),
-                b_arr.as_slice().unwrap(),
-            )
+            simd_distance::l2_distance_fast(a_arr.as_slice().unwrap(), b_arr.as_slice().unwrap())
         }
-        _ => {
-            let a_f32 = a.to_f32();
-            let b_f32 = b.to_f32();
-            vector_simd::euclidean_distance_f32(
-                a_f32.as_slice().unwrap(),
-                b_f32.as_slice().unwrap(),
-            )
+        (QuantizedVector::F16(a16), QuantizedVector::F16(b16)) => {
+            simd_distance::l2_distance_f16(a16, b16)
         }
+        _ => with_widened(a, b, |af, bf| simd_distance::l2_distance_fast(af, bf)),
     }
 }
 
 /// Optimized L2 squared distance for normalized vectors
-/// For unit vectors: ||a-b||² = 2 - 2(a·b) 
+/// For unit vectors: ||a-b||² = 2 - 2(a·b)
 /// This reduces computation from full L2 to a single dot product
 pub fn l2_squared_normalized_quantized(a: &QuantizedVector, b: &QuantizedVector) -> f32 {
     let dot_product = dot_product_quantized(a, b);
@@ -300,30 +343,42 @@ mod tests {
     fn test_normalized_vectors() {
         let a = arr1(&[3.0, 4.0]); // length = 5
         let b = arr1(&[1.0, 0.0]); // length = 1
-        
+
         let a_normalized = QuantizedVector::from_f32_normalized(a.clone(), Precision::F32);
         let b_normalized = QuantizedVector::from_f32_normalized(b.clone(), Precision::F32);
-        
+
         // Check that vectors are normalized to unit length
         let a_f32 = a_normalized.to_f32();
         let b_f32 = b_normalized.to_f32();
-        
+
         let a_norm: f32 = a_f32.iter().map(|x| x * x).sum::<f32>().sqrt();
         let b_norm: f32 = b_f32.iter().map(|x| x * x).sum::<f32>().sqrt();
-        
-        assert!((a_norm - 1.0).abs() < 1e-6, "Vector a not normalized: {}", a_norm);
-        assert!((b_norm - 1.0).abs() < 1e-6, "Vector b not normalized: {}", b_norm);
-        
+
+        assert!(
+            (a_norm - 1.0).abs() < 1e-6,
+            "Vector a not normalized: {}",
+            a_norm
+        );
+        assert!(
+            (b_norm - 1.0).abs() < 1e-6,
+            "Vector b not normalized: {}",
+            b_norm
+        );
+
         // Test that cosine distance on unit vectors is equivalent to L2 distance formula
         let cosine_dist = cosine_distance_normalized_quantized(&a_normalized, &b_normalized);
         let l2_dist = l2_squared_normalized_quantized(&a_normalized, &b_normalized).sqrt();
-        
+
         // For unit vectors: cosine_distance = 1 - dot_product
         // and ||a-b||^2 = 2 - 2*dot_product
         // So cosine_distance should be close to ||a-b||^2 / 2
         let expected_relation = l2_dist * l2_dist / 2.0;
-        assert!((cosine_dist - expected_relation).abs() < 1e-6, 
-            "Cosine distance {} not consistent with L2 distance {}", cosine_dist, l2_dist);
+        assert!(
+            (cosine_dist - expected_relation).abs() < 1e-6,
+            "Cosine distance {} not consistent with L2 distance {}",
+            cosine_dist,
+            l2_dist
+        );
     }
 
     #[test]
@@ -331,15 +386,15 @@ mod tests {
         // Test that optimized distance functions give same results as standard ones
         let a = arr1(&[1.0, 2.0, 3.0, 4.0]);
         let b = arr1(&[2.0, 3.0, 4.0, 5.0]);
-        
+
         let a_norm = QuantizedVector::from_f32_normalized(a.clone(), Precision::F32);
         let b_norm = QuantizedVector::from_f32_normalized(b.clone(), Precision::F32);
-        
+
         // For normalized vectors, cosine distance = 1 - dot_product
         let dot_prod = dot_product_quantized(&a_norm, &b_norm);
         let cosine_dist = cosine_distance_normalized_quantized(&a_norm, &b_norm);
         assert!((cosine_dist - (1.0 - dot_prod)).abs() < 1e-6);
-        
+
         // For normalized vectors, L2^2 = 2 - 2*dot_product
         let l2_squared = l2_squared_normalized_quantized(&a_norm, &b_norm);
         assert!((l2_squared - (2.0 - 2.0 * dot_prod)).abs() < 1e-6);

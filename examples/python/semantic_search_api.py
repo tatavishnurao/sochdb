@@ -9,11 +9,18 @@ A production-ready semantic search service showing:
 - Metadata filtering
 
 Usage:
+    pip install sochdb python-dotenv requests numpy
+    python3 examples/python/semantic_search_api.py
+
+    # Or from this monorepo:
+    cd sochdb-python
+    maturin develop --release
+    cd ..
     python3 examples/python/semantic_search_api.py
 """
 
 # Copyright 2025 Sushanth (https://github.com/sushanthpy)
-# Licensed under the Apache License, Version 2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 import os
 import sys
@@ -25,8 +32,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import requests
 
-# Add SochDB SDK to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../sochdb-python-sdk/src"))
+# Add SochDB package path for monorepo source usage
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../sochdb-python"))
 
 from dotenv import load_dotenv
 load_dotenv()

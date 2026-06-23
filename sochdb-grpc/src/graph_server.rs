@@ -7,18 +7,20 @@
 //!
 //! Provides graph overlay operations for agent memory via gRPC.
 
+use crate::auth_interceptor::{extract_principal, require_capability, require_namespace_access};
+use crate::namespace_server::NamespaceServer;
 use crate::proto::{
+    AddEdgeRequest, AddEdgeResponse, AddNodeRequest, AddNodeResponse, AddTemporalEdgeRequest,
+    AddTemporalEdgeResponse, DeleteEdgeRequest, DeleteEdgeResponse, DeleteNodeRequest,
+    DeleteNodeResponse, GetEdgesRequest, GetEdgesResponse, GetNeighborsRequest,
+    GetNeighborsResponse, GetNodeRequest, GetNodeResponse, GraphEdge, GraphNode,
+    QueryTemporalGraphRequest, QueryTemporalGraphResponse, ShortestPathRequest,
+    ShortestPathResponse, TemporalEdge, TraverseRequest, TraverseResponse,
     graph_service_server::{GraphService, GraphServiceServer},
-    AddEdgeRequest, AddEdgeResponse, AddNodeRequest, AddNodeResponse,
-    AddTemporalEdgeRequest, AddTemporalEdgeResponse,
-    DeleteEdgeRequest, DeleteEdgeResponse, DeleteNodeRequest, DeleteNodeResponse,
-    GetEdgesRequest, GetEdgesResponse, GetNeighborsRequest, GetNeighborsResponse,
-    GetNodeRequest, GetNodeResponse, GraphEdge, GraphNode, ShortestPathRequest,
-    ShortestPathResponse, TraverseRequest, TraverseResponse,
-    QueryTemporalGraphRequest, QueryTemporalGraphResponse, TemporalEdge,
 };
+use crate::security::Capability;
 use dashmap::DashMap;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
@@ -44,12 +46,23 @@ impl NamespaceGraph {
 /// Graph gRPC Server
 pub struct GraphServer {
     namespaces: DashMap<String, Arc<NamespaceGraph>>,
+    /// Shared namespace server for quota enforcement
+    ns_server: Option<NamespaceServer>,
 }
 
 impl GraphServer {
     pub fn new() -> Self {
         Self {
             namespaces: DashMap::new(),
+            ns_server: None,
+        }
+    }
+
+    /// Create with a shared NamespaceServer for quota enforcement.
+    pub fn with_namespace_server(ns: NamespaceServer) -> Self {
+        Self {
+            namespaces: DashMap::new(),
+            ns_server: Some(ns),
         }
     }
 
@@ -77,7 +90,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<AddNodeRequest>,
     ) -> Result<Response<AddNodeResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Write)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         if let Some(node) = req.node {
@@ -98,7 +114,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<GetNodeRequest>,
     ) -> Result<Response<GetNodeResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Read)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         match ns.nodes.get(&req.node_id) {
@@ -117,7 +136,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<DeleteNodeRequest>,
     ) -> Result<Response<DeleteNodeResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Write)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         match ns.nodes.remove(&req.node_id) {
@@ -141,21 +163,18 @@ impl GraphService for GraphServer {
         &self,
         request: Request<AddEdgeRequest>,
     ) -> Result<Response<AddEdgeResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Write)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         if let Some(edge) = req.edge {
             let from_id = edge.from_id.clone();
             let to_id = edge.to_id.clone();
 
-            ns.edges
-                .entry(from_id)
-                .or_default()
-                .push(edge.clone());
-            ns.reverse_edges
-                .entry(to_id)
-                .or_default()
-                .push(edge);
+            ns.edges.entry(from_id).or_default().push(edge.clone());
+            ns.reverse_edges.entry(to_id).or_default().push(edge);
 
             Ok(Response::new(AddEdgeResponse {
                 success: true,
@@ -173,7 +192,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<GetEdgesRequest>,
     ) -> Result<Response<GetEdgesResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Read)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         let mut edges = Vec::new();
@@ -208,7 +230,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<DeleteEdgeRequest>,
     ) -> Result<Response<DeleteEdgeResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Write)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         let mut found = false;
@@ -226,9 +251,7 @@ impl GraphService for GraphServer {
 
         // Remove from reverse edges
         if let Some(mut edges) = ns.reverse_edges.get_mut(&req.to_id) {
-            edges.retain(|e| {
-                !(e.edge_type == req.edge_type && e.from_id == req.from_id)
-            });
+            edges.retain(|e| !(e.edge_type == req.edge_type && e.from_id == req.from_id));
         }
 
         Ok(Response::new(DeleteEdgeResponse {
@@ -245,7 +268,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<TraverseRequest>,
     ) -> Result<Response<TraverseResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Read)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         let mut visited_nodes = Vec::new();
@@ -276,8 +302,8 @@ impl GraphService for GraphServer {
 
             if let Some(edges) = ns.edges.get(&node_id) {
                 for edge in edges.iter() {
-                    let type_matches = req.edge_types.is_empty()
-                        || req.edge_types.contains(&edge.edge_type);
+                    let type_matches =
+                        req.edge_types.is_empty() || req.edge_types.contains(&edge.edge_type);
                     if type_matches && !seen.contains(&edge.to_id) {
                         visited_edges.push(edge.clone());
                         queue.push_back((edge.to_id.clone(), depth + 1));
@@ -297,7 +323,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<ShortestPathRequest>,
     ) -> Result<Response<ShortestPathResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Read)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         // BFS for shortest path
@@ -326,8 +355,8 @@ impl GraphService for GraphServer {
 
             if let Some(node_edges) = ns.edges.get(&current) {
                 for edge in node_edges.iter() {
-                    let type_matches = req.edge_types.is_empty()
-                        || req.edge_types.contains(&edge.edge_type);
+                    let type_matches =
+                        req.edge_types.is_empty() || req.edge_types.contains(&edge.edge_type);
                     if type_matches && !visited.contains(&edge.to_id) {
                         let mut new_path = path.clone();
                         new_path.push(edge.to_id.clone());
@@ -350,7 +379,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<GetNeighborsRequest>,
     ) -> Result<Response<GetNeighborsResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Read)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         let mut neighbor_nodes = Vec::new();
@@ -361,8 +393,8 @@ impl GraphService for GraphServer {
         if req.direction == 0 || req.direction == 2 {
             if let Some(edges) = ns.edges.get(&req.node_id) {
                 for edge in edges.iter() {
-                    let type_matches = req.edge_types.is_empty()
-                        || req.edge_types.contains(&edge.edge_type);
+                    let type_matches =
+                        req.edge_types.is_empty() || req.edge_types.contains(&edge.edge_type);
                     if type_matches && !seen.contains(&edge.to_id) {
                         seen.insert(edge.to_id.clone());
                         neighbor_edges.push(edge.clone());
@@ -378,8 +410,8 @@ impl GraphService for GraphServer {
         if req.direction == 1 || req.direction == 2 {
             if let Some(edges) = ns.reverse_edges.get(&req.node_id) {
                 for edge in edges.iter() {
-                    let type_matches = req.edge_types.is_empty()
-                        || req.edge_types.contains(&edge.edge_type);
+                    let type_matches =
+                        req.edge_types.is_empty() || req.edge_types.contains(&edge.edge_type);
                     if type_matches && !seen.contains(&edge.from_id) {
                         seen.insert(edge.from_id.clone());
                         neighbor_edges.push(edge.clone());
@@ -402,7 +434,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<AddTemporalEdgeRequest>,
     ) -> Result<Response<AddTemporalEdgeResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Write)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         let temporal_edge = TemporalEdge {
@@ -429,7 +464,10 @@ impl GraphService for GraphServer {
         &self,
         request: Request<QueryTemporalGraphRequest>,
     ) -> Result<Response<QueryTemporalGraphResponse>, Status> {
+        let principal = extract_principal(&request);
         let req = request.into_inner();
+        require_capability(&principal, &Capability::Read)?;
+        require_namespace_access(&principal, &req.namespace)?;
         let ns = self.get_or_create_namespace(&req.namespace);
 
         let mut result_edges = Vec::new();

@@ -96,6 +96,12 @@ jobs:
             target: aarch64-apple-darwin
             binary_ext: ""
             lib_ext: ".dylib"
+
+          # macOS x86_64 (Intel) — cross-compiled on Apple Silicon
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_ext: ""
+            lib_ext: ".dylib"
             
           # Windows x64
           - os: windows-latest
@@ -238,7 +244,22 @@ jobs:
             if [ "$DRY_RUN" = "true" ]; then
               cargo publish --dry-run --allow-dirty
             else
-              cargo publish --allow-dirty || echo "⚠️ $pkg_name may already be published"
+              # Attempt publish; tolerate an already-published version (exit 0) but
+              # fail on real errors. cargo emits two different messages depending on
+              # timing: "already uploaded" (just-pushed, mid-index) and
+              # "already exists on crates.io index" (fully indexed/live) — a
+              # re-run after a partial publish hits the latter, so match both.
+              OUTPUT=$(cargo publish --allow-dirty 2>&1) && RC=0 || RC=$?
+              if [ $RC -ne 0 ]; then
+                if echo "$OUTPUT" | grep -qE "already uploaded|already exists on crates\.io"; then
+                  echo "⚠️ $pkg_name is already published, skipping"
+                else
+                  echo "❌ Failed to publish $pkg_name (exit code $RC):"
+                  echo "$OUTPUT"
+                  cd ..
+                  return $RC
+                fi
+              fi
               # Wait for crates.io to index — dependents need this available
               echo "⏳ Waiting for $pkg_name to be indexed on crates.io..."
               sleep 45
@@ -246,35 +267,43 @@ jobs:
             cd ..
           }
           
-          # ── Publish in STRICT dependency order ──
-          # The graph is:
-          #   sochdb-core       → (no sochdb deps)
-          #   sochdb-kernel     → core
-          #   sochdb-index      → core
-          #   sochdb-storage    → core, index
-          #   sochdb-query      → core, storage, index
-          #   sochdb-client     → core, storage, index, query  (published as 'sochdb')
-          #   sochdb-grpc       → core, index, kernel
-          #   sochdb-mcp        → client(sochdb), core, query
-          
+          # ── Publish in STRICT topological order ──
+          # Every crate's INTERNAL (path) deps must already be on crates.io
+          # before it publishes, or cargo fails with "no matching package".
+          # Keep this graph in sync whenever a crate gains a new sochdb-* dep —
+          # sochdb-vector and sochdb-memory were missing here, which is why
+          # sochdb-grpc (which depends on both) failed to publish:
+          #   sochdb-core    → (none)
+          #   sochdb-kernel  → core
+          #   sochdb-index   → core
+          #   sochdb-storage → core, index
+          #   sochdb-query   → core, storage, index
+          #   sochdb-vector  → core, storage, index
+          #   sochdb-memory  → core, storage, query, vector, index
+          #   sochdb-client  → core, storage, index, query                  (published as 'sochdb')
+          #   sochdb-grpc    → core, kernel, index, storage, query, vector, memory
+          #   sochdb-mcp     → core, query
+
           # Layer 0: no internal deps
           publish_crate sochdb-core
-          
+
           # Layer 1: depends only on core
           publish_crate sochdb-kernel
           publish_crate sochdb-index
-          
+
           # Layer 2: depends on core + index
           publish_crate sochdb-storage
-          
+
           # Layer 3: depends on core + storage + index
           publish_crate sochdb-query
-          
-          # Layer 4: depends on everything above
-          publish_crate sochdb-client sochdb  # Published as 'sochdb' on crates.io
-          publish_crate sochdb-grpc
-          
-          # Layer 5: depends on client
+          publish_crate sochdb-vector
+
+          # Layer 4: depends on core + storage + query + vector + index
+          publish_crate sochdb-memory
+
+          # Layer 5: top-level crates — need every layer above
+          publish_crate sochdb-client sochdb  # published as 'sochdb' on crates.io
+          publish_crate sochdb-grpc           # needs vector + memory (now published above)
           publish_crate sochdb-mcp
 
   # ===========================================================================
@@ -301,7 +330,7 @@ jobs:
         run: |
           mkdir -p release-assets
           
-          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu aarch64-apple-darwin x86_64-pc-windows-msvc; do
+          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-msvc; do
             if [ -d "release-binaries/$target" ]; then
               cd release-binaries
               if [ "$target" = "x86_64-pc-windows-msvc" ]; then
@@ -356,7 +385,8 @@ jobs:
             This release includes pre-built binaries for:
             - Linux x86_64
             - Linux aarch64 (ARM64) — AWS Graviton, Ampere Altra
-            - macOS ARM64 (Apple Silicon) - Intel Macs use Rosetta 2
+            - macOS ARM64 (Apple Silicon)
+            - macOS x86_64 (Intel)
             - Windows x64
             
             See [CHANGELOG.md](https://github.com/sochdb/sochdb/blob/main/CHANGELOG.md) for details.
@@ -401,4 +431,5 @@ jobs:
           echo "- ✅ Linux x86_64" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Linux aarch64 (ARM64)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ macOS ARM64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ macOS x86_64 (Intel)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Windows x64" >> $GITHUB_STEP_SUMMARY

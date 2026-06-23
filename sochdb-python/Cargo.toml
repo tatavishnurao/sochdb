@@ -1,9 +1,9 @@
 [package]
 name = "sochdb-python"
-version = "0.5.0"
+version = "2.0.11"
 edition = "2024"
 authors = ["Sushanth <sushanth@sochdb.dev>"]
-license.workspace = true
+license = "AGPL-3.0-or-later"
 description = "SochDB Python native extension with PyO3 - zero-copy vector operations"
 
 [lib]
@@ -15,6 +15,8 @@ crate-type = ["cdylib"]
 sochdb-index = { path = "../sochdb-index" }
 sochdb-core = { path = "../sochdb-core", features = ["analytics"] }
 sochdb-storage = { path = "../sochdb-storage" }
+sochdb-vector = { path = "../sochdb-vector" }
+sochdb-query = { path = "../sochdb-query" }
 sochdb = { path = "../sochdb-client" }
 
 # PyO3 bindings
@@ -34,6 +36,9 @@ tracing = "0.1"
 
 # Error handling
 thiserror = "1.0"
+
+# CSV parsing (for load_csv)
+csv = "1"
 
 [dev-dependencies]
 tempfile = "3.15"

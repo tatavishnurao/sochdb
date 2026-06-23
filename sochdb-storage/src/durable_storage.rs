@@ -17,13 +17,19 @@
 
 //! Durable Storage Layer
 //!
-//! This module wires together all storage components into a production-ready
-//! durable storage engine:
+//! Wires together the live storage components into a durable engine:
 //!
-//! - WAL (txn_wal.rs) for durability
+//! - WAL (txn_wal.rs) for crash-consistent durability + recovery
 //! - Group Commit for throughput
 //! - MVCC for isolation
 //! - LSCS for columnar efficiency
+//!
+//! Truth-in-capabilities: the live path provides crash-consistent WAL recovery,
+//! but NOT at-rest encryption, point-in-time recovery, ARIES checkpointing, or
+//! WAL fencing — those modules exist but are quarantined behind the empty,
+//! non-default `experimental` feature and are unwired. Query
+//! [`crate::durability_capabilities`] rather than relying on prose like
+//! "production-grade".
 //!
 //! ## Architecture
 //!
@@ -53,26 +59,66 @@
 //! - Writers: Serialize through WAL, use MVCC for conflict detection
 //! - Readers: Lock-free reads at snapshot timestamp
 //! - Commits: Batched through GroupCommit for throughput
+//!
+//! ## Isolation Contract
+//!
+//! The live write path (`MvccManager`, used by `DurableStorage`) provides
+//! **Serializable Snapshot Isolation (SSI)**, which is strictly stronger than
+//! plain Snapshot Isolation (SI):
+//!
+//! - **Snapshot reads.** Every transaction reads from a consistent snapshot
+//!   fixed at `begin_transaction()` (its `snapshot_ts`). Concurrent commits are
+//!   invisible to it — see `test_snapshot_isolation`. This alone is SI and is
+//!   vulnerable to **write skew** (two transactions each read a set the other
+//!   writes, both commit, and no serial order reproduces the result).
+//! - **Write-skew prevention.** On commit, `MvccManager::validate_ssi` inspects
+//!   recently-committed concurrent transactions for rw-antidependency edges:
+//!   an inbound edge (another txn wrote a key we read, `T_other →rw→ T_me`) and
+//!   an outbound edge (we wrote a key another txn read, `T_me →rw→ T_other`).
+//!   When a transaction sits on **both** an inbound and an outbound rw-edge it
+//!   is the pivot of a potential dependency cycle (Cahill/Fekete "dangerous
+//!   structure"), so it is aborted. This is the conservative safe subset of the
+//!   SSI test: it may abort some serializable schedules (false positives) but
+//!   **never admits a non-serializable one** (no false negatives), so the
+//!   externally observable isolation level is Serializable.
+//! - **Read-only transactions** (`begin_read_only`) skip read-set tracking and
+//!   never participate in validation; they always observe a serializable
+//!   snapshot and never abort.
+//!
+//! ### MVCC garbage collection is snapshot-safe
+//!
+//! Old versions are pruned by `DurableStorage::gc()`, which feeds the
+//! **low-water-mark** `MvccManager::min_active_snapshot()` — the minimum
+//! `snapshot_ts` across all still-active transactions — into
+//! `MvccMemTable::gc()` and then `BinarySearchChain::gc_by_ts()`. The chain
+//! retains every version with `commit_ts > min_active_ts` **plus one anchor
+//! version at or below the watermark**, so any in-flight reader can still
+//! resolve the correct version for its snapshot. A version is only freed once
+//! **no active snapshot can observe it**. The watermark is recomputed on every
+//! `begin`/`commit`/`abort`, so it is monotonic with respect to the oldest live
+//! reader. See `test_gc_preserves_versions_for_active_snapshot`.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use dashmap::DashMap;
 use smallvec::SmallVec;
 
 use crossbeam_skiplist::SkipMap;
 
-use crate::deferred_index::{DeferredSortedIndex, DeferredIndexConfig};
+use crate::DurabilityCapabilities;
+use crate::deferred_index::{DeferredIndexConfig, DeferredSortedIndex};
+use crate::encryption::EncryptionKey;
 use crate::group_commit::EventDrivenGroupCommit;
+use crate::keyring;
 use crate::txn_wal::{TxnWal, TxnWalBuffer, TxnWalEntry};
-use sochdb_core::{Result, SochDBError};
 use sochdb_core::version_chain::{
-    BinarySearchChain, ChainEntry,
-    MvccVersionChain, MvccVersionChainMut, WriteConflictDetection,
-    VisibilityContext, TxnId, Timestamp,
+    BinarySearchChain, ChainEntry, MvccVersionChain, MvccVersionChainMut, Timestamp, TxnId,
+    VisibilityContext, WriteConflictDetection,
 };
+use sochdb_core::{Result, SochDBError};
 
 // =============================================================================
 // SSI Bloom Filter - Fast Conflict Pre-Filtering
@@ -269,9 +315,18 @@ pub struct Version {
 
 // Rec 11: Implement ChainEntry so BinarySearchChain<Version> works
 impl ChainEntry for Version {
-    #[inline] fn commit_ts(&self) -> u64 { self.commit_ts }
-    #[inline] fn txn_id(&self) -> u64 { self.txn_id }
-    #[inline] fn set_commit_ts(&mut self, ts: u64) { self.commit_ts = ts; }
+    #[inline]
+    fn commit_ts(&self) -> u64 {
+        self.commit_ts
+    }
+    #[inline]
+    fn txn_id(&self) -> u64 {
+        self.txn_id
+    }
+    #[inline]
+    fn set_commit_ts(&mut self, ts: u64) {
+        self.commit_ts = ts;
+    }
 }
 
 // ============================================================================
@@ -282,7 +337,7 @@ impl ChainEntry for Version {
 ///
 /// ## Optimization: Binary Search with Sorted Commit Ordering
 ///
-/// Separates committed versions (sorted descending by commit_ts) from 
+/// Separates committed versions (sorted descending by commit_ts) from
 /// uncommitted version (single optional slot per transaction).
 ///
 /// **Before:** O(v) linear scan + O(v) max computation = O(v)
@@ -305,12 +360,14 @@ impl VersionChain {
     /// Create a new empty version chain
     #[inline]
     pub fn new() -> Self {
-        Self { inner: BinarySearchChain::new() }
+        Self {
+            inner: BinarySearchChain::new(),
+        }
     }
 
     /// Add a new uncommitted version
     /// If there's already an uncommitted version from this txn, update it in place
-    /// 
+    ///
     /// O(1) - just updates the uncommitted slot
     #[inline]
     pub fn add_uncommitted(&mut self, value: Option<Vec<u8>>, txn_id: u64) {
@@ -331,7 +388,7 @@ impl VersionChain {
     }
 
     /// Commit a version - moves from uncommitted slot to sorted committed list
-    /// 
+    ///
     /// O(log v) - inserts into sorted position using binary search
     #[inline]
     pub fn commit(&mut self, txn_id: u64, commit_ts: u64) -> bool {
@@ -339,7 +396,7 @@ impl VersionChain {
     }
 
     /// Abort a version (remove uncommitted version for txn)
-    /// 
+    ///
     /// O(1) - just clears the uncommitted slot if it matches
     #[inline]
     pub fn abort(&mut self, txn_id: u64) {
@@ -355,7 +412,7 @@ impl VersionChain {
     }
 
     /// Check if there's an uncommitted version by another transaction
-    /// 
+    ///
     /// O(1) - just checks the uncommitted slot
     #[inline]
     pub fn has_write_conflict(&self, my_txn_id: u64) -> bool {
@@ -393,7 +450,8 @@ impl MvccVersionChain for VersionChain {
 
     fn get_visible(&self, ctx: &VisibilityContext) -> Option<&Self::Value> {
         // Delegate to BinarySearchChain, then project to value field
-        self.inner.read_at(ctx.snapshot_ts, Some(ctx.reader_txn_id))
+        self.inner
+            .read_at(ctx.snapshot_ts, Some(ctx.reader_txn_id))
             .map(|v| &v.value)
     }
 
@@ -474,14 +532,14 @@ pub struct MvccTransaction {
 
 impl MvccTransaction {
     /// Create a new transaction with pre-sized collections
-    /// 
+    ///
     /// This avoids HashSet resize overhead during the transaction
     /// which was causing +11% regression on write_set.insert().
     #[inline]
     pub fn new(txn_id: u64, snapshot_ts: u64) -> Self {
         Self::with_mode(txn_id, snapshot_ts, TransactionMode::ReadWrite)
     }
-    
+
     /// Create a read-only transaction (SSI bypass - 2.6x faster)
     ///
     /// Read-only transactions skip all SSI tracking:
@@ -490,13 +548,13 @@ impl MvccTransaction {
     /// - No commit validation
     ///
     /// ## Performance
-    /// 
+    ///
     /// For N=100 reads: 8350ns → 3230ns (2.6× improvement)
     #[inline]
     pub fn read_only(txn_id: u64, snapshot_ts: u64) -> Self {
         Self::with_mode(txn_id, snapshot_ts, TransactionMode::ReadOnly)
     }
-    
+
     /// Create a write-only transaction (partial SSI bypass)
     ///
     /// Write-only transactions skip read tracking:
@@ -507,13 +565,13 @@ impl MvccTransaction {
     pub fn write_only(txn_id: u64, snapshot_ts: u64) -> Self {
         Self::with_mode(txn_id, snapshot_ts, TransactionMode::WriteOnly)
     }
-    
+
     /// Create transaction with specific mode
     #[inline]
     pub fn with_mode(txn_id: u64, snapshot_ts: u64, mode: TransactionMode) -> Self {
         // Optimize allocation based on mode
         let (write_capacity, read_capacity) = match mode {
-            TransactionMode::ReadOnly => (0, 0),  // No tracking needed
+            TransactionMode::ReadOnly => (0, 0), // No tracking needed
             TransactionMode::WriteOnly => (WRITE_SET_INITIAL_CAPACITY, 0),
             TransactionMode::ReadWrite => (WRITE_SET_INITIAL_CAPACITY, READ_SET_INITIAL_CAPACITY),
         };
@@ -521,7 +579,7 @@ impl MvccTransaction {
     }
 
     /// Create with custom capacities for expected workload
-    /// 
+    ///
     /// Use this when you know the transaction will write many keys
     /// to avoid resize overhead entirely.
     #[inline]
@@ -598,12 +656,12 @@ pub enum TransactionMode {
     /// Cannot form rw-antidependency cycles (no writes to create outgoing edges)
     /// Safe to skip read_set, read_bloom, and commit validation entirely
     ReadOnly,
-    
+
     /// Write-only transaction - skips read tracking
     /// Cannot form incoming rw-edges (no reads from concurrent writers)
     /// Only needs write_set and write_bloom tracking
     WriteOnly,
-    
+
     /// Full read-write transaction (default) - complete SSI tracking
     /// May form both incoming and outgoing rw-edges
     /// Requires full validation at commit time
@@ -617,13 +675,16 @@ impl TransactionMode {
     pub fn tracks_reads(&self) -> bool {
         matches!(self, TransactionMode::ReadWrite)
     }
-    
+
     /// Check if this mode requires write tracking
     #[inline]
     pub fn tracks_writes(&self) -> bool {
-        matches!(self, TransactionMode::WriteOnly | TransactionMode::ReadWrite)
+        matches!(
+            self,
+            TransactionMode::WriteOnly | TransactionMode::ReadWrite
+        )
     }
-    
+
     /// Check if commit needs SSI validation
     #[inline]
     pub fn needs_ssi_validation(&self) -> bool {
@@ -699,12 +760,12 @@ impl MvccManager {
     }
 
     /// Begin a new transaction with snapshot isolation
-    /// 
+    ///
     /// Uses pre-sized HashSets to avoid resize overhead (+11% regression fix)
     pub fn begin(&self, txn_id: u64) -> MvccTransaction {
         self.begin_with_mode(txn_id, TransactionMode::ReadWrite)
     }
-    
+
     /// Begin a read-only transaction (SSI bypass - 2.6x faster)
     ///
     /// Read-only transactions skip all SSI tracking, reducing
@@ -719,7 +780,7 @@ impl MvccManager {
     pub fn begin_read_only(&self, txn_id: u64) -> MvccTransaction {
         self.begin_with_mode(txn_id, TransactionMode::ReadOnly)
     }
-    
+
     /// Begin a write-only transaction (partial SSI bypass)
     ///
     /// Write-only transactions skip read tracking, reducing overhead
@@ -728,7 +789,7 @@ impl MvccManager {
     pub fn begin_write_only(&self, txn_id: u64) -> MvccTransaction {
         self.begin_with_mode(txn_id, TransactionMode::WriteOnly)
     }
-    
+
     /// Begin a transaction with specific mode
     ///
     /// This is the core transaction creation method that all other
@@ -773,7 +834,7 @@ impl MvccManager {
             if !txn.mode.tracks_reads() {
                 return;
             }
-            
+
             // Only track reads if within reasonable bounds
             if txn.read_set.len() < 10000 {
                 txn.read_set.insert(SmallVec::from_slice(key));
@@ -831,14 +892,14 @@ impl MvccManager {
 
         // OPTIMIZATION: Only track ReadWrite transactions for SSI
         // ReadOnly/WriteOnly can't form complete rw-antidependency cycles
-        let needs_ssi_tracking = removed_txn.mode == TransactionMode::ReadWrite 
-            && !removed_txn.read_set.is_empty() 
+        let needs_ssi_tracking = removed_txn.mode == TransactionMode::ReadWrite
+            && !removed_txn.read_set.is_empty()
             && !removed_txn.write_set.is_empty();
-        
+
         if needs_ssi_tracking {
             // Need to clone write_set since we return it AND track it
             let write_set_for_return = removed_txn.write_set.clone();
-            
+
             self.track_commit_owned(
                 txn_id,
                 commit_ts,
@@ -922,16 +983,24 @@ impl MvccManager {
         let mut any_may_intersect = false;
         for entry in self.recent_commits.iter() {
             let (_, (other_commit_ts, other_read_bloom, other_write_bloom, _, _)) = entry.pair();
-            
-            // Only check concurrent transactions
-            if *other_commit_ts <= my_snapshot {
+
+            // Only check concurrent transactions.
+            //
+            // A committed transaction is *concurrent* with us iff its writes are
+            // invisible to our snapshot. Read visibility is strict
+            // (`commit_ts < snapshot_ts`), so a transaction with
+            // `commit_ts >= my_snapshot` is invisible and must be validated
+            // against. Using `<` here (not `<=`) keeps this window consistent
+            // with `read_at`; a `<=` would skip a boundary transaction whose
+            // `commit_ts == my_snapshot` and miss a genuine write-skew.
+            if *other_commit_ts < my_snapshot {
                 continue;
             }
 
             // Check bloom filter intersection (O(m/64) per filter)
             // If our writes may intersect their reads OR their writes may intersect our reads
-            if txn.write_bloom.may_intersect(other_read_bloom) 
-                || other_write_bloom.may_intersect(&txn.read_bloom) 
+            if txn.write_bloom.may_intersect(other_read_bloom)
+                || other_write_bloom.may_intersect(&txn.read_bloom)
             {
                 any_may_intersect = true;
                 break;
@@ -966,9 +1035,11 @@ impl MvccManager {
                 ),
             ) = entry.pair();
 
-            // Only consider transactions that committed after our snapshot started
-            // (concurrent transactions)
-            if *other_commit_ts <= my_snapshot {
+            // Only consider transactions concurrent with us: those whose writes
+            // are invisible to our snapshot. Read visibility is strict
+            // (`commit_ts < snapshot_ts`), so `commit_ts >= my_snapshot` means
+            // concurrent. `<` (not `<=`) keeps this consistent with `read_at`.
+            if *other_commit_ts < my_snapshot {
                 continue;
             }
 
@@ -1052,13 +1123,7 @@ impl MvccManager {
         // No cloning needed - we take ownership
         self.recent_commits.insert(
             txn_id,
-            (
-                commit_ts,
-                read_bloom,
-                write_bloom,
-                read_set,
-                write_set,
-            ),
+            (commit_ts, read_bloom, write_bloom, read_set, write_set),
         );
 
         // Lazy pruning: only prune when we're significantly over capacity
@@ -1194,7 +1259,7 @@ impl EpochDirtyList {
 // ============================================================================
 
 /// Streaming iterator for range scans
-/// 
+///
 /// Yields results one at a time without materializing the full result set.
 /// This enables processing of very large result sets with O(1) memory per
 /// iteration instead of O(N) for the entire result set.
@@ -1213,12 +1278,12 @@ struct ScanRangeIterator<'a> {
 
 impl<'a> Iterator for ScanRangeIterator<'a> {
     type Item = (Vec<u8>, Vec<u8>);
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         // Lazy initialization on first call
         if !self.initialized {
             self.initialized = true;
-            
+
             if self.use_ordered {
                 // Try deferred index first (after compaction, it uses a SkipMap internally)
                 if let Some(ref def_idx) = self.memtable.deferred_index {
@@ -1227,27 +1292,25 @@ impl<'a> Iterator for ScanRangeIterator<'a> {
                     let snapshot_ts = self.snapshot_ts;
                     let current_txn_id = self.current_txn_id;
                     let data = &self.memtable.data;
-                    
+
                     // Collect keys from deferred index (already sorted after compact)
                     let keys: Vec<Vec<u8>> = if end.is_empty() {
                         def_idx.range_from(&start).collect()
                     } else {
                         def_idx.range(&start, &end).collect()
                     };
-                    
-                    let iter: Box<dyn Iterator<Item = (Vec<u8>, Vec<u8>)> + 'a> = Box::new(
-                        keys.into_iter()
-                            .filter_map(move |key| {
-                                if let Some(chain) = data.get(&key)
-                                    && let Some(v) = chain.read_at(snapshot_ts, current_txn_id)
-                                    && let Some(value) = &v.value
-                                {
-                                    Some((key, value.clone()))
-                                } else {
-                                    None
-                                }
-                            })
-                    );
+
+                    let iter: Box<dyn Iterator<Item = (Vec<u8>, Vec<u8>)> + 'a> =
+                        Box::new(keys.into_iter().filter_map(move |key| {
+                            if let Some(chain) = data.get(&key)
+                                && let Some(v) = chain.read_at(snapshot_ts, current_txn_id)
+                                && let Some(value) = &v.value
+                            {
+                                Some((key, value.clone()))
+                            } else {
+                                None
+                            }
+                        }));
                     self.ordered_iter = Some(iter);
                 } else if let Some(ref idx) = self.memtable.ordered_index {
                     let start = self.start.clone();
@@ -1255,37 +1318,32 @@ impl<'a> Iterator for ScanRangeIterator<'a> {
                     let snapshot_ts = self.snapshot_ts;
                     let current_txn_id = self.current_txn_id;
                     let data = &self.memtable.data;
-                    
-                    let iter: Box<dyn Iterator<Item = (Vec<u8>, Vec<u8>)> + 'a> = if end.is_empty() {
-                        Box::new(
-                            idx.range(start..)
-                                .filter_map(move |entry| {
-                                    let key = entry.key();
-                                    if let Some(chain) = data.get(key)
-                                        && let Some(v) = chain.read_at(snapshot_ts, current_txn_id)
-                                        && let Some(value) = &v.value
-                                    {
-                                        Some((key.clone(), value.clone()))
-                                    } else {
-                                        None
-                                    }
-                                })
-                        )
+
+                    let iter: Box<dyn Iterator<Item = (Vec<u8>, Vec<u8>)> + 'a> = if end.is_empty()
+                    {
+                        Box::new(idx.range(start..).filter_map(move |entry| {
+                            let key = entry.key();
+                            if let Some(chain) = data.get(key)
+                                && let Some(v) = chain.read_at(snapshot_ts, current_txn_id)
+                                && let Some(value) = &v.value
+                            {
+                                Some((key.clone(), value.clone()))
+                            } else {
+                                None
+                            }
+                        }))
                     } else {
-                        Box::new(
-                            idx.range(start..end)
-                                .filter_map(move |entry| {
-                                    let key = entry.key();
-                                    if let Some(chain) = data.get(key)
-                                        && let Some(v) = chain.read_at(snapshot_ts, current_txn_id)
-                                        && let Some(value) = &v.value
-                                    {
-                                        Some((key.clone(), value.clone()))
-                                    } else {
-                                        None
-                                    }
-                                })
-                        )
+                        Box::new(idx.range(start..end).filter_map(move |entry| {
+                            let key = entry.key();
+                            if let Some(chain) = data.get(key)
+                                && let Some(v) = chain.read_at(snapshot_ts, current_txn_id)
+                                && let Some(value) = &v.value
+                            {
+                                Some((key.clone(), value.clone()))
+                            } else {
+                                None
+                            }
+                        }))
                     };
                     self.ordered_iter = Some(iter);
                 }
@@ -1295,32 +1353,30 @@ impl<'a> Iterator for ScanRangeIterator<'a> {
                 let end = self.end.clone();
                 let snapshot_ts = self.snapshot_ts;
                 let current_txn_id = self.current_txn_id;
-                
-                let iter: Box<dyn Iterator<Item = (Vec<u8>, Vec<u8>)> + 'a> = Box::new(
-                    self.memtable.data.iter()
-                        .filter_map(move |entry| {
-                            let key = entry.key();
-                            
-                            if key.as_slice() < start.as_slice() {
-                                return None;
-                            }
-                            if !end.is_empty() && key.as_slice() >= end.as_slice() {
-                                return None;
-                            }
-                            
-                            if let Some(v) = entry.value().read_at(snapshot_ts, current_txn_id)
-                                && let Some(value) = &v.value
-                            {
-                                Some((key.clone(), value.clone()))
-                            } else {
-                                None
-                            }
-                        })
-                );
+
+                let iter: Box<dyn Iterator<Item = (Vec<u8>, Vec<u8>)> + 'a> =
+                    Box::new(self.memtable.data.iter().filter_map(move |entry| {
+                        let key = entry.key();
+
+                        if key.as_slice() < start.as_slice() {
+                            return None;
+                        }
+                        if !end.is_empty() && key.as_slice() >= end.as_slice() {
+                            return None;
+                        }
+
+                        if let Some(v) = entry.value().read_at(snapshot_ts, current_txn_id)
+                            && let Some(value) = &v.value
+                        {
+                            Some((key.clone(), value.clone()))
+                        } else {
+                            None
+                        }
+                    }));
                 self.unordered_iter = Some(iter);
             }
         }
-        
+
         // Get next from appropriate iterator
         if let Some(ref mut iter) = self.ordered_iter {
             iter.next()
@@ -1452,7 +1508,8 @@ impl MvccMemTable {
         let mut total_size = 0u64;
 
         // Rec 3: Batch MVCC tracking - single lock acquire for all keys
-        self.dirty_list.record_versions_batch(writes.iter().map(|(k, _)| k.clone()));
+        self.dirty_list
+            .record_versions_batch(writes.iter().map(|(k, _)| k.clone()));
 
         for (key, value) in writes {
             // Insert into ordered index (if enabled)
@@ -1531,9 +1588,9 @@ impl MvccMemTable {
     /// - O(K) to iterate matching keys
     ///
     /// When ordered_index is disabled: O(N) full DashMap scan (fallback)
-    /// 
+    ///
     /// ## Optimizations Applied
-    /// 
+    ///
     /// - Pre-allocates result vector based on expected output size
     /// - Uses batch-friendly iteration patterns
     /// - Minimizes allocations during iteration
@@ -1602,7 +1659,7 @@ impl MvccMemTable {
     }
 
     /// Optimized full scan with batch allocation
-    /// 
+    ///
     /// For use when scanning entire tables/namespaces.
     /// Pre-allocates based on actual data size.
     pub fn scan_all(
@@ -1624,7 +1681,7 @@ impl MvccMemTable {
     }
 
     /// Streaming scan iterator for very large datasets
-    /// 
+    ///
     /// Returns an iterator that yields (key, value) pairs without
     /// materializing the entire result set in memory.
     pub fn scan_prefix_iter<'a>(
@@ -1727,21 +1784,21 @@ impl MvccMemTable {
     }
 
     /// Streaming range scan iterator for very large datasets
-    /// 
+    ///
     /// Returns an iterator that yields (key, value) pairs without
     /// materializing the entire result set in memory. Uses the ordered
     /// index when available for O(log N + K) complexity.
-    /// 
+    ///
     /// ## Zero-Allocation Design
-    /// 
+    ///
     /// While the iterator itself cannot avoid allocations for returned
     /// values (since the caller needs ownership), it avoids:
     /// - Pre-materializing all results
     /// - Intermediate buffers
     /// - Repeated key comparisons for already-visited entries
-    /// 
+    ///
     /// ## Usage
-    /// 
+    ///
     /// ```ignore
     /// for (key, value) in memtable.scan_range_iter(b"start", b"end", ts, txn) {
     ///     // Process each result as it arrives
@@ -1759,10 +1816,10 @@ impl MvccMemTable {
         if let Some(ref idx) = self.deferred_index {
             idx.compact();
         }
-        
+
         // Use either ordered index or full scan
         let use_ordered = self.ordered_index.is_some() || self.deferred_index.is_some();
-        
+
         // Create iterator based on availability of ordered index
         ScanRangeIterator {
             memtable: self,
@@ -2282,7 +2339,7 @@ impl MemTableKind {
                 if let Some(ref idx) = m.ordered_index {
                     let start_handle = ArenaKeyHandle::new(start);
                     let end_handle = ArenaKeyHandle::new(end);
-                    
+
                     if end.is_empty() {
                         for entry in idx.range(start_handle..) {
                             let key = entry.key();
@@ -2409,6 +2466,55 @@ pub struct DurableStorage {
     /// Database lock for exclusive access (None = no locking)
     #[allow(dead_code)]
     db_lock: Option<crate::lock::DatabaseLock>,
+    /// Whether at-rest encryption is active for this instance (drives the live
+    /// per-instance durability matrix). Set from the resolved keyring at open.
+    at_rest_encrypted: bool,
+    /// Whether Point-in-Time Recovery is enabled for this database (Task 3B PITR
+    /// phase 1). Derived from the presence of `wal.manifest` at open (the manifest
+    /// is the single source of truth), or set by `enable_point_in_time_recovery`.
+    /// When enabled, the destructive `truncate_wal()` is forbidden (segment
+    /// sealing is the PITR-safe replacement, landing in a later phase) so the WAL
+    /// record ordinal stays a stable, durable monotonic LSN across restarts.
+    pitr_enabled: AtomicBool,
+}
+
+/// Encryption configuration for opening a [`DurableStorage`].
+///
+/// `disabled()` (the default for the legacy open variants) keeps the database
+/// plaintext and byte-compatible with pre-encryption binaries. `with_kek()`
+/// supplies the Key-Encryption-Key — the operator secret that *wraps* a
+/// per-database data key; it is never used verbatim as the cipher key (see
+/// [`crate::keyring`]). A wrong/missing KEK for an encrypted database fails
+/// closed at open (the DB will refuse to open, never silently read as plaintext).
+pub struct StorageEncryption {
+    /// The KEK. `None` ⇒ plaintext database.
+    pub kek: Option<EncryptionKey>,
+    /// Human-readable identifier for the key source (e.g. "env:SOCHDB_ENCRYPTION_KEY",
+    /// "embedded", "kms:..."). Bound into the keyring for provenance.
+    pub source_id: String,
+}
+
+impl StorageEncryption {
+    /// Plaintext (no encryption) — the default.
+    pub fn disabled() -> Self {
+        Self {
+            kek: None,
+            source_id: "none".to_string(),
+        }
+    }
+
+    /// Encrypt at rest under the given KEK.
+    pub fn with_kek(kek: EncryptionKey, source_id: impl Into<String>) -> Self {
+        Self {
+            kek: Some(kek),
+            source_id: source_id.into(),
+        }
+    }
+
+    /// Whether a key is configured (i.e. encryption is requested).
+    pub fn is_enabled(&self) -> bool {
+        self.kek.is_some()
+    }
 }
 
 impl DurableStorage {
@@ -2453,7 +2559,59 @@ impl DurableStorage {
         enable_ordered_index: bool,
         memtable_type: MemTableType,
     ) -> Result<Self> {
-        Self::open_with_full_config_internal(path, enable_ordered_index, memtable_type, true)
+        Self::open_with_full_config_internal(
+            path,
+            enable_ordered_index,
+            memtable_type,
+            true,
+            StorageEncryption::disabled(),
+        )
+    }
+
+    /// Open with at-rest encryption configured via [`StorageEncryption`].
+    ///
+    /// With `StorageEncryption::disabled()` this is identical to
+    /// [`Self::open_with_full_config`]. With a KEK, the database is opened (or
+    /// created) encrypted: a per-DB data key is generated and wrapped into the
+    /// keyring on first open, and a wrong/missing key on a subsequent open fails
+    /// closed. Reads are unaffected (the live read path is in-memory); only the
+    /// WAL write/recovery path pays the AEAD cost.
+    pub fn open_with_encryption<P: AsRef<Path>>(
+        path: P,
+        enable_ordered_index: bool,
+        memtable_type: MemTableType,
+        encryption: StorageEncryption,
+    ) -> Result<Self> {
+        Self::open_with_full_config_internal(
+            path,
+            enable_ordered_index,
+            memtable_type,
+            true,
+            encryption,
+        )
+    }
+
+    /// The live, per-instance durability capabilities of THIS database.
+    ///
+    /// Unlike the build-level [`crate::durability_capabilities`] (which reports
+    /// defaults), this reflects the actual resolved state — notably whether
+    /// at-rest encryption is active for this opened instance.
+    pub fn durability_capabilities(&self) -> DurabilityCapabilities {
+        DurabilityCapabilities {
+            crash_recovery: true,
+            at_rest_encryption: self.at_rest_encrypted,
+            // Point-in-time recovery is live (recover_to) when PITR is enabled:
+            // the WAL is fully retained and can be replayed to an LSN/timestamp.
+            point_in_time_recovery: self.pitr_enabled.load(Ordering::SeqCst),
+            // ARIES / fencing remain unwired on the live path.
+            aries_checkpoint: false,
+            wal_fencing: false,
+        }
+    }
+
+    /// Whether at-rest encryption is active for this instance.
+    pub fn is_encrypted(&self) -> bool {
+        self.at_rest_encrypted
     }
 
     /// Open without locking (for testing crash recovery scenarios)
@@ -2463,7 +2621,81 @@ impl DurableStorage {
     /// the storage instance. In production, always use `open_with_full_config`.
     #[cfg(test)]
     pub fn open_without_lock<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_full_config_internal(path, true, MemTableType::Standard, false)
+        Self::open_with_full_config_internal(
+            path,
+            true,
+            MemTableType::Standard,
+            false,
+            StorageEncryption::disabled(),
+        )
+    }
+
+    /// Open an ephemeral (in-memory-like) DurableStorage backed by a temp directory.
+    ///
+    /// Uses the full DurableStorage engine (WAL, MVCC, SSI) but writes to a
+    /// temporary directory that is automatically cleaned up when the
+    /// `EphemeralHandle` is dropped. This ensures test and production code paths
+    /// are identical — bugs found in tests are guaranteed to reproduce in production.
+    ///
+    /// # Returns
+    /// An `EphemeralHandle` that owns both the storage and the temp directory.
+    /// Access the storage via `handle.storage()` or `Deref` coercion.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let handle = DurableStorage::open_ephemeral()?;
+    /// let txn = handle.begin_transaction()?;
+    /// handle.write(txn, b"key".to_vec(), b"value".to_vec())?;
+    /// handle.commit(txn)?;
+    /// // temp directory cleaned up when `handle` drops
+    /// ```
+    pub fn open_ephemeral() -> Result<EphemeralHandle> {
+        let tmp = tempfile::tempdir().map_err(|e| SochDBError::Io(e))?;
+        let storage = Self::open_with_full_config_internal(
+            tmp.path(),
+            true,
+            MemTableType::Standard,
+            false, // No lock needed for ephemeral
+            StorageEncryption::disabled(),
+        )?;
+        Ok(EphemeralHandle {
+            storage,
+            _tmpdir: tmp,
+        })
+    }
+
+    /// Open an ephemeral DurableStorage with group commit enabled.
+    ///
+    /// Same as `open_ephemeral()` but with group commit for higher throughput.
+    pub fn open_ephemeral_with_group_commit() -> Result<EphemeralHandle> {
+        let tmp = tempfile::tempdir().map_err(|e| SochDBError::Io(e))?;
+        let mut storage = Self::open_with_full_config_internal(
+            tmp.path(),
+            true,
+            MemTableType::Standard,
+            false,
+            StorageEncryption::disabled(),
+        )?;
+
+        let wal = storage.wal.clone();
+        let gc = EventDrivenGroupCommit::new(move |txn_ids: &[u64]| {
+            for &txn_id in txn_ids {
+                let entry = TxnWalEntry::txn_commit(txn_id);
+                wal.append_no_flush(&entry).map_err(|e| e.to_string())?;
+            }
+            wal.flush().map_err(|e| e.to_string())?;
+            wal.sync().map_err(|e| e.to_string())?;
+            Ok(std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64)
+        });
+        storage.group_commit = Some(Arc::new(gc));
+
+        Ok(EphemeralHandle {
+            storage,
+            _tmpdir: tmp,
+        })
     }
 
     fn open_with_full_config_internal<P: AsRef<Path>>(
@@ -2471,20 +2703,52 @@ impl DurableStorage {
         enable_ordered_index: bool,
         memtable_type: MemTableType,
         acquire_lock: bool,
+        encryption: StorageEncryption,
     ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         std::fs::create_dir_all(&path)?;
 
         // Acquire exclusive lock on database directory (unless disabled for testing)
         let db_lock = if acquire_lock {
-            Some(crate::lock::DatabaseLock::acquire(&path)
-                .map_err(|e| SochDBError::LockError(e.to_string()))?)
+            Some(
+                crate::lock::DatabaseLock::acquire(&path)
+                    .map_err(|e| SochDBError::LockError(e.to_string()))?,
+            )
         } else {
             None
         };
 
         let wal_path = path.join("wal.log");
-        let wal = Arc::new(TxnWal::new(&wal_path)?);
+
+        // Resolve at-rest encryption from the keyring BEFORE touching the WAL.
+        // - A fresh DB (no wal.log yet) with a KEK ⇒ create an encrypted keyring.
+        // - An existing plaintext DB with a KEK ⇒ refused (must migrate explicitly).
+        // - An encrypted DB with a wrong/missing KEK ⇒ refused fail-closed.
+        let is_new_db = !wal_path.exists();
+        let enc_state = keyring::load_or_init(
+            &path,
+            encryption.kek.as_ref(),
+            &encryption.source_id,
+            is_new_db,
+        )?;
+        let at_rest_encrypted = enc_state.is_encrypted();
+        let wal = Arc::new(TxnWal::new_with_encryption(
+            &wal_path,
+            enc_state.engine(),
+            enc_state.db_uuid(),
+            enc_state.key_epoch(),
+        )?);
+
+        // PITR anchor: the presence of wal.manifest is the single source of truth
+        // that this DB is PITR-enabled. If present, seed last_checkpoint_lsn from
+        // it (it is otherwise in-memory and lost on restart).
+        let (pitr_enabled, initial_checkpoint_lsn) =
+            if crate::wal_manifest::WalManifest::exists(&path) {
+                let m = crate::wal_manifest::WalManifest::load(&path)?;
+                (true, m.last_checkpoint_lsn)
+            } else {
+                (false, 0)
+            };
 
         let storage = Self {
             path,
@@ -2494,7 +2758,7 @@ impl DurableStorage {
             txn_write_buffers: DashMap::new(),
             group_commit: None,
             needs_recovery: AtomicU64::new(0),
-            last_checkpoint_lsn: AtomicU64::new(0),
+            last_checkpoint_lsn: AtomicU64::new(initial_checkpoint_lsn),
             sync_mode: AtomicU64::new(1), // Default: NORMAL (like SQLite)
             commits_since_sync: AtomicU64::new(0),
             // Adaptive batch sizing (Little's Law)
@@ -2502,6 +2766,8 @@ impl DurableStorage {
             last_commit_us: AtomicU64::new(0),
             fsync_latency_us: AtomicU64::new(5000), // 5ms default
             db_lock,
+            at_rest_encrypted,
+            pitr_enabled: AtomicBool::new(pitr_enabled),
         };
 
         // Check if recovery needed
@@ -2563,8 +2829,23 @@ impl DurableStorage {
         policy: crate::index_policy::IndexPolicy,
         group_commit: bool,
     ) -> Result<Self> {
+        Self::open_with_policy_encrypted(path, policy, group_commit, StorageEncryption::disabled())
+    }
+
+    /// Policy-based open with at-rest encryption configured.
+    ///
+    /// Identical to [`Self::open_with_policy`] but threads a [`StorageEncryption`]
+    /// down to the keyring/WAL so the embedded `Database` kernel can open (or
+    /// create) an encrypted database. `StorageEncryption::disabled()` is exactly
+    /// the plaintext behaviour.
+    pub fn open_with_policy_encrypted<P: AsRef<Path>>(
+        path: P,
+        policy: crate::index_policy::IndexPolicy,
+        group_commit: bool,
+        encryption: StorageEncryption,
+    ) -> Result<Self> {
         use crate::index_policy::IndexPolicy;
-        
+
         // Derive configuration from policy
         let (enable_ordered_index, memtable_type) = match policy {
             IndexPolicy::WriteOptimized | IndexPolicy::AppendOnly => {
@@ -2582,8 +2863,9 @@ impl DurableStorage {
         };
 
         if group_commit {
-            let mut storage = Self::open_with_full_config(path, enable_ordered_index, memtable_type)?;
-            
+            let mut storage =
+                Self::open_with_encryption(path, enable_ordered_index, memtable_type, encryption)?;
+
             let wal = storage.wal.clone();
             let gc = EventDrivenGroupCommit::new(move |txn_ids: &[u64]| {
                 for &txn_id in txn_ids {
@@ -2600,7 +2882,7 @@ impl DurableStorage {
             storage.group_commit = Some(Arc::new(gc));
             Ok(storage)
         } else {
-            Self::open_with_full_config(path, enable_ordered_index, memtable_type)
+            Self::open_with_encryption(path, enable_ordered_index, memtable_type, encryption)
         }
     }
 
@@ -2618,22 +2900,36 @@ impl DurableStorage {
         path: P,
         policy: crate::index_policy::IndexPolicy,
     ) -> Result<Self> {
+        Self::open_for_concurrent_encrypted(path, policy, StorageEncryption::disabled())
+    }
+
+    /// Concurrent-mode open with at-rest encryption configured.
+    ///
+    /// Identical to [`Self::open_for_concurrent`] but threads a
+    /// [`StorageEncryption`] through, so an encrypted database can also be opened
+    /// in concurrent (multi-reader) mode rather than failing closed for lack of a
+    /// key channel.
+    pub fn open_for_concurrent_encrypted<P: AsRef<Path>>(
+        path: P,
+        policy: crate::index_policy::IndexPolicy,
+        encryption: StorageEncryption,
+    ) -> Result<Self> {
         use crate::index_policy::IndexPolicy;
-        
+
         let (enable_ordered_index, memtable_type) = match policy {
-            IndexPolicy::WriteOptimized | IndexPolicy::AppendOnly => {
-                (false, MemTableType::Arena)
-            }
-            IndexPolicy::Balanced => {
-                (true, MemTableType::Standard)
-            }
-            IndexPolicy::ScanOptimized => {
-                (true, MemTableType::Standard)
-            }
+            IndexPolicy::WriteOptimized | IndexPolicy::AppendOnly => (false, MemTableType::Arena),
+            IndexPolicy::Balanced => (true, MemTableType::Standard),
+            IndexPolicy::ScanOptimized => (true, MemTableType::Standard),
         };
 
         // Open WITHOUT exclusive file lock (concurrent MVCC handles coordination)
-        Self::open_with_full_config_internal(path, enable_ordered_index, memtable_type, false)
+        Self::open_with_full_config_internal(
+            path,
+            enable_ordered_index,
+            memtable_type,
+            false,
+            encryption,
+        )
     }
 
     /// Get the memtable type being used
@@ -2670,6 +2966,69 @@ impl DurableStorage {
         let commit_ts = self.mvcc.alloc_commit_ts();
 
         // Collect keys being written for efficient commit
+        let mut write_set: HashSet<InlineKey> = HashSet::new();
+        for (key, value) in &writes {
+            write_set.insert(SmallVec::from_slice(key));
+            self.memtable
+                .write(key.clone(), Some(value.clone()), recovery_txn_id)?;
+        }
+        self.memtable.commit(recovery_txn_id, commit_ts, &write_set);
+
+        self.needs_recovery.store(0, Ordering::SeqCst);
+
+        Ok(RecoveryStats {
+            transactions_recovered: txn_count,
+            writes_recovered: writes.len(),
+            commit_ts,
+        })
+    }
+
+    /// Point-in-Time Recovery: rebuild the in-memory state as of `target`.
+    ///
+    /// This is the PITR analogue of [`Self::recover`] — call it on a FRESH open
+    /// INSTEAD of `recover()` (not in addition to it), to materialize the
+    /// database as it existed at a chosen LSN or commit timestamp. Because PITR
+    /// mode never truncates the WAL, the full history is retained and replayed up
+    /// to (and stopping at) the target, with transaction atomicity preserved
+    /// (a transaction is applied only if its commit is within the target).
+    ///
+    /// Requires PITR to be enabled (the WAL must be fully retained); returns an
+    /// error otherwise, since a truncated WAL cannot honor an arbitrary target.
+    pub fn recover_to(&self, target: crate::txn_wal::RecoveryTarget) -> Result<RecoveryStats> {
+        if !self.pitr_enabled.load(Ordering::SeqCst) {
+            return Err(SochDBError::InvalidArgument(
+                "recover_to requires Point-in-Time Recovery to be enabled \
+                 (the full WAL must be retained); call enable_point_in_time_recovery first"
+                    .to_string(),
+            ));
+        }
+
+        // Single-shot recovery on a fresh open: refuse if state was already
+        // rebuilt (by recover() or a prior recover_to()). Re-applying would layer
+        // a stale set over the point-in-time state under a newer commit_ts and
+        // silently corrupt it (recover()/recover_to() both clear needs_recovery).
+        if self.needs_recovery.load(Ordering::SeqCst) == 0 {
+            return Err(SochDBError::InvalidArgument(
+                "recover_to must be the sole recovery on a fresh open, but state \
+                 was already recovered; reopen the database and call recover_to first"
+                    .to_string(),
+            ));
+        }
+
+        // Make the on-disk WAL match current_lsn() before replaying. Under the
+        // default NORMAL sync mode the commit record(s) may still sit in the
+        // BufWriter, while current_lsn() counts the in-memory sequence — so
+        // without this flush+fsync a captured-LSN cut would silently drop
+        // committed-but-unflushed records (replay reads a fresh on-disk handle).
+        self.wal.flush()?;
+        self.wal.sync()?;
+
+        let (writes, txn_count) = self.wal.replay_to_target(target)?;
+
+        // Apply the bounded set of committed writes to the (fresh) memtable,
+        // mirroring recover().
+        let recovery_txn_id = self.wal.alloc_txn_id();
+        let commit_ts = self.mvcc.alloc_commit_ts();
         let mut write_set: HashSet<InlineKey> = HashSet::new();
         for (key, value) in &writes {
             write_set.insert(SmallVec::from_slice(key));
@@ -2735,7 +3094,10 @@ impl DurableStorage {
     /// Only safe for single-threaded access (no concurrent writes).
     #[inline]
     pub fn read_latest(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let snapshot_ts = self.mvcc.ts_counter.load(std::sync::atomic::Ordering::Relaxed);
+        let snapshot_ts = self
+            .mvcc
+            .ts_counter
+            .load(std::sync::atomic::Ordering::Relaxed);
         self.memtable.read(key, snapshot_ts, None)
     }
 
@@ -2744,7 +3106,10 @@ impl DurableStorage {
     /// Uses the current global timestamp. Only safe for single-threaded access.
     #[inline]
     pub fn scan_latest(&self, prefix: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
-        let snapshot_ts = self.mvcc.ts_counter.load(std::sync::atomic::Ordering::Relaxed);
+        let snapshot_ts = self
+            .mvcc
+            .ts_counter
+            .load(std::sync::atomic::Ordering::Relaxed);
         self.memtable.scan_prefix(prefix, snapshot_ts, None)
     }
 
@@ -2867,8 +3232,11 @@ impl DurableStorage {
     /// - 1 (NORMAL): Adaptive sync using Little's Law: W* = √(τ/λ)
     /// - 2 (FULL): Sync every commit (safest, slowest)
     pub fn commit(&self, txn_id: u64) -> Result<u64> {
-        // First, flush all buffered writes to WAL with SINGLE lock acquisition
-        // This is the key optimization: O(1) lock instead of O(writes) locks
+        // First, flush all buffered DATA writes to the WAL with a SINGLE lock
+        // acquisition (O(1) lock instead of O(writes) locks). Flushing data
+        // records before validation is safe: ARIES recovery only treats them as
+        // winners if a *durable commit record* for this transaction also exists,
+        // and that record is written below — strictly after validation succeeds.
         if let Some((_, buffer)) = self.txn_write_buffers.remove(&txn_id)
             && !buffer.is_empty()
         {
@@ -2876,22 +3244,34 @@ impl DurableStorage {
             self.wal.flush_buffer(&buffer)?;
         }
 
-        // Use group commit if available, otherwise direct commit
+        // ====================================================================
+        // Task 1 — Linearizable commit invariant:
+        //
+        //   A commit record must NEVER become durable unless the transaction
+        //   has already passed SSI validation and its write set is final.
+        //
+        // We therefore VALIDATE (and freeze the write set) *before* making the
+        // commit record durable. `mvcc.commit` performs SSI validation and
+        // returns `None` on a dangerous structure (serialization conflict) or
+        // if the transaction no longer exists. Writing/fsyncing the commit
+        // record before this point would let a crash resurrect a transaction
+        // that the live system rejected — the classic "committed-after-crash,
+        // aborted-before-crash" non-linearizability bug.
+        // ====================================================================
+        let (commit_ts, write_set) = self.mvcc.commit(txn_id).ok_or_else(|| {
+            SochDBError::Validation(
+                "transaction aborted: SSI validation failed (serialization conflict) \
+                 or transaction not found"
+                    .into(),
+            )
+        })?;
+
+        // Validation passed and the write set is frozen. Only now may the
+        // commit record become durable.
         if let Some(gc) = &self.group_commit {
-            // Submit to group commit and wait for result
-            // This batches multiple commits into a single fsync
+            // Submit the *validated* commit intent to group commit and wait.
+            // This batches multiple validated commits into a single fsync.
             gc.submit_and_wait(txn_id).map_err(SochDBError::Internal)?;
-
-            // Get commit timestamp and write_set from MVCC
-            let (commit_ts, write_set) = self
-                .mvcc
-                .commit(txn_id)
-                .ok_or_else(|| SochDBError::Internal("Transaction not found".into()))?;
-
-            // Commit in memtable (O(k) where k = keys written)
-            self.memtable.commit(txn_id, commit_ts, &write_set);
-
-            Ok(commit_ts)
         } else {
             // Direct commit path with adaptive sync (Little's Law)
             let sync_mode = self.sync_mode.load(Ordering::Relaxed);
@@ -2925,18 +3305,13 @@ impl DurableStorage {
 
                 self.commits_since_sync.store(0, Ordering::Relaxed);
             }
-
-            // Get commit timestamp and write_set from MVCC
-            let (commit_ts, write_set) = self
-                .mvcc
-                .commit(txn_id)
-                .ok_or_else(|| SochDBError::Internal("Transaction not found".into()))?;
-
-            // Commit in memtable (O(k) where k = keys written)
-            self.memtable.commit(txn_id, commit_ts, &write_set);
-
-            Ok(commit_ts)
         }
+
+        // Commit record is durable (or buffered per sync mode) for a validated
+        // transaction — publish the writes to the memtable. (O(k), k = keys.)
+        self.memtable.commit(txn_id, commit_ts, &write_set);
+
+        Ok(commit_ts)
     }
 
     /// Update arrival rate using exponential moving average
@@ -3059,7 +3434,7 @@ impl DurableStorage {
     }
 
     /// Streaming scan for very large result sets
-    /// 
+    ///
     /// Returns an iterator that yields (key, value) pairs without
     /// materializing the entire result set in memory.
     #[inline]
@@ -3070,7 +3445,8 @@ impl DurableStorage {
         end: &'a [u8],
     ) -> impl Iterator<Item = (Vec<u8>, Vec<u8>)> + 'a {
         let snapshot_ts = self.mvcc.get_snapshot_ts(txn_id).unwrap_or(0);
-        self.memtable.scan_range_iter(start, end, snapshot_ts, Some(txn_id))
+        self.memtable
+            .scan_range_iter(start, end, snapshot_ts, Some(txn_id))
     }
 
     /// Force fsync to disk
@@ -3094,7 +3470,63 @@ impl DurableStorage {
         let entry = TxnWalEntry::checkpoint(txn_id);
         let lsn = self.wal.append_sync(&entry)?;
         self.last_checkpoint_lsn.store(lsn, Ordering::SeqCst);
+        // PITR: persist the checkpoint LSN to the durable manifest so it survives
+        // restart. This piggybacks the fsync that append_sync already performed;
+        // the manifest write is itself crash-safe (temp + fsync + atomic rename).
+        // No-op (and no manifest write) when PITR is not enabled.
+        if self.pitr_enabled.load(Ordering::SeqCst) {
+            self.persist_pitr_manifest(lsn)?;
+        }
         Ok(lsn)
+    }
+
+    /// The current durable monotonic LSN (the WAL record ordinal). In PITR mode
+    /// the WAL is never truncated, so this is stable and monotonic across
+    /// restarts (`recover_state` rebuilds it by re-counting on reopen).
+    pub fn current_lsn(&self) -> u64 {
+        self.wal.sequence()
+    }
+
+    /// Whether Point-in-Time Recovery is enabled for this database.
+    pub fn is_pitr_enabled(&self) -> bool {
+        self.pitr_enabled.load(Ordering::SeqCst)
+    }
+
+    /// Enable Point-in-Time Recovery for this database (one-way, explicit opt-in).
+    ///
+    /// Writes the durable `wal.manifest` whose presence marks the DB PITR-enabled
+    /// on every future open. Once enabled, the destructive [`Self::truncate_wal`]
+    /// is forbidden so the WAL record ordinal stays a stable durable LSN (segment
+    /// sealing — the PITR-safe space-reclaim — lands in a later phase). Idempotent.
+    pub fn enable_point_in_time_recovery(&self) -> Result<()> {
+        if self.pitr_enabled.load(Ordering::SeqCst) {
+            return Ok(()); // already enabled
+        }
+        // Persist the durable manifest FIRST; only flip the in-memory flag after
+        // the durable write succeeds. Otherwise a failed manifest write would
+        // leave `durability_capabilities()` reporting PITR (and the truncate
+        // guard active) with no durable anchor on disk.
+        let lsn = self.last_checkpoint_lsn.load(Ordering::SeqCst);
+        if crate::wal_manifest::WalManifest::exists(&self.path) {
+            self.persist_pitr_manifest(lsn)?;
+        } else {
+            crate::wal_manifest::WalManifest::new(lsn).write_atomic(&self.path)?;
+        }
+        self.pitr_enabled.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+
+    /// Persist the PITR manifest with the given checkpoint LSN, preserving the
+    /// existing db identity if a manifest is already present.
+    fn persist_pitr_manifest(&self, lsn: u64) -> Result<()> {
+        let manifest = match crate::wal_manifest::WalManifest::load(&self.path) {
+            Ok(mut m) => {
+                m.last_checkpoint_lsn = lsn;
+                m
+            }
+            Err(_) => crate::wal_manifest::WalManifest::new(lsn),
+        };
+        manifest.write_atomic(&self.path)
     }
 
     /// Truncate the WAL file after checkpoint.
@@ -3106,7 +3538,18 @@ impl DurableStorage {
     ///
     /// Call after `checkpoint()` when WAL durability across restarts is
     /// not required (e.g. desktop telemetry viewers, caches).
+    ///
+    /// Refused when PITR is enabled: truncation resets the WAL record ordinal,
+    /// which would break the durable monotonic LSN that PITR anchors on. The
+    /// PITR-safe way to reclaim space is segment sealing (a later phase).
     pub fn truncate_wal(&self) -> Result<()> {
+        if self.pitr_enabled.load(Ordering::SeqCst) {
+            return Err(SochDBError::InvalidArgument(
+                "truncate_wal is disabled while Point-in-Time Recovery is enabled \
+                 (it would reset the durable LSN); use segment sealing to reclaim space"
+                    .to_string(),
+            ));
+        }
         self.wal.truncate()
     }
 
@@ -3149,6 +3592,62 @@ impl DurableStorage {
 impl Drop for DurableStorage {
     fn drop(&mut self) {
         let _ = self.shutdown();
+    }
+}
+
+// =============================================================================
+// EphemeralHandle - Temp-directory-backed DurableStorage for testing
+// =============================================================================
+
+/// Owns a `DurableStorage` instance backed by a temporary directory.
+///
+/// The temp directory is automatically cleaned up when this handle is dropped.
+/// Access the underlying storage via `Deref` coercion or `.storage()`.
+///
+/// # Why this exists
+///
+/// SochDB previously had two storage engines — `LscsStorage` (BTreeMap-backed,
+/// in-memory WAL, used by tests) and `DurableStorage` (SkipMap-backed, real WAL,
+/// used in production). This dual-engine architecture meant bugs could surface
+/// only in production because the test path exercised different code.
+///
+/// `EphemeralHandle` eliminates this divergence: tests use the exact same
+/// `DurableStorage` engine as production, just backed by a temp directory.
+pub struct EphemeralHandle {
+    storage: DurableStorage,
+    _tmpdir: tempfile::TempDir,
+}
+
+impl EphemeralHandle {
+    /// Get a reference to the underlying storage
+    pub fn storage(&self) -> &DurableStorage {
+        &self.storage
+    }
+
+    /// Get a mutable reference to the underlying storage
+    pub fn storage_mut(&mut self) -> &mut DurableStorage {
+        &mut self.storage
+    }
+
+    /// Consume the handle and return the storage and temp directory.
+    ///
+    /// Useful when you need an `Arc<DurableStorage>` — the caller must keep
+    /// the `TempDir` alive for the lifetime of the storage.
+    pub fn into_parts(self) -> (DurableStorage, tempfile::TempDir) {
+        (self.storage, self._tmpdir)
+    }
+}
+
+impl std::ops::Deref for EphemeralHandle {
+    type Target = DurableStorage;
+    fn deref(&self) -> &DurableStorage {
+        &self.storage
+    }
+}
+
+impl std::ops::DerefMut for EphemeralHandle {
+    fn deref_mut(&mut self) -> &mut DurableStorage {
+        &mut self.storage
     }
 }
 
@@ -3238,6 +3737,104 @@ mod tests {
     }
 
     #[test]
+    fn test_gc_preserves_versions_for_active_snapshot() {
+        // GC must not free a version that an in-flight reader's snapshot can
+        // still observe. The low-water-mark (min_active_snapshot) is the oldest
+        // live reader; any version visible to it must survive GC.
+        let dir = tempdir().unwrap();
+        let storage = DurableStorage::open(dir.path()).unwrap();
+
+        // Seed an initial committed version v1.
+        let t1 = storage.begin_transaction().unwrap();
+        storage.write(t1, b"k".to_vec(), b"v1".to_vec()).unwrap();
+        storage.commit(t1).unwrap();
+
+        // Open a long-lived snapshot reader BEFORE any newer writes. Its
+        // snapshot_ts pins the GC watermark so v1 cannot be reclaimed.
+        let reader = storage.begin_transaction().unwrap();
+        assert_eq!(
+            storage.read(reader, b"k").unwrap(),
+            Some(b"v1".to_vec()),
+            "reader's snapshot must see v1"
+        );
+
+        // Produce several newer committed versions while the reader is active.
+        for v in ["v2", "v3", "v4"] {
+            let w = storage.begin_transaction().unwrap();
+            storage
+                .write(w, b"k".to_vec(), v.as_bytes().to_vec())
+                .unwrap();
+            storage.commit(w).unwrap();
+        }
+
+        // Run GC. Because `reader` is still active, the watermark is pinned at
+        // its snapshot and the version it needs (v1) must NOT be freed.
+        let _freed = storage.gc();
+        assert_eq!(
+            storage.read(reader, b"k").unwrap(),
+            Some(b"v1".to_vec()),
+            "GC must not free a version still visible to an active snapshot"
+        );
+
+        // A fresh transaction sees the latest committed version.
+        let fresh = storage.begin_transaction().unwrap();
+        assert_eq!(storage.read(fresh, b"k").unwrap(), Some(b"v4".to_vec()));
+        storage.abort(fresh).unwrap();
+
+        // Release the old reader; the watermark can now advance.
+        storage.abort(reader).unwrap();
+
+        // After the old snapshot is gone, GC may reclaim superseded versions,
+        // and new readers still resolve the latest value correctly.
+        let _freed2 = storage.gc();
+        let after = storage.begin_transaction().unwrap();
+        assert_eq!(storage.read(after, b"k").unwrap(), Some(b"v4".to_vec()));
+        storage.abort(after).unwrap();
+    }
+
+    #[test]
+    fn test_ssi_detects_write_skew() {
+        // Classic write-skew: two concurrent transactions each read what the
+        // other writes (disjoint write keys). Under plain SI both would commit,
+        // violating serializability. Under SSI the pivot transaction (with both
+        // an inbound and an outbound rw-edge) must be aborted, so the two
+        // commits cannot both succeed.
+        let dir = tempdir().unwrap();
+        let storage = DurableStorage::open(dir.path()).unwrap();
+
+        // Seed two keys.
+        let seed = storage.begin_transaction().unwrap();
+        storage.write(seed, b"x".to_vec(), b"0".to_vec()).unwrap();
+        storage.write(seed, b"y".to_vec(), b"0".to_vec()).unwrap();
+        storage.commit(seed).unwrap();
+
+        // T1 reads x and y, then writes x.
+        let t1 = storage.begin_transaction().unwrap();
+        let _ = storage.read(t1, b"x").unwrap();
+        let _ = storage.read(t1, b"y").unwrap();
+
+        // T2 reads x and y, then writes y. (Concurrent with T1.)
+        let t2 = storage.begin_transaction().unwrap();
+        let _ = storage.read(t2, b"x").unwrap();
+        let _ = storage.read(t2, b"y").unwrap();
+
+        storage.write(t1, b"x".to_vec(), b"1".to_vec()).unwrap();
+        storage.write(t2, b"y".to_vec(), b"1".to_vec()).unwrap();
+
+        // First committer wins.
+        let c1 = storage.commit(t1);
+        assert!(c1.is_ok(), "first committer should succeed: {c1:?}");
+
+        // The second committer forms a dangerous rw-structure with T1 and must
+        // be rejected to preserve serializability.
+        let c2 = storage.commit(t2);
+        assert!(
+            c2.is_err(),
+            "SSI must abort the write-skew pivot, but commit succeeded"
+        );
+    }
+
+    #[test]
     fn test_abort_transaction() {
         let dir = tempdir().unwrap();
         let storage = DurableStorage::open(dir.path()).unwrap();
@@ -3292,6 +3889,535 @@ mod tests {
             let v = storage.read(txn, b"persist").unwrap();
             assert_eq!(v, Some(b"data".to_vec()));
             storage.abort(txn).unwrap();
+        }
+    }
+
+    /// At-rest encryption end-to-end through the live DurableStorage engine
+    /// (Task 3B): an encrypted DB round-trips committed data, never leaks
+    /// plaintext to the WAL file, flips the per-instance durability matrix, and
+    /// fails CLOSED on a wrong or missing key (never a silent plaintext/empty
+    /// open).
+    #[test]
+    fn test_at_rest_encryption_end_to_end() {
+        let dir = tempdir().unwrap();
+        let kek = || EncryptionKey::new([0xABu8; 32]);
+
+        // Phase 1: create an encrypted DB, write committed data, clean close.
+        {
+            let storage = DurableStorage::open_with_encryption(
+                dir.path(),
+                true,
+                MemTableType::Standard,
+                StorageEncryption::with_kek(kek(), "test"),
+            )
+            .unwrap();
+            assert!(storage.is_encrypted());
+            assert!(storage.durability_capabilities().at_rest_encryption);
+            storage.set_sync_mode(2);
+            let t = storage.begin_transaction().unwrap();
+            storage
+                .write(t, b"secret-key".to_vec(), b"secret-value".to_vec())
+                .unwrap();
+            storage.commit(t).unwrap();
+        } // clean drop releases the file lock
+
+        // The keyring exists and the WAL bytes do not leak the plaintext record.
+        assert!(dir.path().join("keyring.json").exists());
+        let raw = std::fs::read(dir.path().join("wal.log")).unwrap();
+        assert!(!contains(&raw, b"secret-value"), "value leaked to WAL");
+        assert!(!contains(&raw, b"secret-key"), "key leaked to WAL");
+
+        // Phase 2: reopen with the CORRECT key, recover, read back.
+        {
+            let storage = DurableStorage::open_with_encryption(
+                dir.path(),
+                true,
+                MemTableType::Standard,
+                StorageEncryption::with_kek(kek(), "test"),
+            )
+            .unwrap();
+            storage.recover().unwrap();
+            let t = storage.begin_transaction().unwrap();
+            assert_eq!(
+                storage.read(t, b"secret-key").unwrap(),
+                Some(b"secret-value".to_vec()),
+                "committed encrypted data must round-trip"
+            );
+            storage.abort(t).unwrap();
+        }
+
+        // Phase 3: WRONG key must fail closed (keyring canary), not open empty.
+        {
+            let wrong = DurableStorage::open_with_encryption(
+                dir.path(),
+                true,
+                MemTableType::Standard,
+                StorageEncryption::with_kek(EncryptionKey::new([0x00u8; 32]), "test"),
+            );
+            assert!(wrong.is_err(), "wrong KEK must fail closed");
+        }
+
+        // Phase 4: opening an encrypted DB with NO key must fail closed.
+        {
+            let no_key = DurableStorage::open_with_encryption(
+                dir.path(),
+                true,
+                MemTableType::Standard,
+                StorageEncryption::disabled(),
+            );
+            assert!(
+                no_key.is_err(),
+                "encrypted DB opened without key must fail closed"
+            );
+        }
+    }
+
+    /// A plaintext DB reports at_rest_encryption=false on the live matrix.
+    #[test]
+    fn test_plaintext_db_reports_unencrypted() {
+        let dir = tempdir().unwrap();
+        let storage = DurableStorage::open_without_lock(dir.path()).unwrap();
+        assert!(!storage.is_encrypted());
+        assert!(!storage.durability_capabilities().at_rest_encryption);
+        assert!(storage.durability_capabilities().crash_recovery);
+        assert!(!dir.path().join("keyring.json").exists());
+    }
+
+    fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+        haystack.windows(needle.len()).any(|w| w == needle)
+    }
+
+    /// PITR phase 1 — durable monotonic LSN anchor.
+    ///
+    /// Enabling PITR writes the durable manifest; the WAL record ordinal (LSN)
+    /// and the last-checkpoint LSN then survive a reopen, and the destructive
+    /// truncate is refused so the anchor can never reset. A non-PITR DB is
+    /// completely unaffected (no manifest, truncate works).
+    #[test]
+    fn test_pitr_durable_lsn_and_truncate_guard() {
+        let dir = tempdir().unwrap();
+
+        // Default DB: not PITR, no manifest, truncate allowed.
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            assert!(!s.is_pitr_enabled());
+            assert!(!s.durability_capabilities().point_in_time_recovery);
+            assert!(s.truncate_wal().is_ok());
+        }
+        assert!(!dir.path().join("wal.manifest").exists());
+
+        // Enable PITR, write+checkpoint, capture the LSN.
+        let lsn_before;
+        let ckpt_lsn;
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            s.enable_point_in_time_recovery().unwrap();
+            assert!(s.is_pitr_enabled());
+
+            let t = s.begin_transaction().unwrap();
+            s.write(t, b"k1".to_vec(), b"v1".to_vec()).unwrap();
+            s.commit(t).unwrap();
+            ckpt_lsn = s.checkpoint().unwrap();
+            lsn_before = s.current_lsn();
+            assert!(lsn_before > 0);
+
+            // truncate is refused while PITR is on.
+            assert!(
+                s.truncate_wal().is_err(),
+                "truncate must be refused in PITR mode"
+            );
+        }
+        assert!(dir.path().join("wal.manifest").exists());
+
+        // Reopen: PITR auto-detected from the manifest; LSN did NOT reset.
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            assert!(
+                s.is_pitr_enabled(),
+                "PITR must be auto-detected from manifest"
+            );
+            s.recover().unwrap();
+            assert_eq!(
+                s.current_lsn(),
+                lsn_before,
+                "durable LSN must survive reopen (not reset to 0/record-recount drift)"
+            );
+            assert_eq!(
+                s.stats().last_checkpoint_lsn,
+                ckpt_lsn,
+                "last_checkpoint_lsn must be restored from the manifest"
+            );
+            // Committed data still readable.
+            let t = s.begin_transaction().unwrap();
+            assert_eq!(s.read(t, b"k1").unwrap(), Some(b"v1".to_vec()));
+            s.abort(t).unwrap();
+        }
+    }
+
+    /// PITR phase 2 — END-TO-END restore to a point in time.
+    ///
+    /// Enable PITR, commit two transactions, then on fresh reopens
+    /// `recover_to(target)` materializes the exact historical state: an LSN cut
+    /// between the two transactions sees only the first; the full LSN / a
+    /// far-future timestamp sees both; timestamp 0 sees nothing. Transaction
+    /// atomicity is preserved at the cut.
+    #[test]
+    fn test_pitr_recover_to_point_in_time() {
+        use crate::txn_wal::RecoveryTarget;
+
+        let dir = tempdir().unwrap();
+
+        // Build history: txn1 sets k1=v1; txn2 overwrites k1=v1b and adds k2=v2.
+        let (lsn_after_txn1, lsn_after_txn2);
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            s.enable_point_in_time_recovery().unwrap();
+
+            let t1 = s.begin_transaction().unwrap();
+            s.write(t1, b"k1".to_vec(), b"v1".to_vec()).unwrap();
+            s.commit(t1).unwrap();
+            lsn_after_txn1 = s.current_lsn();
+
+            let t2 = s.begin_transaction().unwrap();
+            s.write(t2, b"k1".to_vec(), b"v1b".to_vec()).unwrap();
+            s.write(t2, b"k2".to_vec(), b"v2".to_vec()).unwrap();
+            s.commit(t2).unwrap();
+            lsn_after_txn2 = s.current_lsn();
+
+            s.checkpoint().unwrap();
+        }
+        assert!(lsn_after_txn2 > lsn_after_txn1);
+
+        // Restore to the cut between txn1 and txn2: only txn1's effect is visible.
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            s.recover_to(RecoveryTarget::Lsn(lsn_after_txn1)).unwrap();
+            let t = s.begin_transaction().unwrap();
+            assert_eq!(
+                s.read(t, b"k1").unwrap(),
+                Some(b"v1".to_vec()),
+                "txn1 value"
+            );
+            assert_eq!(
+                s.read(t, b"k2").unwrap(),
+                None,
+                "txn2 must NOT be present at the cut"
+            );
+            s.abort(t).unwrap();
+        }
+
+        // Restore to the full LSN: both transactions visible (txn2 wins on k1).
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            s.recover_to(RecoveryTarget::Lsn(lsn_after_txn2)).unwrap();
+            let t = s.begin_transaction().unwrap();
+            assert_eq!(s.read(t, b"k1").unwrap(), Some(b"v1b".to_vec()));
+            assert_eq!(s.read(t, b"k2").unwrap(), Some(b"v2".to_vec()));
+            s.abort(t).unwrap();
+        }
+
+        // Timestamp bounds: MAX => everything; 0 => nothing.
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            s.recover_to(RecoveryTarget::Timestamp(u64::MAX)).unwrap();
+            let t = s.begin_transaction().unwrap();
+            assert_eq!(s.read(t, b"k1").unwrap(), Some(b"v1b".to_vec()));
+            assert_eq!(s.read(t, b"k2").unwrap(), Some(b"v2".to_vec()));
+            s.abort(t).unwrap();
+        }
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            s.recover_to(RecoveryTarget::Timestamp(0)).unwrap();
+            let t = s.begin_transaction().unwrap();
+            assert_eq!(s.read(t, b"k1").unwrap(), None, "no commit is <= ts 0");
+            s.abort(t).unwrap();
+        }
+
+        // The capability matrix now reports PITR live for this DB.
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            assert!(s.durability_capabilities().point_in_time_recovery);
+        }
+    }
+
+    /// recover_to is refused on a non-PITR database (the WAL may be truncated, so
+    /// an arbitrary target cannot be honored).
+    #[test]
+    fn test_recover_to_refused_without_pitr() {
+        use crate::txn_wal::RecoveryTarget;
+        let dir = tempdir().unwrap();
+        let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+        assert!(s.recover_to(RecoveryTarget::Lsn(1)).is_err());
+        assert!(!s.durability_capabilities().point_in_time_recovery);
+    }
+
+    /// Regression (review HIGH): under the DEFAULT NORMAL sync mode a commit
+    /// record may sit unflushed in the BufWriter while current_lsn() counts it.
+    /// recover_to MUST flush+fsync before replaying, or a same-process restore to
+    /// the captured LSN silently drops the committed-but-unflushed tail.
+    #[test]
+    fn test_recover_to_flushes_before_replay() {
+        use crate::txn_wal::RecoveryTarget;
+        let dir = tempdir().unwrap();
+        let s = DurableStorage::open_without_lock(dir.path()).unwrap(); // NORMAL sync
+        s.enable_point_in_time_recovery().unwrap();
+        let t = s.begin_transaction().unwrap();
+        s.write(t, b"k".to_vec(), b"v".to_vec()).unwrap();
+        s.commit(t).unwrap(); // commit record likely unflushed under NORMAL
+        let lsn = s.current_lsn();
+        // No checkpoint, SAME process: replay reads a fresh on-disk handle.
+        let stats = s.recover_to(RecoveryTarget::Lsn(lsn)).unwrap();
+        assert!(
+            stats.writes_recovered >= 1,
+            "committed-but-unflushed data must be recovered (flush before replay)"
+        );
+    }
+
+    /// Regression (review MEDIUM): recover_to must be the SOLE recovery on a
+    /// fresh open. After recover() (or a prior recover_to) it must refuse, rather
+    /// than silently layer a stale set over the point-in-time state.
+    #[test]
+    fn test_recover_to_refuses_after_recovery() {
+        use crate::txn_wal::RecoveryTarget;
+        let dir = tempdir().unwrap();
+        {
+            let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+            s.enable_point_in_time_recovery().unwrap();
+            let t = s.begin_transaction().unwrap();
+            s.write(t, b"k".to_vec(), b"v".to_vec()).unwrap();
+            s.commit(t).unwrap();
+            s.checkpoint().unwrap();
+        }
+        let s = DurableStorage::open_without_lock(dir.path()).unwrap();
+        s.recover().unwrap(); // full recovery first
+        assert!(
+            s.recover_to(RecoveryTarget::Lsn(1)).is_err(),
+            "recover_to after recover() must refuse (would double-apply)"
+        );
+        // And a second recover_to after a first also refuses.
+        let s2 = DurableStorage::open_without_lock(dir.path()).unwrap();
+        s2.recover_to(RecoveryTarget::Lsn(u64::MAX)).unwrap();
+        assert!(s2.recover_to(RecoveryTarget::Lsn(1)).is_err());
+    }
+
+    /// recover_to over an ENCRYPTED WAL: the bounded replay decrypts correctly
+    /// (review LOW: the encrypted bounded path was previously untested).
+    #[test]
+    fn test_pitr_recover_to_encrypted() {
+        use crate::encryption::EncryptionKey;
+        use crate::txn_wal::RecoveryTarget;
+
+        let dir = tempdir().unwrap();
+        let kek = [0x9Fu8; 32];
+        let mk = || StorageEncryption::with_kek(EncryptionKey::new(kek), "test");
+
+        let lsn_after_txn1;
+        {
+            let s = DurableStorage::open_with_encryption(
+                dir.path(),
+                true,
+                MemTableType::Standard,
+                mk(),
+            )
+            .unwrap();
+            s.enable_point_in_time_recovery().unwrap();
+            let t1 = s.begin_transaction().unwrap();
+            s.write(t1, b"k1".to_vec(), b"v1".to_vec()).unwrap();
+            s.commit(t1).unwrap();
+            lsn_after_txn1 = s.current_lsn();
+            let t2 = s.begin_transaction().unwrap();
+            s.write(t2, b"k2".to_vec(), b"v2".to_vec()).unwrap();
+            s.commit(t2).unwrap();
+            s.checkpoint().unwrap();
+            s.shutdown().ok();
+        }
+
+        // Reopen encrypted, restore to the cut between the two txns.
+        let s =
+            DurableStorage::open_with_encryption(dir.path(), true, MemTableType::Standard, mk())
+                .unwrap();
+        s.recover_to(RecoveryTarget::Lsn(lsn_after_txn1)).unwrap();
+        let t = s.begin_transaction().unwrap();
+        assert_eq!(
+            s.read(t, b"k1").unwrap(),
+            Some(b"v1".to_vec()),
+            "encrypted bounded replay must decrypt the in-window record"
+        );
+        assert_eq!(s.read(t, b"k2").unwrap(), None, "txn2 is past the cut");
+        s.abort(t).unwrap();
+    }
+
+    /// PITR composes with at-rest encryption (the manifest anchor is independent
+    /// of the keyring; an encrypted PITR DB round-trips and stays fail-closed).
+    #[test]
+    fn test_pitr_with_encryption() {
+        use crate::encryption::EncryptionKey;
+
+        let dir = tempdir().unwrap();
+        let kek = [0x2Bu8; 32];
+
+        {
+            let s = DurableStorage::open_with_encryption(
+                dir.path(),
+                true,
+                MemTableType::Standard,
+                StorageEncryption::with_kek(EncryptionKey::new(kek), "test"),
+            )
+            .unwrap();
+            s.enable_point_in_time_recovery().unwrap();
+            let t = s.begin_transaction().unwrap();
+            s.write(t, b"ek".to_vec(), b"ev".to_vec()).unwrap();
+            s.commit(t).unwrap();
+            s.checkpoint().unwrap();
+            s.shutdown().ok();
+        }
+        assert!(dir.path().join("keyring.json").exists());
+        assert!(dir.path().join("wal.manifest").exists());
+
+        // Reopen encrypted + PITR.
+        let s = DurableStorage::open_with_encryption(
+            dir.path(),
+            true,
+            MemTableType::Standard,
+            StorageEncryption::with_kek(EncryptionKey::new(kek), "test"),
+        )
+        .unwrap();
+        assert!(s.is_pitr_enabled());
+        assert!(s.is_encrypted());
+        s.recover().unwrap();
+        let t = s.begin_transaction().unwrap();
+        assert_eq!(s.read(t, b"ek").unwrap(), Some(b"ev".to_vec()));
+        s.abort(t).unwrap();
+    }
+
+    /// Crash-atomicity on an ENCRYPTED database: a simulated crash (forget) on an
+    /// encrypted WAL must, on reopen with the correct key, replay committed data
+    /// (decrypted via the crypto-aware recovery path) while NOT resurrecting
+    /// aborted/in-flight writes — and a wrong key after the crash fails closed.
+    /// Combines the at-rest-encryption + crash-atomicity guarantees.
+    #[test]
+    fn test_encrypted_crash_recovery_atomicity() {
+        use crate::encryption::EncryptionKey;
+        let dir = tempdir().unwrap();
+        let kek = || StorageEncryption::with_kek(EncryptionKey::new([0xC1u8; 32]), "test");
+        // open encrypted WITHOUT the file lock so a forget()+reopen works in-test.
+        let open = |enc: StorageEncryption| {
+            DurableStorage::open_with_full_config_internal(
+                dir.path(),
+                true,
+                MemTableType::Standard,
+                false,
+                enc,
+            )
+        };
+
+        {
+            let storage = open(kek()).unwrap();
+            assert!(storage.is_encrypted());
+            storage.set_sync_mode(2); // FULL: fsync each commit before the "crash"
+            let t1 = storage.begin_transaction().unwrap();
+            storage
+                .write(t1, b"committed".to_vec(), b"durable".to_vec())
+                .unwrap();
+            storage.commit(t1).unwrap();
+            let t2 = storage.begin_transaction().unwrap();
+            storage
+                .write(t2, b"aborted".to_vec(), b"x".to_vec())
+                .unwrap();
+            storage.abort(t2).unwrap();
+            let t3 = storage.begin_transaction().unwrap();
+            storage
+                .write(t3, b"inflight".to_vec(), b"y".to_vec())
+                .unwrap();
+            std::mem::forget(storage); // crash: skip clean shutdown
+        }
+
+        // Reopen with the CORRECT key: committed survives, others do not.
+        {
+            let storage = open(kek()).unwrap();
+            storage.recover().unwrap();
+            let t = storage.begin_transaction().unwrap();
+            assert_eq!(
+                storage.read(t, b"committed").unwrap(),
+                Some(b"durable".to_vec()),
+                "committed encrypted write must survive the crash"
+            );
+            assert_eq!(storage.read(t, b"aborted").unwrap(), None);
+            assert_eq!(storage.read(t, b"inflight").unwrap(), None);
+            storage.abort(t).unwrap();
+        }
+
+        // Wrong key after the crash must fail closed (keyring canary).
+        assert!(
+            open(StorageEncryption::with_kek(
+                EncryptionKey::new([0u8; 32]),
+                "test"
+            ))
+            .is_err(),
+            "wrong key after crash must fail closed"
+        );
+    }
+
+    /// Crash-atomicity invariant (Task 4 — completes the Task 1 single-writer
+    /// contract). `test_crash_recovery` proves committed data survives a crash;
+    /// this proves the other half: recovery must NOT resurrect aborted or
+    /// in-flight (never-committed) writes. Together they assert the live
+    /// single-writer engine's commit is atomic AND durable across a crash.
+    #[test]
+    fn test_crash_recovery_atomicity() {
+        let dir = tempdir().unwrap();
+
+        // Phase 1: one committed write, one aborted, one in-flight at crash.
+        {
+            let storage = DurableStorage::open_without_lock(dir.path()).unwrap();
+            storage.set_sync_mode(2); // FULL: fsync every commit before the "crash"
+
+            // Committed — must survive.
+            let t1 = storage.begin_transaction().unwrap();
+            storage
+                .write(t1, b"committed".to_vec(), b"durable".to_vec())
+                .unwrap();
+            storage.commit(t1).unwrap();
+
+            // Aborted — must NOT be resurrected.
+            let t2 = storage.begin_transaction().unwrap();
+            storage
+                .write(t2, b"aborted".to_vec(), b"rolledback".to_vec())
+                .unwrap();
+            storage.abort(t2).unwrap();
+
+            // In-flight (never committed) at crash time — must NOT be resurrected.
+            let t3 = storage.begin_transaction().unwrap();
+            storage
+                .write(t3, b"inflight".to_vec(), b"lost".to_vec())
+                .unwrap();
+
+            // Simulate a crash: skip Drop / clean shutdown.
+            std::mem::forget(storage);
+        }
+
+        // Phase 2: reopen + recover; assert atomicity.
+        {
+            let storage = DurableStorage::open_without_lock(dir.path()).unwrap();
+            storage.recover().unwrap();
+
+            let t = storage.begin_transaction().unwrap();
+            assert_eq!(
+                storage.read(t, b"committed").unwrap(),
+                Some(b"durable".to_vec()),
+                "committed write must survive the crash"
+            );
+            assert_eq!(
+                storage.read(t, b"aborted").unwrap(),
+                None,
+                "aborted write must not be resurrected by recovery"
+            );
+            assert_eq!(
+                storage.read(t, b"inflight").unwrap(),
+                None,
+                "uncommitted in-flight write must not be resurrected by recovery"
+            );
+            storage.abort(t).unwrap();
         }
     }
 
@@ -3566,12 +4692,14 @@ mod tests {
         assert_eq!(memtable.kind(), MemTableType::Standard);
 
         // Write and read
-        memtable.write(b"key1".to_vec(), Some(b"value1".to_vec()), 1).unwrap();
-        
+        memtable
+            .write(b"key1".to_vec(), Some(b"value1".to_vec()), 1)
+            .unwrap();
+
         // Commit transaction at ts=100
         let write_set = std::iter::once(InlineKey::from_slice(b"key1")).collect();
         memtable.commit(1, 100, &write_set);
-        
+
         // Read after commit - snapshot_ts must be > commit_ts for visibility
         let v = memtable.read(b"key1", 101, None);
         assert_eq!(v, Some(b"value1".to_vec()));
@@ -3583,12 +4711,14 @@ mod tests {
         assert_eq!(memtable.kind(), MemTableType::Arena);
 
         // Write and read
-        memtable.write(b"key1".to_vec(), Some(b"value1".to_vec()), 1).unwrap();
-        
+        memtable
+            .write(b"key1".to_vec(), Some(b"value1".to_vec()), 1)
+            .unwrap();
+
         // Commit at ts=100
         let write_set = std::iter::once(InlineKey::from_slice(b"key1")).collect();
         memtable.commit(1, 100, &write_set);
-        
+
         // Read after commit - snapshot_ts > commit_ts
         let v = memtable.read(b"key1", 101, None);
         assert_eq!(v, Some(b"value1".to_vec()));
@@ -3604,7 +4734,9 @@ mod tests {
             for i in 0..5 {
                 let key = format!("key{}", i);
                 let value = format!("value{}", i);
-                memtable.write(key.into_bytes(), Some(value.into_bytes()), 1).unwrap();
+                memtable
+                    .write(key.into_bytes(), Some(value.into_bytes()), 1)
+                    .unwrap();
             }
 
             // Commit all at ts=100
@@ -3615,7 +4747,12 @@ mod tests {
 
             // Scan range with snapshot_ts > commit_ts
             let results = memtable.scan_range(b"key1", b"key4", 101, None);
-            assert_eq!(results.len(), 3, "kind={:?} should have 3 results (key1, key2, key3)", kind);
+            assert_eq!(
+                results.len(),
+                3,
+                "kind={:?} should have 3 results (key1, key2, key3)",
+                kind
+            );
         }
     }
 
@@ -3623,12 +4760,14 @@ mod tests {
     fn test_durable_storage_arena() {
         let dir = tempdir().unwrap();
         let storage = DurableStorage::open_with_arena(dir.path()).unwrap();
-        
+
         assert_eq!(storage.memtable_type(), MemTableType::Arena);
 
         // Basic transaction should work the same
         let txn_id = storage.begin_transaction().unwrap();
-        storage.write(txn_id, b"key1".to_vec(), b"value1".to_vec()).unwrap();
+        storage
+            .write(txn_id, b"key1".to_vec(), b"value1".to_vec())
+            .unwrap();
         storage.commit(txn_id).unwrap();
 
         let txn2 = storage.begin_transaction().unwrap();
@@ -3640,14 +4779,11 @@ mod tests {
     #[test]
     fn test_durable_storage_full_config() {
         let dir = tempdir().unwrap();
-        
+
         // Test with Arena and ordered index enabled
-        let storage = DurableStorage::open_with_full_config(
-            dir.path(),
-            true,
-            MemTableType::Arena,
-        ).unwrap();
-        
+        let storage =
+            DurableStorage::open_with_full_config(dir.path(), true, MemTableType::Arena).unwrap();
+
         assert_eq!(storage.memtable_type(), MemTableType::Arena);
 
         // Write multiple keys
@@ -3655,7 +4791,9 @@ mod tests {
         for i in 0..10 {
             let key = format!("key{:02}", i);
             let value = format!("value{}", i);
-            storage.write(txn, key.into_bytes(), value.into_bytes()).unwrap();
+            storage
+                .write(txn, key.into_bytes(), value.into_bytes())
+                .unwrap();
         }
         storage.commit(txn).unwrap();
 

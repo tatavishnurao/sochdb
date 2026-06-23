@@ -39,8 +39,8 @@
 //! Recovery is O(|WAL| + |checkpoint|). The FSM tracks and exposes this
 //! to allow operators to configure appropriate probe timeouts.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use parking_lot::RwLock;
@@ -164,17 +164,17 @@ impl Default for BootBudgets {
     fn default() -> Self {
         Self {
             init_budget: Duration::from_secs(30),
-            migrate_budget: Duration::from_secs(300),   // 5 min for migrations
-            recover_budget: Duration::from_secs(1800),  // 30 min for WAL replay
-            warmup_budget: Duration::from_secs(300),    // 5 min for cache warmup
-            total_budget: Duration::from_secs(3600),    // 1 hour total
+            migrate_budget: Duration::from_secs(300), // 5 min for migrations
+            recover_budget: Duration::from_secs(1800), // 30 min for WAL replay
+            warmup_budget: Duration::from_secs(300),  // 5 min for cache warmup
+            total_budget: Duration::from_secs(3600),  // 1 hour total
         }
     }
 }
 
 impl BootBudgets {
     /// Create budgets suitable for Kubernetes startupProbe
-    /// 
+    ///
     /// K8s startupProbe checks are: failureThreshold × periodSeconds
     /// These budgets should be less than that product.
     pub fn for_kubernetes(startup_probe_total_seconds: u64) -> Self {
@@ -332,7 +332,16 @@ impl BootStateMachine {
 
     /// Get time remaining in current phase budget
     pub fn remaining_budget(&self) -> Duration {
-        let phase = *self.phase.read();
+        self.remaining_budget_for(*self.phase.read())
+    }
+
+    /// Remaining budget for an explicitly-supplied phase, WITHOUT locking
+    /// `self.phase`. Callers that already hold the `self.phase` lock (e.g.
+    /// `transition_to`, which holds the write guard) MUST use this and pass the
+    /// phase value they hold — calling the public `remaining_budget()` there
+    /// re-locks `self.phase` and self-deadlocks (parking_lot RwLock is not
+    /// reentrant).
+    fn remaining_budget_for(&self, phase: BootPhase) -> Duration {
         let elapsed = self.phase_start.read().elapsed();
         let budget = match phase {
             BootPhase::Init => self.budgets.init_budget,
@@ -418,13 +427,13 @@ impl BootStateMachine {
             });
         }
 
-        // Check budget exceeded
-        if self.remaining_budget() == Duration::ZERO && current.is_booting() {
+        // Check budget exceeded. Use the lock-free variant with the phase we
+        // already hold the write lock on — calling remaining_budget() here would
+        // re-read-lock self.phase and self-deadlock.
+        if self.remaining_budget_for(current) == Duration::ZERO && current.is_booting() {
             *phase = BootPhase::Failed;
-            *self.failure_reason.write() = Some(format!(
-                "Budget exceeded in phase {}",
-                current.name()
-            ));
+            *self.failure_reason.write() =
+                Some(format!("Budget exceeded in phase {}", current.name()));
             return Err(BootError {
                 phase: current,
                 message: "Phase budget exceeded".to_string(),
@@ -448,11 +457,7 @@ impl BootStateMachine {
     pub fn fail(&self, reason: &str) {
         let current = *self.phase.read();
         *self.phase.write() = BootPhase::Failed;
-        *self.failure_reason.write() = Some(format!(
-            "Failed in {}: {}",
-            current.name(),
-            reason
-        ));
+        *self.failure_reason.write() = Some(format!("Failed in {}: {}", current.name(), reason));
     }
 
     /// Get failure reason if failed
@@ -477,18 +482,26 @@ impl BootStateMachine {
 
     /// Record WAL replay progress
     pub fn record_wal_progress(&self, records: u64, bytes: u64) {
-        self.metrics.wal_records_replayed.fetch_add(records, Ordering::Relaxed);
-        self.metrics.wal_bytes_processed.fetch_add(bytes, Ordering::Relaxed);
+        self.metrics
+            .wal_records_replayed
+            .fetch_add(records, Ordering::Relaxed);
+        self.metrics
+            .wal_bytes_processed
+            .fetch_add(bytes, Ordering::Relaxed);
     }
 
     /// Record page recovery
     pub fn record_page_recovered(&self, count: u64) {
-        self.metrics.pages_recovered.fetch_add(count, Ordering::Relaxed);
+        self.metrics
+            .pages_recovered
+            .fetch_add(count, Ordering::Relaxed);
     }
 
     /// Record transaction rollback
     pub fn record_txn_rollback(&self, count: u64) {
-        self.metrics.txns_rolled_back.fetch_add(count, Ordering::Relaxed);
+        self.metrics
+            .txns_rolled_back
+            .fetch_add(count, Ordering::Relaxed);
     }
 
     /// Generate health check response for Kubernetes probes
@@ -546,7 +559,10 @@ impl HealthStatus {
             self.phase_elapsed_ms,
             self.total_elapsed_ms,
             self.remaining_budget_ms,
-            self.failure_reason.as_ref().map(|s| format!("\"{}\"", s.replace('"', "\\\""))).unwrap_or_else(|| "null".to_string()),
+            self.failure_reason
+                .as_ref()
+                .map(|s| format!("\"{}\"", s.replace('"', "\\\"")))
+                .unwrap_or_else(|| "null".to_string()),
             self.wal_records_replayed,
             self.wal_bytes_processed,
         )
@@ -673,8 +689,14 @@ mod tests {
         fsm.start_boot(RecoveryMode::Normal).unwrap();
 
         fsm.record_wal_progress(100, 4096);
-        assert_eq!(fsm.metrics().wal_records_replayed.load(Ordering::Relaxed), 100);
-        assert_eq!(fsm.metrics().wal_bytes_processed.load(Ordering::Relaxed), 4096);
+        assert_eq!(
+            fsm.metrics().wal_records_replayed.load(Ordering::Relaxed),
+            100
+        );
+        assert_eq!(
+            fsm.metrics().wal_bytes_processed.load(Ordering::Relaxed),
+            4096
+        );
     }
 
     #[test]
